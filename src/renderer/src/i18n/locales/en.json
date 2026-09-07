@@ -8540,7 +8540,7 @@
             "description": "Lifts terminal foreground colors that sit too close to the background. Leave blank for automatic, or set 1 to render program colors exactly as sent.",
             "automatic": "Automatic: {{light}} on light backgrounds, {{dark}} on dark.",
             "disabled": "Correction off. Programs that rely on low contrast, like Powerline separators, render as sent.",
-            "pinned": "Foreground colors are lifted until they reach {{ratio}}:1 against the background.",
+            "pinned": "Targets {{ratio}}:1 contrast for foreground colors, where possible.",
             "placeholder": "Auto",
             "suffix": "blank = automatic, 1 = off"
           }

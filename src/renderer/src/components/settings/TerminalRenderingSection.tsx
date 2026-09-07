@@ -33,7 +33,7 @@ function describeMinimumContrastRatio(value: number | undefined): string {
   }
   return translate(
     'auto.components.settings.TerminalPane.minimumContrast.pinned',
-    'Foreground colors are lifted until they reach {{ratio}}:1 against the background.',
+    'Targets {{ratio}}:1 contrast for foreground colors, where possible.',
     { ratio: value }
   )
 }
