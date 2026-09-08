@@ -107,9 +107,9 @@ export async function fetchAntigravityRateLimits(options?: {
   if (!port) {
     return unusableResult('unavailable', NOT_RUNNING_REASON)
   }
-  let body: string
+  let response: { statusCode: number; body: string }
   try {
-    body = await new Promise<string>((resolve, reject) => {
+    response = await new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
       const req = request(
         {
           host: '127.0.0.1',
@@ -126,9 +126,7 @@ export async function fetchAntigravityRateLimits(options?: {
           let chunks = ''
           res.setEncoding('utf8')
           res.on('data', (chunk: string) => (chunks += chunk))
-          res.on('end', () =>
-            res.statusCode === 200 ? resolve(chunks) : reject(new Error(`HTTP ${res.statusCode}`))
-          )
+          res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: chunks }))
         }
       )
       req.on('timeout', () => req.destroy(new Error('Timed out')))
@@ -138,8 +136,14 @@ export async function fetchAntigravityRateLimits(options?: {
   } catch {
     return unusableResult('unavailable', NOT_RUNNING_REASON)
   }
+  // Why: a status code means the server answered, so a drifted endpoint is unreadable quota, not a stopped app.
+  if (response.statusCode !== 200) {
+    return unusableResult('error', UNREADABLE_REASON)
+  }
   try {
-    const { session, weekly, buckets } = mapQuotaSummary(JSON.parse(body) as QuotaSummaryResponse)
+    const { session, weekly, buckets } = mapQuotaSummary(
+      JSON.parse(response.body) as QuotaSummaryResponse
+    )
     if (buckets.length === 0) {
       return unusableResult('error', UNREADABLE_REASON)
     }
