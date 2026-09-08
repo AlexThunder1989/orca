@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
-import { request } from 'node:https'
+import { request } from 'node:http'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type {
@@ -9,7 +9,8 @@ import type {
 } from '../../shared/rate-limit-types'
 
 const LOG_DIR = join(homedir(), '.gemini', 'antigravity-cli', 'log')
-const PORT_LINE = /listening on random port at (\d+) for HTTPS/g
+// Why: the server logs an HTTPS and an HTTP port; the HTTP one needs no certificate and no CSRF token.
+const PORT_LINE = /listening on random port at (\d+) for HTTP(?!S)/g
 const RPC_PATH = '/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary'
 const TIMEOUT_MS = 10_000
 const WINDOW_MINUTES: Record<string, number> = { '5h': 300, weekly: 10080 }
@@ -19,7 +20,6 @@ const UNREADABLE_REASON =
   'Antigravity usage is not available. The Antigravity language server answered without any readable quota.'
 
 type QuotaSummaryBucket = {
-  bucketId?: string
   window?: string
   remainingFraction?: number
   resetTime?: string
@@ -40,11 +40,7 @@ function unusableResult(status: 'unavailable' | 'error', error: string): Provide
   }
 }
 
-export function mapQuotaSummary(data: QuotaSummaryResponse): {
-  session: RateLimitWindow | null
-  weekly: RateLimitWindow | null
-  buckets: RateLimitBucket[]
-} {
+function mapBuckets(data: QuotaSummaryResponse): RateLimitBucket[] {
   const buckets: RateLimitBucket[] = []
   for (const group of data.response?.groups ?? []) {
     // Why: group names read "Gemini Models" / "Claude and GPT models"; the suffix is noise in a status bar.
@@ -64,6 +60,23 @@ export function mapQuotaSummary(data: QuotaSummaryResponse): {
       })
     }
   }
+  return buckets
+}
+
+/** Turns one RetrieveUserQuotaSummary reply into provider state. A server that answered is never "not running". */
+export function quotaRateLimitsFromResponse(statusCode: number, body: string): ProviderRateLimits {
+  if (statusCode !== 200) {
+    return unusableResult('error', UNREADABLE_REASON)
+  }
+  let buckets: RateLimitBucket[]
+  try {
+    buckets = mapBuckets(JSON.parse(body) as QuotaSummaryResponse)
+  } catch {
+    return unusableResult('error', UNREADABLE_REASON)
+  }
+  if (buckets.length === 0) {
+    return unusableResult('error', UNREADABLE_REASON)
+  }
   // Why: the pools are independent, so the headline window is the tightest one the user can hit.
   const tightest = (windowMinutes: number): RateLimitWindow | null => {
     const scoped = buckets.filter((bucket) => bucket.windowMinutes === windowMinutes)
@@ -75,7 +88,15 @@ export function mapQuotaSummary(data: QuotaSummaryResponse): {
     )
     return window
   }
-  return { session: tightest(300), weekly: tightest(10080), buckets }
+  return {
+    provider: 'antigravity',
+    session: tightest(300),
+    weekly: tightest(10080),
+    buckets,
+    updatedAt: Date.now(),
+    error: null,
+    status: 'ok'
+  }
 }
 
 async function readLanguageServerPort(): Promise<number | null> {
@@ -107,9 +128,8 @@ export async function fetchAntigravityRateLimits(options?: {
   if (!port) {
     return unusableResult('unavailable', NOT_RUNNING_REASON)
   }
-  let response: { statusCode: number; body: string }
   try {
-    response = await new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
+    return await new Promise<ProviderRateLimits>((resolve, reject) => {
       const req = request(
         {
           host: '127.0.0.1',
@@ -117,8 +137,7 @@ export async function fetchAntigravityRateLimits(options?: {
           path: RPC_PATH,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          // Why: the language server serves loopback-only HTTPS with a self-signed certificate.
-          rejectUnauthorized: false,
+          // Why: node:http rather than electron's net.fetch, so a configured proxy cannot intercept loopback.
           timeout: TIMEOUT_MS,
           signal: options?.signal
         },
@@ -126,7 +145,7 @@ export async function fetchAntigravityRateLimits(options?: {
           let chunks = ''
           res.setEncoding('utf8')
           res.on('data', (chunk: string) => (chunks += chunk))
-          res.on('end', () => resolve({ statusCode: res.statusCode ?? 0, body: chunks }))
+          res.on('end', () => resolve(quotaRateLimitsFromResponse(res.statusCode ?? 0, chunks)))
         }
       )
       req.on('timeout', () => req.destroy(new Error('Timed out')))
@@ -135,28 +154,5 @@ export async function fetchAntigravityRateLimits(options?: {
     })
   } catch {
     return unusableResult('unavailable', NOT_RUNNING_REASON)
-  }
-  // Why: a status code means the server answered, so a drifted endpoint is unreadable quota, not a stopped app.
-  if (response.statusCode !== 200) {
-    return unusableResult('error', UNREADABLE_REASON)
-  }
-  try {
-    const { session, weekly, buckets } = mapQuotaSummary(
-      JSON.parse(response.body) as QuotaSummaryResponse
-    )
-    if (buckets.length === 0) {
-      return unusableResult('error', UNREADABLE_REASON)
-    }
-    return {
-      provider: 'antigravity',
-      session,
-      weekly,
-      buckets,
-      updatedAt: Date.now(),
-      error: null,
-      status: 'ok'
-    }
-  } catch {
-    return unusableResult('error', UNREADABLE_REASON)
   }
 }

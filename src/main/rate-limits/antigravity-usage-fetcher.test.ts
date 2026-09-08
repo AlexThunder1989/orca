@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { mapQuotaSummary } from './antigravity-usage-fetcher'
+import { quotaRateLimitsFromResponse } from './antigravity-usage-fetcher'
 
 // Captured from RetrieveUserQuotaSummary on a Google AI Pro account.
-const RESPONSE = {
+const BODY = JSON.stringify({
   response: {
     groups: [
       {
@@ -28,27 +28,17 @@ const RESPONSE = {
       {
         displayName: 'Claude and GPT models',
         buckets: [
-          {
-            bucketId: '3p-weekly',
-            window: 'weekly',
-            remainingFraction: 1,
-            resetTime: '2026-09-14T22:50:12Z'
-          },
-          {
-            bucketId: '3p-5h',
-            window: '5h',
-            remainingFraction: 1,
-            resetTime: '2026-09-08T03:50:12Z'
-          }
+          { bucketId: '3p-weekly', window: 'weekly', remainingFraction: 1 },
+          { bucketId: '3p-5h', window: '5h', remainingFraction: 1 }
         ]
       }
     ]
   }
-}
+})
 
-describe('mapQuotaSummary', () => {
+describe('quotaRateLimitsFromResponse', () => {
   it('names a bucket per pool and window', () => {
-    expect(mapQuotaSummary(RESPONSE).buckets).toEqual([
+    expect(quotaRateLimitsFromResponse(200, BODY).buckets).toEqual([
       {
         name: 'Gemini Weekly',
         usedPercent: 80,
@@ -67,37 +57,43 @@ describe('mapQuotaSummary', () => {
         name: 'Claude and GPT Weekly',
         usedPercent: 0,
         windowMinutes: 10080,
-        resetsAt: Date.parse('2026-09-14T22:50:12Z'),
+        resetsAt: null,
         resetDescription: null
       },
       {
         name: 'Claude and GPT 5h',
         usedPercent: 0,
         windowMinutes: 300,
-        resetsAt: Date.parse('2026-09-08T03:50:12Z'),
+        resetsAt: null,
         resetDescription: null
       }
     ])
   })
 
   it('summarises each window with its most constrained pool', () => {
-    const { session, weekly } = mapQuotaSummary(RESPONSE)
-    expect(session?.usedPercent).toBe(23)
-    expect(session?.windowMinutes).toBe(300)
-    expect(weekly?.usedPercent).toBe(80)
-    expect(weekly?.windowMinutes).toBe(10080)
+    const limits = quotaRateLimitsFromResponse(200, BODY)
+    expect(limits.status).toBe('ok')
+    expect(limits.error).toBeNull()
+    expect(limits.session).toMatchObject({ usedPercent: 23, windowMinutes: 300 })
+    expect(limits.weekly).toMatchObject({ usedPercent: 80, windowMinutes: 10080 })
   })
 
-  it('skips buckets with an unknown window', () => {
-    const { session, weekly, buckets } = mapQuotaSummary({
-      response: {
-        groups: [
-          { displayName: 'Gemini Models', buckets: [{ window: 'daily', remainingFraction: 0.5 }] }
-        ]
-      }
-    })
-    expect(buckets).toEqual([])
-    expect(session).toBeNull()
-    expect(weekly).toBeNull()
+  // Why: the reachable-but-unreadable cases must never claim Antigravity is not running.
+  it.each([
+    ['a drifted endpoint', 404, BODY],
+    ['a server error', 500, ''],
+    ['malformed JSON', 200, '{'],
+    ['no groups', 200, '{"response":{}}'],
+    [
+      'only unknown windows',
+      200,
+      '{"response":{"groups":[{"buckets":[{"window":"daily","remainingFraction":0.5}]}]}}'
+    ]
+  ])('reports %s as an unreadable error', (_case, statusCode, body) => {
+    const limits = quotaRateLimitsFromResponse(statusCode, body)
+    expect(limits.status).toBe('error')
+    expect(limits.error).toContain('without any readable quota')
+    expect(limits.session).toBeNull()
+    expect(limits.weekly).toBeNull()
   })
 })
