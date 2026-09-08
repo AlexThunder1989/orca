@@ -167,7 +167,7 @@ export abstract class RateLimitServiceFullCyclePreparation extends RateLimitServ
             signal
           })),
       fetchGeminiRateLimits(geminiCliOAuthEnabled),
-      fetchAntigravityRateLimits(),
+      fetchAntigravityRateLimits({ signal }),
       fetchOpenCodeGoRateLimits(
         cookie,
         workspaceIdOverride || undefined,

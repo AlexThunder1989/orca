@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { request } from 'node:https'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -15,6 +15,8 @@ const TIMEOUT_MS = 10_000
 const WINDOW_MINUTES: Record<string, number> = { '5h': 300, weekly: 10080 }
 const NOT_RUNNING_REASON =
   'Antigravity usage is not available. Orca reads it from the Antigravity language server, which is only reachable while Antigravity is running.'
+const UNREADABLE_REASON =
+  'Antigravity usage is not available. The Antigravity language server answered without any readable quota.'
 
 type QuotaSummaryBucket = {
   bucketId?: string
@@ -25,6 +27,17 @@ type QuotaSummaryBucket = {
 
 type QuotaSummaryResponse = {
   response?: { groups?: { displayName?: string; buckets?: QuotaSummaryBucket[] }[] }
+}
+
+function unusableResult(status: 'unavailable' | 'error', error: string): ProviderRateLimits {
+  return {
+    provider: 'antigravity',
+    session: null,
+    weekly: null,
+    updatedAt: Date.now(),
+    error,
+    status
+  }
 }
 
 export function mapQuotaSummary(data: QuotaSummaryResponse): {
@@ -67,32 +80,36 @@ export function mapQuotaSummary(data: QuotaSummaryResponse): {
 
 async function readLanguageServerPort(): Promise<number | null> {
   const entries = await readdir(LOG_DIR).catch(() => [] as string[])
-  const newest = entries
-    .filter((name) => name.endsWith('.log'))
-    .sort()
-    .pop()
+  const logs = await Promise.all(
+    entries
+      .filter((name) => name.endsWith('.log'))
+      .map(async (name) => ({
+        name,
+        // Why: the port is random per launch, so the live server owns the log still being written to.
+        mtimeMs: await stat(join(LOG_DIR, name))
+          .then((stats) => stats.mtimeMs)
+          .catch(() => 0)
+      }))
+  )
+  const newest = logs.sort((a, b) => b.mtimeMs - a.mtimeMs).at(0)
   if (!newest) {
     return null
   }
-  const text = await readFile(join(LOG_DIR, newest), 'utf8').catch(() => '')
+  const text = await readFile(join(LOG_DIR, newest.name), 'utf8').catch(() => '')
   const ports = [...text.matchAll(PORT_LINE)]
   return ports.length > 0 ? Number(ports.at(-1)![1]) : null
 }
 
-export async function fetchAntigravityRateLimits(): Promise<ProviderRateLimits> {
+export async function fetchAntigravityRateLimits(options?: {
+  signal?: AbortSignal
+}): Promise<ProviderRateLimits> {
   const port = await readLanguageServerPort()
   if (!port) {
-    return {
-      provider: 'antigravity',
-      session: null,
-      weekly: null,
-      updatedAt: Date.now(),
-      error: NOT_RUNNING_REASON,
-      status: 'unavailable'
-    }
+    return unusableResult('unavailable', NOT_RUNNING_REASON)
   }
+  let body: string
   try {
-    const body = await new Promise<string>((resolve, reject) => {
+    body = await new Promise<string>((resolve, reject) => {
       const req = request(
         {
           host: '127.0.0.1',
@@ -102,7 +119,8 @@ export async function fetchAntigravityRateLimits(): Promise<ProviderRateLimits> 
           headers: { 'Content-Type': 'application/json' },
           // Why: the language server serves loopback-only HTTPS with a self-signed certificate.
           rejectUnauthorized: false,
-          timeout: TIMEOUT_MS
+          timeout: TIMEOUT_MS,
+          signal: options?.signal
         },
         (res) => {
           let chunks = ''
@@ -117,9 +135,13 @@ export async function fetchAntigravityRateLimits(): Promise<ProviderRateLimits> 
       req.on('error', reject)
       req.end('{}')
     })
+  } catch {
+    return unusableResult('unavailable', NOT_RUNNING_REASON)
+  }
+  try {
     const { session, weekly, buckets } = mapQuotaSummary(JSON.parse(body) as QuotaSummaryResponse)
     if (buckets.length === 0) {
-      throw new Error('No quota buckets returned')
+      return unusableResult('error', UNREADABLE_REASON)
     }
     return {
       provider: 'antigravity',
@@ -131,13 +153,6 @@ export async function fetchAntigravityRateLimits(): Promise<ProviderRateLimits> 
       status: 'ok'
     }
   } catch {
-    return {
-      provider: 'antigravity',
-      session: null,
-      weekly: null,
-      updatedAt: Date.now(),
-      error: NOT_RUNNING_REASON,
-      status: 'unavailable'
-    }
+    return unusableResult('error', UNREADABLE_REASON)
   }
 }
