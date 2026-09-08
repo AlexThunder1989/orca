@@ -78,7 +78,6 @@ describe('quotaRateLimitsFromResponse', () => {
     expect(limits.weekly).toMatchObject({ usedPercent: 80, windowMinutes: 10080 })
   })
 
-  // Why: the reachable-but-unreadable cases must never claim Antigravity is not running.
   it.each([
     ['a drifted endpoint', 404, BODY],
     ['a server error', 500, ''],

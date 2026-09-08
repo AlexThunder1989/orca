@@ -19,14 +19,13 @@ const NOT_RUNNING_REASON =
 const UNREADABLE_REASON =
   'Antigravity usage is not available. The Antigravity language server answered without any readable quota.'
 
-type QuotaSummaryBucket = {
-  window?: string
-  remainingFraction?: number
-  resetTime?: string
-}
-
 type QuotaSummaryResponse = {
-  response?: { groups?: { displayName?: string; buckets?: QuotaSummaryBucket[] }[] }
+  response?: {
+    groups?: {
+      displayName?: string
+      buckets?: { window?: string; remainingFraction?: number; resetTime?: string }[]
+    }[]
+  }
 }
 
 function unusableResult(status: 'unavailable' | 'error', error: string): ProviderRateLimits {
@@ -40,37 +39,32 @@ function unusableResult(status: 'unavailable' | 'error', error: string): Provide
   }
 }
 
-function mapBuckets(data: QuotaSummaryResponse): RateLimitBucket[] {
-  const buckets: RateLimitBucket[] = []
-  for (const group of data.response?.groups ?? []) {
-    // Why: group names read "Gemini Models" / "Claude and GPT models"; the suffix is noise in a status bar.
-    const pool = (group.displayName ?? '').replace(/\s*models$/i, '')
-    for (const bucket of group.buckets ?? []) {
-      const windowMinutes = WINDOW_MINUTES[bucket.window ?? '']
-      if (!windowMinutes || typeof bucket.remainingFraction !== 'number') {
-        continue
-      }
-      const resetsAt = bucket.resetTime ? new Date(bucket.resetTime).getTime() : Number.NaN
-      buckets.push({
-        name: `${pool} ${bucket.window === 'weekly' ? 'Weekly' : '5h'}`.trim(),
-        usedPercent: Math.min(100, Math.max(0, Math.round((1 - bucket.remainingFraction) * 100))),
-        windowMinutes,
-        resetsAt: Number.isNaN(resetsAt) ? null : resetsAt,
-        resetDescription: null
-      })
-    }
-  }
-  return buckets
-}
-
-/** Turns one RetrieveUserQuotaSummary reply into provider state. A server that answered is never "not running". */
+/** A server that answered is never reported as "not running". */
 export function quotaRateLimitsFromResponse(statusCode: number, body: string): ProviderRateLimits {
   if (statusCode !== 200) {
     return unusableResult('error', UNREADABLE_REASON)
   }
-  let buckets: RateLimitBucket[]
+  const buckets: RateLimitBucket[] = []
   try {
-    buckets = mapBuckets(JSON.parse(body) as QuotaSummaryResponse)
+    const data = JSON.parse(body) as QuotaSummaryResponse
+    for (const group of data.response?.groups ?? []) {
+      // Why: group names read "Gemini Models" / "Claude and GPT models"; the suffix is noise in a status bar.
+      const pool = (group.displayName ?? '').replace(/\s*models$/i, '')
+      for (const bucket of group.buckets ?? []) {
+        const windowMinutes = WINDOW_MINUTES[bucket.window ?? '']
+        if (!windowMinutes || typeof bucket.remainingFraction !== 'number') {
+          continue
+        }
+        const resetsAt = bucket.resetTime ? new Date(bucket.resetTime).getTime() : Number.NaN
+        buckets.push({
+          name: `${pool} ${bucket.window === 'weekly' ? 'Weekly' : '5h'}`.trim(),
+          usedPercent: Math.min(100, Math.max(0, Math.round((1 - bucket.remainingFraction) * 100))),
+          windowMinutes,
+          resetsAt: Number.isNaN(resetsAt) ? null : resetsAt,
+          resetDescription: null
+        })
+      }
+    }
   } catch {
     return unusableResult('error', UNREADABLE_REASON)
   }
