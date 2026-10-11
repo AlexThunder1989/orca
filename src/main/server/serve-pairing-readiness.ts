@@ -11,7 +11,10 @@ export async function buildServePairingReadiness(
     mobilePairing?: boolean
     grantDesktopControl?: boolean
   },
-  rpc: Pick<OrcaRuntimeRpcServer, 'getWebSocketEndpoint' | 'createPairingOffer'>
+  rpc: Pick<
+    OrcaRuntimeRpcServer,
+    'getWebSocketEndpoint' | 'createPairingOffer' | 'createMobilePairingOffer'
+  >
 ): Promise<Pick<ServeReadiness, 'boundEndpoint' | 'advertisedEndpoint' | 'pairing'>> {
   const boundEndpoint = rpc.getWebSocketEndpoint()
   const advertised = boundEndpoint
@@ -23,12 +26,18 @@ export async function buildServePairingReadiness(
         reason: 'disabled_by_operator',
         guidance: 'Restart without --no-pairing to create a client pairing offer.'
       } as const)
-    : rpc.createPairingOffer({
-        address: options.pairingAddress,
-        name: `${options.mobilePairing ? 'Mobile' : 'CLI'} ${new Date().toLocaleDateString()}`,
-        scope: options.mobilePairing ? 'mobile' : 'runtime',
-        grants: options.grantDesktopControl ? ['desktop-control'] : []
-      })
+    : options.mobilePairing
+      ? await rpc.createMobilePairingOffer({
+          address: options.pairingAddress,
+          connectionMode: 'automatic',
+          name: 'Mobile'
+        })
+      : rpc.createPairingOffer({
+          address: options.pairingAddress,
+          name: `CLI ${new Date().toLocaleDateString()}`,
+          scope: 'runtime',
+          grants: options.grantDesktopControl ? ['desktop-control'] : []
+        })
 
   return {
     boundEndpoint,

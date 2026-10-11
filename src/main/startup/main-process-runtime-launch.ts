@@ -169,6 +169,7 @@ async function launchServeMode(
   // Why: a phone paired to a headless host still registers and unregisters its token;
   // it simply never receives a push, because nothing dispatches notifications here.
   startDesktopPushService(runtimeRpc)
+  startDesktopRelayService(runtimeRpc)
   settleDesktopActivation()
   installServeQuitHandling()
   // Why: headless serve has no renderer to run the normal cli:install flow; do it here for macOS/Linux only (Windows-excluded: install() only mutates registry PATH, not child terminals).

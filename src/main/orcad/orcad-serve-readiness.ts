@@ -8,7 +8,10 @@ import type { OrcadOptions } from './orcad-entry'
 export async function buildOrcadServeReadiness(input: {
   options: OrcadOptions
   runtimeId: string
-  rpc: Pick<OrcaRuntimeRpcServer, 'getWebSocketEndpoint' | 'createPairingOffer'>
+  rpc: Pick<
+    OrcaRuntimeRpcServer,
+    'getWebSocketEndpoint' | 'createPairingOffer' | 'createMobilePairingOffer'
+  >
   collectHealth: () => Promise<OrcadHealth>
 }): Promise<ServeReadiness> {
   return {
