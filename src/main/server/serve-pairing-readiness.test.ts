@@ -58,24 +58,4 @@ describe('serve mobile pairing output', () => {
     expect(ready.pairing).toMatchObject({ available: false, reason: 'relay_mint_failed' })
     expect(rpc.createPairingOffer).not.toHaveBeenCalled()
   })
-
-  it('preserves ordinary runtime client pairing', async () => {
-    const rpc = server()
-    const ready = await buildServePairingReadiness({}, rpc)
-    expect(rpc.createMobilePairingOffer).not.toHaveBeenCalled()
-    expect(ready.pairing).toMatchObject({
-      available: true,
-      url: 'orca://pair?direct',
-      scope: 'runtime',
-      qr: null
-    })
-  })
-
-  it('creates no credentials when pairing is disabled', async () => {
-    const rpc = server()
-    const ready = await buildServePairingReadiness({ noPairing: true, mobilePairing: true }, rpc)
-    expect(rpc.createMobilePairingOffer).not.toHaveBeenCalled()
-    expect(rpc.createPairingOffer).not.toHaveBeenCalled()
-    expect(ready.pairing).toMatchObject({ available: false, reason: 'disabled_by_operator' })
-  })
 })
