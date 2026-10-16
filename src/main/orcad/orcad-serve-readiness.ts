@@ -8,14 +8,12 @@ import type { OrcadOptions } from './orcad-entry'
 export async function buildOrcadServeReadiness(input: {
   options: OrcadOptions
   runtimeId: string
-  rpc: Pick<
-    OrcaRuntimeRpcServer,
-    'getWebSocketEndpoint' | 'createPairingOffer' | 'createMobilePairingOffer'
-  >
+  rpc: Pick<OrcaRuntimeRpcServer, 'getWebSocketEndpoint' | 'createPairingOffer'>
   collectHealth: () => Promise<OrcadHealth>
 }): Promise<ServeReadiness> {
   return {
     runtimeId: input.runtimeId,
+    // Why no Relay: orcad runs no Relay service and pins its bind, so mobile pairing stays direct.
     ...(await buildServePairingReadiness(input.options, input.rpc)),
     // Why 'settled': the WSL CLI reconciliation barrier is a desktop-launch concern.
     // orcad never runs it, so there is no pending repair a client could race.
