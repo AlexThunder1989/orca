@@ -10,6 +10,7 @@ import { connectionManager } from './ssh-ipc-context'
 import { getPublicSshState } from './ssh-renderer-broadcast'
 import { disconnectRegisteredSshTarget } from './ssh-session-teardown'
 import { errorMessage } from '../../shared/error-message'
+import { clearSshCredentialDeclined, isSshCredentialDeclined } from '../ssh/ssh-credential-decline'
 
 export function registerSshConnectionHandlers(): void {
   setSshTargetRegistryHandlers({
@@ -17,8 +18,8 @@ export function registerSshConnectionHandlers(): void {
     getState: (targetId: string) => getPublicSshState(targetId)
   })
 
-  ipcMain.handle('ssh:connect', async (_event, args: { targetId: string }) => {
-    return connectTarget(args.targetId)
+  ipcMain.handle('ssh:connect', async (_event, args: { targetId: string; automatic?: boolean }) => {
+    return connectTarget(args.targetId, { automatic: args.automatic === true })
   })
 
   ipcMain.handle('ssh:disconnect', async (_event, args: { targetId: string }) => {
@@ -31,12 +32,14 @@ export function registerSshConnectionHandlers(): void {
 
   // Why: auto-connect callers need to know whether connecting will prompt; true when the last connect required a credential and no live conn has it cached.
   ipcMain.handle('ssh:needsPassphrasePrompt', (_event, args: { targetId: string }) => {
+    if (isSshCredentialDeclined(args.targetId)) {
+      return true
+    }
     const target = getSshTargetRegistryStore()!.getTarget(args.targetId)
     if (!target?.lastRequiredPassphrase) {
       return false
     }
-    const conn = connectionManager!.getConnection(args.targetId)
-    return !conn?.hasCachedCredential()
+    return !connectionManager!.hasCachedCredential(target)
   })
 
   ipcMain.handle('ssh:testConnection', async (_event, args: { targetId: string }) => {
@@ -44,6 +47,7 @@ export function registerSshConnectionHandlers(): void {
     if (!target) {
       throw new Error(`SSH target "${args.targetId}" not found`)
     }
+    clearSshCredentialDeclined(args.targetId)
 
     // Why: testConnection's disconnect() would tear down an in-flight connect's transport; await it instead.
     const inFlight = connectInFlight.get(args.targetId)

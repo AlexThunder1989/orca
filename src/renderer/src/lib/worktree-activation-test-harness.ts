@@ -46,13 +46,12 @@ export function registerWorktreeActivationReset(): void {
 export type MockActivationStore = {
   tabsByWorktree: Record<string, { id: string }[]>
   defaultTerminalTabsAppliedByWorktreeId: Record<string, true>
-  createTab: Mock<() => { id: string }>
+  createTab: Mock<(...args: unknown[]) => { id: string }>
   setActiveTab: Mock<() => void>
   setTabCustomTitle: Mock<() => void>
   setTabColor: Mock<() => void>
   markDefaultTerminalTabsApplied: Mock<() => void>
   reconcileWorktreeTabModel: Mock<() => { renderableTabCount: number }>
-  queueTabStartupCommand: Mock<() => void>
   queueTabInitialCwd: Mock<() => void>
   queueTabSetupSplit: Mock<() => void>
   queueTabIssueCommandSplit: Mock<() => void>
@@ -68,10 +67,27 @@ export function createMockStore(overrides: Record<string, unknown> = {}): MockAc
     setTabColor: vi.fn(),
     markDefaultTerminalTabsApplied: vi.fn(),
     reconcileWorktreeTabModel: vi.fn(() => ({ renderableTabCount: 0 })),
-    queueTabStartupCommand: vi.fn(),
     queueTabInitialCwd: vi.fn(),
     queueTabSetupSplit: vi.fn(),
     queueTabIssueCommandSplit: vi.fn(),
     ...overrides
   }
+}
+
+/** The startup command each created tab was published with, keyed by the created tab's id. */
+export function createdTabStartups(store: MockActivationStore): Record<string, unknown> {
+  const startups: Record<string, unknown> = {}
+  store.createTab.mock.calls.forEach((call, index) => {
+    const result = store.createTab.mock.results[index]
+    const options = call[3]
+    if (
+      result?.type === 'return' &&
+      options &&
+      typeof options === 'object' &&
+      'pendingStartup' in options
+    ) {
+      startups[result.value.id] = options.pendingStartup
+    }
+  })
+  return startups
 }

@@ -23,8 +23,12 @@ import {
 import { TRANSPORT_CONNECT_SETTLE_GRACE_MS } from './pty-connect-limits'
 import { buildPaneTransportOptions } from './pane-transport-options'
 import { createUnservedSshPaneTransport } from './unserved-ssh-pane-connect'
+import { createLegacyRelayBridgeTransport } from '../legacy-relay-bridge-transport'
+import { legacyRelayBridgePtyIdForPane } from '../legacy-relay-bridge-panes'
 
 import type { ConnectPanePtySession } from './connect-pane-pty-session'
+import type { PtyTransport } from '../pty-transport-types'
+import { isPassiveTerminalInputReport } from '../terminal-passive-input-report'
 import { resolveTerminalInlineImagesEnabled } from '../../../../../shared/terminal-inline-images-settings'
 
 /** Transport creation, terminal capability replies, viewport claims, and undeliverable-input recovery. */
@@ -54,7 +58,13 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
       : session.unservedSshTargetId
         ? createUnservedSshPaneTransport()
         : session.runtimeEnvironmentId
-          ? createRemoteRuntimePtyTransport(session.runtimeEnvironmentId, session.transportOptions)
+          ? withLegacyRelayBridge(
+              session,
+              createRemoteRuntimePtyTransport(
+                session.runtimeEnvironmentId,
+                session.transportOptions
+              )
+            )
           : createIpcPtyTransport(session.transportOptions)
   session.canSendDesktopQueryReply = (): boolean => {
     const ptyId = session.transport.getPtyId()
@@ -122,9 +132,14 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
     session.sendDesktopQueryReplyImmediate
   )
 
-  session.claimViewportForUserActivity = (): void => {
+  session.claimViewportForUserActivity = (input?: string): void => {
     const currentPtyId = session.transport.getPtyId()
     if (!currentPtyId || getFitOverrideForPty(currentPtyId)?.mode !== 'remote-desktop-fit') {
+      return
+    }
+    // Why: TUIs re-arm DECSET 1004 on every SIGWINCH and xterm answers with a focus report; claiming
+    // on it made two mirrors of different grids take the PTY from each other forever (#26469).
+    if (input !== undefined && isPassiveTerminalInputReport(input)) {
       return
     }
     let proposed: { cols: number; rows: number } | undefined
@@ -266,4 +281,21 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
       })
     }
   )
+}
+
+/** COMPAT(legacy-relay-bridge, revisit 2027-01-15): a pane an older Orca's relay still runs. */
+function withLegacyRelayBridge(session: ConnectPanePtySession, inner: PtyTransport): PtyTransport {
+  const leafId = session.deps.restoredLeafId ?? session.pane.leafId
+  const ptyId = legacyRelayBridgePtyIdForPane({
+    tabId: session.deps.tabId,
+    leafId,
+    boundPtyId:
+      (leafId ? session.deps.restoredPtyIdByLeafId?.[leafId] : undefined) ??
+      useAppStore
+        .getState()
+        .tabsByWorktree[session.deps.worktreeId]?.find((tab) => tab.id === session.deps.tabId)
+        ?.ptyId
+  })
+  session.legacyRelayBridgePtyId = ptyId
+  return ptyId ? createLegacyRelayBridgeTransport(ptyId, inner) : inner
 }

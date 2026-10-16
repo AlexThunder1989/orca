@@ -12,9 +12,9 @@ import {
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import {
   getProjectGroupingForRepo,
-  type ProjectGroupingIndex,
-  type WorktreeGroupEntry
-} from './project-grouping'
+  type ProjectGroupingIndex
+} from '../../../../../../shared/project-section-grouping'
+import type { WorktreeGroupEntry } from './worktree-group-entry'
 import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
 import type { RenderableFolderWorkspace } from './folder-workspace-lanes'
 

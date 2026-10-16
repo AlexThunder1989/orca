@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildRows } from './worktree-list/grouping/build-rows'
 import { getNoticeHostContextLabels } from './worktree-list/grouping/host-labels'
-import { buildProjectGroupingIndex } from './worktree-list/grouping/project-grouping'
+import { buildProjectGroupingIndex } from '../../../../shared/project-section-grouping'
 import { repo, worktree, project, projectHostSetups } from './worktree-list-groups-test-fixtures'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { ProjectHostSetup } from '../../../../shared/project-types'

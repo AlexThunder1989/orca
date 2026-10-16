@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto'
+import type { ExecutionHostId } from '../../shared/execution-host'
 import type { RuntimeTerminalOrphanAdoptionRequest } from '../../shared/runtime-types'
+import { loadWorkspaceLayoutWithoutReport } from '../../shared/workspace-layout/workspace-layout-load'
+import { nameBasedLoadContext } from '../../shared/workspace-layout/workspace-layout-minted-ids'
+import { saveWorkspaceLayout } from '../../shared/workspace-layout/workspace-layout-save'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
 import { collectPersistedTerminalLeafIds } from './mobile-session-layout-projection'
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
@@ -11,6 +15,7 @@ type Claim = RuntimeTerminalOrphanAdoptionRequest['claims'][number]
 type Topology = NonNullable<RuntimeTerminalOrphanAdoptionRequest['topology']>
 
 export function buildRuntimeTerminalOrphanSession(args: {
+  hostId: ExecutionHostId
   session: WorkspaceSessionState
   sessionWorktreeId: string
   worktreeId: string
@@ -21,6 +26,7 @@ export function buildRuntimeTerminalOrphanSession(args: {
   getDisplayTitle: (pty: RuntimePtyWorktreeRecord) => string | null
 }): WorkspaceSessionState {
   const {
+    hostId,
     session,
     sessionWorktreeId,
     worktreeId,
@@ -185,5 +191,8 @@ export function buildRuntimeTerminalOrphanSession(args: {
     [worktreeId]: activeGroup.id
   }
   const persisted = advanceTerminalTopologyRevision(next, worktreeId)
-  return persisted
+  // The shared serializer writes each adopted tab's tab-bar entry, which nothing else would.
+  return saveWorkspaceLayout(
+    loadWorkspaceLayoutWithoutReport(hostId, persisted, nameBasedLoadContext())
+  )
 }

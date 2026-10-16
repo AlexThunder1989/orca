@@ -14,9 +14,8 @@ import type {
 //
 // The control is not the count. A remount that mounts a pane which fails the
 // same way is not evidence that anything changed, so recovery gates on an
-// OBSERVED outcome, borrowing the direct-SSH pane retry vocabulary
-// (DirectSshPaneRetryResult): an attempt that has not settled blocks the next
-// one, and a settled failure refuses the same reason until a new trigger.
+// OBSERVED outcome: an attempt that has not settled blocks the next one, and a
+// settled failure refuses the same reason until a new trigger.
 
 // Backstop only — a breadcrumb-emitting ceiling for a loop the outcome gate
 // somehow failed to catch. The outcome gate is what stops a storm.

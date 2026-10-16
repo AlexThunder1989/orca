@@ -15,6 +15,7 @@ import {
 } from '../../shared/orcad-artifacts'
 import { shellEscape } from './ssh-connection-utils'
 import { RELAY_REMOTE_DIR } from './relay-protocol'
+import { ORCAD_MACHINE_HOMES_DIRNAME } from './orcad-machine-home'
 
 export type OrcadStdioBridgeMode = 'raw' | 'base64'
 
@@ -75,13 +76,21 @@ export const ORCAD_STDIO_BRIDGE_FUNCTION = `function orcadStdioBridge(port, mode
   })
 }`
 
-/** Any verified runtime in the store serves; orcad is running on one of them. */
+/**
+ * Any verified runtime serves; orcad is running on one of them. Machine homes on a shared `$HOME`
+ * (`orcad-machine-home.ts`) hold stores too, possibly for another architecture, so a runtime must
+ * start before the bridge execs it.
+ */
 export function orcadPosixStdioBridgeCommand(port: number): string {
   const script = `${ORCAD_STDIO_BRIDGE_FUNCTION}\norcadStdioBridge(Number(process.argv[1]), 'raw')`
-  const runtimes = `"$HOME"/${shellEscape(`${RELAY_REMOTE_DIR}/${ORCAD_RUNTIMES_DIRNAME}`)}`
+  const store = `${RELAY_REMOTE_DIR}/${ORCAD_RUNTIMES_DIRNAME}/${ORCAD_NODE_RUNTIME_DIR_PREFIX}`
+  const executable = `/${ORCAD_NODE_RUNTIME_POSIX_EXECUTABLE}`
+  const machineStores = `${RELAY_REMOTE_DIR}/${ORCAD_MACHINE_HOMES_DIRNAME}/`
   return [
-    `for runtime in ${runtimes}/${ORCAD_NODE_RUNTIME_DIR_PREFIX}*/${ORCAD_NODE_RUNTIME_POSIX_EXECUTABLE}; do`,
-    `if [ -x "$runtime" ]; then exec "$runtime" -e ${shellEscape(script)} ${String(port)}; fi;`,
+    `for runtime in "$HOME"/${shellEscape(store)}*${shellEscape(executable)}`,
+    `"$HOME"/${shellEscape(machineStores)}*/${shellEscape(store)}*${shellEscape(executable)}; do`,
+    `if [ -x "$runtime" ] && "$runtime" -e 0 >/dev/null 2>&1; then`,
+    `exec "$runtime" -e ${shellEscape(script)} ${String(port)}; fi;`,
     `done; echo ${shellEscape(ORCAD_STDIO_BRIDGE_NO_NODE)}; exit 127`
   ].join(' ')
 }

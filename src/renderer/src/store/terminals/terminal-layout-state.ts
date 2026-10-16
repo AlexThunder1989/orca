@@ -4,10 +4,8 @@ import {
   normalizeTerminalLayoutPtyOwnership,
   resolveTerminalLayoutPtyOwnershipTransfers
 } from '@/components/terminal-pane/terminal-layout-pty-ownership'
-import { transferDirectSshPaneDetachLedger } from '../slices/direct-ssh-terminal-authority-ledger'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
 import {
-  isCurrentDirectSshAuthority,
   resolvePrimaryLayoutPtyId,
   uniquePtyIds,
   withTerminalTabPtyId
@@ -151,17 +149,9 @@ export function createTerminalLayoutActions(
         const nextTabsByWorktree = detachedPtyId
           ? withTerminalTabPtyId(sourceTabsByWorktree, targetTabId, detachedPtyId)
           : sourceTabsByWorktree
-        const directSshLedger = transferDirectSshPaneDetachLedger(s, {
-          detachedPtyId,
-          sourcePtyId: sourcePrimaryPtyId,
-          sourceTabId,
-          targetTabId,
-          isAuthorityCurrent: (authority) => isCurrentDirectSshAuthority(s, authority)
-        })
         return {
           ptyIdsByTabId: nextPtyIdsByTabId,
           lastKnownRelayPtyIdByTabId: nextLastKnownRelayPtyIdByTabId,
-          ...directSshLedger,
           ...(nextTabsByWorktree !== s.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {})
         }
       })

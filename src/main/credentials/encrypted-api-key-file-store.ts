@@ -1,4 +1,4 @@
-import { guardedSafeStorage as safeStorage } from '../host/safe-storage-availability'
+import { getSecretStore } from '../../shared/secret-store'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -73,10 +73,10 @@ export function createEncryptedApiKeyFileStore({
     if (envelope.kind === 'plaintext') {
       return envelope.payload.toString('utf8')
     }
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!getSecretStore().isEncryptionAvailable()) {
       throw new Error(`${providerLabel} API key could not be decrypted`)
     }
-    return safeStorage.decryptString(envelope.payload)
+    return getSecretStore().decryptString(envelope.payload)
   }
 
   function has(): boolean {
@@ -115,10 +115,10 @@ export function createEncryptedApiKeyFileStore({
     if (!trimmed) {
       throw new Error(`${providerLabel} API key is required`)
     }
-    if (safeStorage.isEncryptionAvailable()) {
+    if (getSecretStore().isEncryptionAvailable()) {
       writeSecureFile(
         getApiKeyPath(),
-        encodeApiKeyEnvelope('encrypted', safeStorage.encryptString(trimmed)),
+        encodeApiKeyEnvelope('encrypted', getSecretStore().encryptString(trimmed)),
         { durable: true }
       )
       cachedApiKey = trimmed

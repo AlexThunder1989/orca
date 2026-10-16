@@ -8,9 +8,9 @@
  */
 import { logOrcadActivationOutcome } from './orcad-activation-outcome-log'
 import { join } from 'node:path'
-import type { SshConnection } from './ssh-connection'
+import type { OrcadHostTransport } from './orcad-host-transport'
 import { ORCAD_INSTALL_MODEL } from './remote-install-model'
-import { computeRemoteInstallDir, readLocalFullVersion } from './ssh-relay-versioned-install'
+import { computeRemoteInstallDir, readLocalFullVersion } from './remote-versioned-install'
 import { readOrcadActivationRecord } from './orcad-activation-record-store'
 import type { OrcadActivationRecord } from './orcad-activation-record'
 import type { OrcadActivationVerdict } from './orcad-activation-gate'
@@ -20,10 +20,10 @@ import { installOrcadBundle } from './orcad-remote-install'
 import { getAppEnvironment } from '../../shared/app-environment'
 import type { NodeRuntimeTarget } from '../../shared/node-runtime-pin'
 import { ORCAD_STARTUP_READINESS_TIMEOUT_MS } from '../../shared/orcad-profile-preflight'
-import { materializeOrcadArtifact } from './orcad-artifact-materializer'
+import { materializeOrcadArtifact } from '../orcad/orcad-artifact-materializer'
 import { readOrcadBundleTarget } from './orcad-deployment-target'
 import { resolveOrcadRuntimeTarget } from './orcad-runtime-target'
-import { materializeNodeRuntimeArchive } from './pinned-runtime-materializer'
+import { materializeNodeRuntimeArchive } from '../node-runtime/pinned-runtime-materializer'
 import {
   orcadActivationFenceExists,
   resolveOrcadActivationReadinessTimeout,
@@ -33,7 +33,7 @@ import { activateInstalledOrcad } from './orcad-installed-activation'
 import { orcadActivationFenceRefusal } from './orcad-activation-fence-hold'
 
 export type OrcadDeployOptions = {
-  conn: SshConnection
+  conn: OrcadHostTransport
   host: RemoteHostPlatform
   remoteHome: string
   /** An already assembled bundle; otherwise materialize the packaged template for this host. */
@@ -57,6 +57,11 @@ export type OrcadDeployOptions = {
    * incumbent found under the fence makes the census unverifiable rather than wrongly zero.
    */
   censusRecord?: OrcadActivationRecord
+  /**
+   * Counts again under the fence just before the incumbent stops, so a terminal opened during
+   * the upload still defers the update. Called only while the incumbent is the one counted.
+   */
+  recountCensus?: () => Promise<OrcadTerminalCensus>
   force?: boolean
   /** The Orca app version activating, recorded so an older client never downgrades the host. */
   appVersion?: string
@@ -66,6 +71,8 @@ export type OrcadDeployOptions = {
    */
   admitRecord?: (record: OrcadActivationRecord, candidateVersion: string) => string | null
   readinessTimeoutMs?: number
+  /** WSL only; SSH hosts always re-hash the runtime (see `installOrcadBundle`). */
+  recordedNodeRuntimeProbe?: boolean
   now?: () => Date
   sleep?: (ms: number) => Promise<void>
   signal?: AbortSignal

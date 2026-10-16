@@ -9,14 +9,14 @@ import { assertNotExists, rethrowWithUserMessage } from '../ipc/filesystem-creat
 import { classifyFilesystemDirectoryEntries } from '../ipc/filesystem-symlink-directory-entries'
 import { getLocalGitOptionsForRegisteredWorktree } from '../ipc/local-worktree-runtime-options'
 import { listMarkdownDocuments } from '../ipc/markdown-documents'
-import type { Store } from '../persistence'
+import type { RuntimeStore } from '../runtime/runtime-store-contract'
 import { runBundledRipgrepTextSearch } from '../ripgrep/bundled-ripgrep-text-search'
-import { parseWslPath } from '../wsl'
+import { resolveBundledRipgrepWslRouting } from '../ripgrep/bundled-ripgrep-wsl-routing'
 import type { IFilesystemProvider } from './filesystem-provider-contract'
 
 export type LocalFilesystemProviderOptions = {
   /** Read lazily so a call that fails earlier never touches the store. */
-  requireStore(): Store
+  requireStore(): RuntimeStore
   /** Injected: the auth layer reaches the host router, so importing it here would be a cycle. */
   resolveAuthorizedPath: typeof ResolveAuthorizedPath
 }
@@ -134,17 +134,16 @@ export function createLocalFilesystemProvider(
         signal
       )
       throwIfSignalAborted(signal)
-      const { wslDistro } = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        searchOptions.rootPath,
-        rootPath
+      const { wslDistro, wslDistroForOutput } = resolveBundledRipgrepWslRouting(
+        rootPath,
+        getLocalGitOptionsForRegisteredWorktree(store, searchOptions.rootPath, rootPath).wslDistro
       )
       return runBundledRipgrepTextSearch({
         options: searchOptions,
         rootPath,
         resultRootPath: rootPath,
         wslDistro,
-        wslDistroForOutput: parseWslPath(rootPath)?.distro ?? wslDistro,
+        wslDistroForOutput,
         signal,
         // Why: request abort owns cancellation; only the renderer IPC search keeps a by-id registry.
         onSpawn: () => () => undefined

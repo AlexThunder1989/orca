@@ -19,7 +19,10 @@ import {
   getWorkspaceFileRevealOwner,
   revealInFileManager
 } from '@/lib/reveal-in-file-manager'
-import { getRouteForLocalPathOpenOwner, isLocalPathOpenBlocked } from '@/lib/local-path-open-guard'
+import {
+  getRouteForLocalPathOpenOwner,
+  isRevealOrEditorOpenBlocked
+} from '@/lib/local-path-open-guard'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { NO_OPEN_IN_APPLICATIONS } from '@/lib/open-in-application-selection'
 import {
@@ -63,7 +66,7 @@ export function SourceControlEntryContextMenu({
   const revealOwner = useAppStore((s) =>
     getWorkspaceFileRevealOwner(s, currentWorktreeId, { connectionId, runtimeEnvironmentId })
   )
-  const revealBlocked = isLocalPathOpenBlocked(revealOwner)
+  const revealBlocked = isRevealOrEditorOpenBlocked(revealOwner)
   const openInRoute = useMemo(() => getRouteForLocalPathOpenOwner(revealOwner), [revealOwner])
 
   const handleCopyPath = useCallback(() => {

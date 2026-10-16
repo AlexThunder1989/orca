@@ -48,6 +48,10 @@ export type RuntimeSkillCommandSurface = {
   publishSkillPackageVersion(
     request: SkillCloudPublishRequest
   ): Promise<SkillCloudOperation<SkillCloudVersion>>
+  findOwnedSkillPackageId(
+    name: string,
+    options: SkillCloudOptions
+  ): ReturnType<SkillCloudService['findOwnedPackageId']>
   createSkillPackageShare(
     packageId: string,
     request: SkillCloudOptions & { pinnedVersionId?: string; idempotencyKey?: string }

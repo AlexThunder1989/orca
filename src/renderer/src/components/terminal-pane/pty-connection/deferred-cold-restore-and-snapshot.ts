@@ -1,5 +1,5 @@
 import { useAppStore } from '@/store'
-import type { PtyReplayDataMeta } from '../pty-transport'
+import type { PtyReplayDataMeta } from '../pty-transport-types'
 import { INITIAL_MODE_2031_REPLY_SCAN_STATE } from '../../../../../shared/terminal-color-scheme-protocol'
 import { waitForTerminalOutputParsed } from '@/lib/pane-manager/pane-terminal-output-scheduler'
 import { executeTerminalStartupCommandPaste } from '../terminal-startup-command-paste'

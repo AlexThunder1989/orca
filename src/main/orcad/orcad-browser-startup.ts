@@ -1,6 +1,6 @@
 import { BrowserError } from '../browser/browser-error'
 import { BROWSER_UNAVAILABLE_ERROR_CODE } from '../../shared/runtime-types'
-import type { RuntimeBrowserCommands } from '../runtime/orca-runtime-browser'
+import type { RuntimeBrowserCommands } from '../runtime/browser/browser-commands'
 import { setRuntimeBrowserCommandsFactory } from '../runtime/runtime-browser-commands-factory'
 import {
   resolveOrcadBrowserProvider,

@@ -105,9 +105,8 @@ export function translateAcpRequest(
     }
   }
   const presentation =
-    method === 'session/request_permission'
-      ? acpPermissionPresentation(params)
-      : options.dialect.request?.(method, params)
+    options.dialect.request?.(method, params) ??
+    (method === 'session/request_permission' ? acpPermissionPresentation(params) : undefined)
   if (!presentation) {
     // A file system or terminal call Orca never advertised is the agent's own misstep (OpenCode 1.x
     // repeats each approved edit as a file write it already made): refused, with no row.

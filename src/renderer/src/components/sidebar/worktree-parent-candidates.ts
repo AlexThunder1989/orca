@@ -59,12 +59,8 @@ export function isEligibleWorktreeParent({
   childHostId?: string | null
 }): boolean {
   return (
-    candidateParent.repoId === child.repoId &&
     childHostId !== null &&
     getWorktreeOwnerHostId(candidateParent, repoMap) === childHostId &&
-    (child.projectId === undefined ||
-      candidateParent.projectId === undefined ||
-      child.projectId === candidateParent.projectId) &&
     !candidateParent.isArchived &&
     canAssignWorktreeParent({
       child,

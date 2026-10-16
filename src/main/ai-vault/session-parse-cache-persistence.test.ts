@@ -28,11 +28,10 @@ import {
   parseAgentSessionFileCached,
   resetSessionParseCacheForTests,
   seedSessionParseCache,
-  snapshotSessionParseCacheForPersistence,
   type PersistedSessionParseCacheEntry,
   type SessionParseStats
 } from './session-scanner-parse-cache'
-import { getSessionParseCacheEntry } from './session-parse-cache-store'
+import { getSessionParseCacheEntry, storeSessionParseCacheEntry } from './session-parse-cache-store'
 import type { SessionSidecarObservation } from './session-sidecar-stat'
 import { isolatedScanRoots } from './session-scanner-test-fixtures'
 import { parseClaudeSessionFile } from './session-scanner-primary-parsers'
@@ -109,7 +108,7 @@ async function parseAndPersist(path: string): Promise<SessionParseStats> {
   const stats = createSessionParseStats()
   await ensureSessionParseCacheLoaded()
   await parseAgentSessionFileCached(await claudeCandidate(path), process.platform, stats)
-  scheduleSessionParseCachePersist(stats)
+  scheduleSessionParseCachePersist()
   await flushSessionParseCachePersistForTests()
   return stats
 }
@@ -153,7 +152,7 @@ describe('session parse cache persistence', () => {
     expect(first).not.toBeNull()
     expect(stats.fullParses).toBe(1)
 
-    scheduleSessionParseCachePersist(stats)
+    scheduleSessionParseCachePersist()
     await flushSessionParseCachePersistForTests()
     expect(existsSync(cacheFile)).toBe(true)
 
@@ -278,13 +277,7 @@ describe('session parse cache persistence', () => {
     vi.clearAllMocks()
 
     await ensureSessionParseCacheLoaded()
-    scheduleSessionParseCachePersist({
-      reused: 0,
-      incremental: 2,
-      fullParses: 5,
-      earlyStopped: 0,
-      bytesRead: 10
-    })
+    scheduleSessionParseCachePersist()
     await flushSessionParseCachePersistForTests()
 
     expect(fsPromises.readFile).not.toHaveBeenCalled()
@@ -299,11 +292,11 @@ describe('session parse cache persistence', () => {
     const cacheFile = join(root, 'session-parse-cache.json')
     initSessionParseCachePersistence({ filePath: cacheFile, appVersion: APP_VERSION })
     const transcript = await writeTranscript(root)
-    const stats = await coldParseStats(transcript)
+    await coldParseStats(transcript)
 
     vi.clearAllMocks()
-    scheduleSessionParseCachePersist(stats)
-    scheduleSessionParseCachePersist(stats)
+    scheduleSessionParseCachePersist()
+    scheduleSessionParseCachePersist()
     await flushSessionParseCachePersistForTests()
 
     expect(fsPromises.rename).toHaveBeenCalledTimes(1)
@@ -408,7 +401,7 @@ describe('session parse cache persistence', () => {
     vi.mocked(fsPromises.rename).mockRejectedValueOnce(
       Object.assign(new Error('EPERM: rename blocked'), { code: 'EPERM' })
     )
-    scheduleSessionParseCachePersist(stats)
+    scheduleSessionParseCachePersist()
     await expect(flushSessionParseCachePersistForTests()).resolves.toBeUndefined()
     expect(debugSpy).toHaveBeenCalled()
 
@@ -449,7 +442,7 @@ describe('session parse cache persistence', () => {
     const session = await parseAgentSessionFileCached(candidate, process.platform, stats)
     expect(session).not.toBeNull()
 
-    scheduleSessionParseCachePersist(stats)
+    scheduleSessionParseCachePersist()
     await expect(flushSessionParseCachePersistForTests()).resolves.toBeUndefined()
     expect(debugSpy).toHaveBeenCalled()
 
@@ -482,15 +475,12 @@ describe('sidecar observations survive the round trip', () => {
 
     const stats = createSessionParseStats()
     await parseAgentSessionFileCached(await claudeCandidate(path), process.platform, stats)
-    const seeded = snapshotSessionParseCacheForPersistence().map(
-      ([entryPath, entry]): [string, PersistedSessionParseCacheEntry] => [
-        entryPath,
-        sidecar === undefined ? entry : { ...entry, sidecar }
-      ]
-    )
-    resetSessionParseCacheForTests()
-    seedSessionParseCache(seeded)
-    scheduleSessionParseCachePersist(stats)
+    const entry = getSessionParseCacheEntry(path)
+    if (!entry) {
+      throw new Error('Expected a completed cached entry')
+    }
+    storeSessionParseCacheEntry(path, { ...entry, sidecar })
+    scheduleSessionParseCachePersist()
     await flushSessionParseCachePersistForTests()
 
     simulateRestart(cacheFile)

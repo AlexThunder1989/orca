@@ -10,8 +10,8 @@ import {
 
 /**
  * The precondition is only worth anything if it runs first. A loader failure is not
- * catchable, so a preflight that lands after `main()` has already reached
- * `await import('../ipc/pty')` prevents nothing.
+ * catchable, so a preflight that lands after `main()` has already imported
+ * the PTY runtime prevents nothing.
  */
 const { order, profileProbe, reserveStdout } = vi.hoisted(() => {
   const order: string[] = []

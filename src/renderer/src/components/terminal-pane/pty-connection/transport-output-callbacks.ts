@@ -1,7 +1,6 @@
 import type { SpawnDeferralReason } from '../../../../../shared/host-spawn-admission'
 import { createTerminalStartupTiming } from '../terminal-startup-timing'
-import type { PtyReplayDataMeta } from '../pty-transport'
-import type { PtyTransportRecoveryState } from '../pty-transport-types'
+import type { PtyReplayDataMeta, PtyTransportRecoveryState } from '../pty-transport-types'
 import type { PtyDataMeta } from '../pty-dispatcher'
 import type { PtyPaneStartup } from '../pty-connection-types'
 

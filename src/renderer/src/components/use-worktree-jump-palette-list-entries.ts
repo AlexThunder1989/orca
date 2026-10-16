@@ -15,7 +15,10 @@ import type { WorktreeJumpPaletteSections } from './use-worktree-jump-palette-se
 import type { WorktreeJumpPaletteWorktrees } from './use-worktree-jump-palette-worktrees'
 import type { WorktreeJumpPaletteLocalState } from './use-worktree-jump-palette-local-state'
 
+import type { WorktreeJumpPaletteTaskSearch } from './use-worktree-jump-palette-task-search'
+
 type WorktreeJumpPaletteListEntriesInput = WorktreeJumpPaletteSections &
+  Pick<WorktreeJumpPaletteTaskSearch, 'taskItems'> &
   Pick<WorktreeJumpPaletteWorktrees, 'hasQuery'> &
   Pick<WorktreeJumpPaletteLocalState, 'autoSelectedItemIdRef' | 'taskSourceUrl'> &
   Pick<WorktreeJumpPaletteSections, 'middleLeadsSections' | 'handleExpandSection'>
@@ -28,7 +31,8 @@ export function useWorktreeJumpPaletteListEntries({
   autoSelectedItemIdRef,
   taskSourceUrl,
   handleExpandSection,
-  middleLeadsSections
+  middleLeadsSections,
+  taskItems
 }: WorktreeJumpPaletteListEntriesInput) {
   const listEntries = useMemo<PaletteListEntry[]>(() => {
     const entries: PaletteListEntry[] = []
@@ -44,6 +48,16 @@ export function useWorktreeJumpPaletteListEntries({
       multiPrimaryFirstScreen,
       multiPrimaryLayout
     } = paletteSections
+    const pushTasks = (): void => {
+      if (taskItems.length) {
+        entries.push({
+          id: '__header_tasks__',
+          type: 'section-header',
+          label: translate('worktreeJumpPalette.tasksHeader', 'Tasks')
+        })
+        appendPaletteListEntries(entries, taskItems)
+      }
+    }
     const pushOverflowHint = (id: string, overflowCount: number, onSeeMore?: () => void): void => {
       if (overflowCount > 0) {
         entries.push({
@@ -83,10 +97,10 @@ export function useWorktreeJumpPaletteListEntries({
         id: `__header_worktrees__${idSuffix}`,
         type: 'section-header',
         label: hasQuery
-          ? translate('auto.components.WorktreeJumpPalette.worktreesHeader', 'Worktrees')
+          ? translate('auto.components.WorktreeJumpPalette.worktreesHeader', 'Workspaces')
           : translate(
               'auto.components.WorktreeJumpPalette.recentWorktreesHeader',
-              'Recent Worktrees'
+              'Recent Workspaces'
             )
       })
     }
@@ -205,6 +219,7 @@ export function useWorktreeJumpPaletteListEntries({
         handleExpandSection(trailingSectionKey)
       )
       pushProjectAndMiddleSections()
+      pushTasks()
       if (showCreateAction) {
         entries.push({ id: CREATE_WORKTREE_ITEM_ID, type: 'create-worktree' })
       }
@@ -223,6 +238,7 @@ export function useWorktreeJumpPaletteListEntries({
     if (!openTabsLeadSections) {
       pushOpenTabSection()
     }
+    pushTasks()
     if (showCreateAction) {
       entries.push({ id: CREATE_WORKTREE_ITEM_ID, type: 'create-worktree' })
     }
@@ -234,7 +250,8 @@ export function useWorktreeJumpPaletteListEntries({
     openTabsLeadSections,
     paletteSections,
     showCreateAction,
-    taskSourceUrl
+    taskSourceUrl,
+    taskItems
   ])
   const selectableItems = useMemo<PaletteItem[]>(
     () =>

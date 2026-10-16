@@ -36,12 +36,12 @@ describe('the connect-time relay terminal verdict', () => {
     await expect(decide(census).verdict).resolves.toEqual({ verdict: 'exited', count: 0 })
   })
 
-  it('stays on the relay while any endpoint, even another desktop’s, runs live work', async () => {
-    // Only the host-wide census counted them, so they belong to another desktop or session.
+  it('reads live work, even another desktop’s, as live and leaves it to the bridge', async () => {
+    // COMPAT(legacy-relay-bridge): the host converts anyway; nothing here stops a relay.
     await expect(decide({ verdict: 'live', count: 2 }).verdict).resolves.toEqual({
       verdict: 'live',
       count: 2,
-      elsewhere: true
+      bridged: true
     })
   })
 
@@ -49,8 +49,11 @@ describe('the connect-time relay terminal verdict', () => {
     ['incomplete', { verdict: 'unverifiable', count: 1 } as const],
     ['could not list the endpoints', { verdict: 'unenumerable', count: 0 } as const],
     ['failed', new Error('connect refused')]
-  ])('refuses as unverifiable when the census %s', async (_label, census) => {
-    await expect(decide(census).verdict).resolves.toMatchObject({ verdict: 'unverifiable' })
+  ])('reads unverifiable, never exited, when the census %s', async (_label, census) => {
+    await expect(decide(census).verdict).resolves.toMatchObject({
+      verdict: 'unverifiable',
+      bridged: true
+    })
   })
 
   // A lease an older build left proves nothing; the host census decides.

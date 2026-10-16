@@ -134,7 +134,11 @@ export async function dispatchClaudeTurn(
   }
   const startupFailure = claudeStartupFailureFact(session)
   if (startupFailure) {
-    return { state: 'rejected', ...claudeDispatchRejection(startupFailure) }
+    // Refused before the write, so the agent never saw it.
+    return {
+      state: 'rejected',
+      ...claudeDispatchRejection({ ...startupFailure, neverReachedAgent: true })
+    }
   }
   // Read the sent content, not the journal blocks: only the mapped trailing prompt decides
   // whether Claude runs a command, so the two cannot disagree about which frame settles this.

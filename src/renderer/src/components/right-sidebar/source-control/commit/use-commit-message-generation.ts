@@ -2,9 +2,9 @@ import { useCallback, useEffect } from 'react'
 import { getConnectionId } from '@/lib/connection-context'
 import {
   cancelRuntimeGenerateCommitMessage,
-  generateRuntimeCommitMessage,
-  type RuntimeGenerateCommitMessageOverrides
-} from '@/runtime/runtime-git-client'
+  generateRuntimeCommitMessage
+} from '@/runtime/runtime-git-generation-client'
+import type { RuntimeGenerateCommitMessageOverrides } from '@/runtime/runtime-git-client-context'
 import { useAppStore } from '@/store'
 import {
   createRunningCommitMessageGenerationRecord,

@@ -49,7 +49,6 @@ export async function resolveRuntimeGitLabForkMrBase(args: {
   try {
     const localRef = await fetchGitLabMergeRequestHeadRef(
       args.repo,
-      null,
       args.remote,
       args.mrIid,
       args.localGitExecOptions ? { localGitExecOptions: args.localGitExecOptions } : {}

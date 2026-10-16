@@ -12,7 +12,7 @@ import {
   getRecentSelfWrite,
   type RecentSelfWrite
 } from '@/components/editor/editor-self-write-registry'
-import { readRuntimeFileContent } from '@/runtime/runtime-file-client'
+import { readRuntimeFileContent } from '@/runtime/runtime-file-read-client'
 import type { EditorExternalWatchTarget } from './editor-external-watch-targets'
 import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
 

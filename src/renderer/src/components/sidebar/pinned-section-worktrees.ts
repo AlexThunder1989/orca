@@ -1,56 +1,84 @@
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
-import { getProjectedWorktreeLineageChildrenByParentId } from './worktree-lineage-projection'
+import { getLineagePlacementRows } from '../../../../shared/worktree-occurrence-plan'
+import {
+  getCyclicProjectedWorktreeLineageIds,
+  getSidebarLineageParent
+} from './worktree-lineage-projection'
+
+export function getSidebarLineageRowsByIdentity(
+  worktrees: readonly Worktree[],
+  worktreeMap: ReadonlyMap<string, Worktree>
+): Map<string, Worktree> {
+  return new Map(
+    [...worktreeMap.values(), ...worktrees].map((worktree) => [
+      getWorktreeHostIdentity(worktree),
+      worktree
+    ])
+  )
+}
+
+export function getSidebarLineageChildren(
+  worktrees: readonly Worktree[],
+  lineageById: Readonly<Record<string, WorktreeLineage>>,
+  worktreeMap: ReadonlyMap<string, Worktree>,
+  filterRepoIds: readonly string[] = []
+): Map<string, Worktree[]> {
+  const rowsByIdentity = getSidebarLineageRowsByIdentity(worktrees, worktreeMap)
+  const allowedRepoIds = filterRepoIds.length > 0 ? new Set(filterRepoIds) : null
+  const cyclicIds = getCyclicProjectedWorktreeLineageIds(lineageById, worktreeMap)
+  const childrenByParentIdentity = new Map<string, Worktree[]>()
+  for (const child of rowsByIdentity.values()) {
+    if (cyclicIds.has(child.id) || (allowedRepoIds && !allowedRepoIds.has(child.repoId))) {
+      continue
+    }
+    const parent = getSidebarLineageParent(child, lineageById, rowsByIdentity)
+    if (!parent || (allowedRepoIds && !allowedRepoIds.has(parent.repoId))) {
+      continue
+    }
+    const identity = getWorktreeHostIdentity(parent)
+    const children = childrenByParentIdentity.get(identity) ?? []
+    children.push(child)
+    childrenByParentIdentity.set(identity, children)
+  }
+  return childrenByParentIdentity
+}
 
 // Why: pin is placement of the clicked row. Descendants keep their own isPinned
 // and still follow a visible pinned ancestor into the Pinned section.
 export function getPinnedSectionWorktrees(
   worktrees: readonly Worktree[],
   lineageById: Readonly<Record<string, WorktreeLineage>>,
-  worktreeMap: ReadonlyMap<string, Worktree>
+  worktreeMap: ReadonlyMap<string, Worktree>,
+  filterRepoIds: readonly string[] = []
 ): Worktree[] {
-  const visibleIdentities = new Set(worktrees.map(getWorktreeHostIdentity))
-  const childrenByParentId = getProjectedWorktreeLineageChildrenByParentId(lineageById, worktreeMap)
-  const included = new Set<string>()
-  const seen = new Set<string>()
-  const pendingWorktrees = worktrees
-    .filter((worktree) => worktree.isPinned)
-    .map(({ id, hostId }) => ({ id, hostId }))
-
-  while (pendingWorktrees.length > 0) {
-    const current = pendingWorktrees.pop()
-    if (!current) {
-      continue
-    }
-    const identity = getWorktreeHostIdentity(current)
-    if (seen.has(identity)) {
-      continue
-    }
-    seen.add(identity)
-    if (visibleIdentities.has(identity)) {
-      included.add(identity)
-    }
-    for (const child of childrenByParentId.get(current.id) ?? []) {
-      // Lineage ids are hostless, but a lineage edge cannot cross execution hosts.
-      pendingWorktrees.push({ id: child.id, hostId: current.hostId })
-    }
-  }
-
-  return worktrees.filter((worktree) => included.has(getWorktreeHostIdentity(worktree)))
+  return getLineagePlacementRows({
+    rows: worktrees,
+    isPinned: (worktree) => worktree.isPinned === true,
+    childrenByParentIdentity: getSidebarLineageChildren(
+      worktrees,
+      lineageById,
+      worktreeMap,
+      filterRepoIds
+    ),
+    identityOf: getWorktreeHostIdentity,
+    duplicatePinned: false
+  }).pinned
 }
 
 export function isPinnedSectionWorktree(
   worktree: Worktree,
   visibleWorktrees: readonly Worktree[],
   lineageById: Readonly<Record<string, WorktreeLineage>>,
-  worktreeMap: ReadonlyMap<string, Worktree>
+  worktreeMap: ReadonlyMap<string, Worktree>,
+  filterRepoIds: readonly string[] = []
 ): boolean {
   if (worktree.isPinned) {
     return true
   }
   const identity = getWorktreeHostIdentity(worktree)
-  return getPinnedSectionWorktrees(visibleWorktrees, lineageById, worktreeMap).some(
+  return getPinnedSectionWorktrees(visibleWorktrees, lineageById, worktreeMap, filterRepoIds).some(
     (candidate) => getWorktreeHostIdentity(candidate) === identity
   )
 }

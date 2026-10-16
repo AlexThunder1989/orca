@@ -25,7 +25,8 @@ import {
 } from './worktree-operation-route'
 import { getNestedSshTargetIdForFolderWorkspace } from './folder-workspace-runtime-owner'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
-import { hostRouteForAuthority, type RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import { hostRouteForAuthority } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
 /** A worktree id, a `folder:` workspace key, or the floating workspace; `hostId` when the row names one. */
 export type WorkspaceOwnerRef = { workspaceId: string; hostId?: ExecutionHostId }

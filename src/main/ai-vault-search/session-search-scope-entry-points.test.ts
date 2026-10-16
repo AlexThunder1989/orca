@@ -56,7 +56,6 @@ describe('every search entry point carries the scope identity through', () => {
       paths: ['/work/app']
     })
   })
-
 })
 
 describe('the shared remote client', () => {

@@ -100,7 +100,7 @@ function applyCommand(
     case 'openAgentSessionTab':
       return openAgentSessionTab(model, command, context)
     case 'startPane':
-      return startPane(model, command)
+      return startPane(model, command, context)
     case 'restartPane':
       return restartPane(model, command)
     case 'sleep':

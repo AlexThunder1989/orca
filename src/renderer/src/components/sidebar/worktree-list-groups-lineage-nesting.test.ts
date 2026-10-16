@@ -318,10 +318,10 @@ describe('buildRows workspace lineage nesting', () => {
   })
 
   it.each([
-    ['repo', { repoId: 'other-repo' }],
-    ['host', { hostId: 'ssh:other-host' as const }],
-    ['project', { projectId: 'github:other/project' }]
-  ])('does not nest resolved lineage across a known %s boundary', (_label, boundary) => {
+    ['repo', { repoId: 'other-repo' }, [0, 1]],
+    ['host', { hostId: 'ssh:other-host' as const }, [0, 0]],
+    ['project', { projectId: 'github:other/project' }, [0, 1]]
+  ] as const)('applies the known %s lineage boundary', (_label, boundary, depths) => {
     const boundedParent = {
       ...parent,
       repoId: 'repo-1',
@@ -353,7 +353,7 @@ describe('buildRows workspace lineage nesting', () => {
       true
     )
 
-    expect(rows.filter((row) => row.type === 'item').map((row) => row.depth)).toEqual([0, 0])
+    expect(rows.filter((row) => row.type === 'item').map((row) => row.depth)).toEqual(depths)
   })
 
   it('keeps the hydrated lineage side-map authoritative when inline metadata disagrees', () => {

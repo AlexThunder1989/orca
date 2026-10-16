@@ -6,7 +6,6 @@ import {
   store,
   WORKTREE_FEATURE_PATH,
   commitChangesMock,
-  getSshGitProviderMock,
   resolveCommitMessageSettingsMock,
   generatePullRequestFieldsFromContextMock,
   getPullRequestDraftContextMock,
@@ -26,10 +25,6 @@ vi.mock(
   async () => (await import('./filesystem-test-harness')).crashBreadcrumbMock
 )
 vi.mock(
-  '../local-downloaded-folder-promotion',
-  async () => (await import('./filesystem-test-harness')).folderPromotionMock
-)
-vi.mock(
   '../git/status',
   async () => (await import('./filesystem-test-harness')).gitStatusModuleMock
 )
@@ -41,10 +36,6 @@ vi.mock('../git/worktree', async () => (await import('./filesystem-test-harness'
 vi.mock(
   '../providers/ssh-filesystem-dispatch',
   async () => (await import('./filesystem-test-harness')).sshFilesystemDispatchMock
-)
-vi.mock(
-  '../providers/ssh-git-dispatch',
-  async () => (await import('./filesystem-test-harness')).sshGitDispatchMock
 )
 vi.mock(
   '../text-generation/commit-message-text-generation',
@@ -65,6 +56,7 @@ vi.mock(
 
 import { registerFilesystemHandlers } from './filesystem'
 import { invalidateAuthorizedRootsCache } from './registered-worktree-roots-cache'
+import { SSH_HOST_NOT_SERVED_MESSAGE } from '../providers/ssh-host-not-served-error'
 
 describe('registerFilesystemHandlers', () => {
   beforeEach(() => {
@@ -93,7 +85,6 @@ describe('registerFilesystemHandlers', () => {
 
   it('refuses ssh git:commit as not served instead of running local commitChanges', async () => {
     const sshCommitMock = vi.fn().mockResolvedValue({ success: true })
-    getSshGitProviderMock.mockReturnValue({ commit: sshCommitMock })
 
     registerFilesystemHandlers(store as never)
 
@@ -113,7 +104,6 @@ describe('registerFilesystemHandlers', () => {
 
   it('rejects git:remoteCommitUrl with a short hash before SSH dispatch', async () => {
     const sshRemoteCommitUrlMock = vi.fn()
-    getSshGitProviderMock.mockReturnValue({ getRemoteCommitUrl: sshRemoteCommitUrlMock })
 
     registerFilesystemHandlers(store as never)
 
@@ -143,7 +133,6 @@ describe('registerFilesystemHandlers', () => {
 
   it('rejects git:commit with whitespace-only message before SSH dispatch', async () => {
     const sshCommitMock = vi.fn().mockResolvedValue({ success: true })
-    getSshGitProviderMock.mockReturnValue({ commit: sshCommitMock })
 
     registerFilesystemHandlers(store as never)
 
@@ -224,31 +213,18 @@ describe('registerFilesystemHandlers pull request field generation', () => {
       )
     })
 
-    it('enriches the SSH pull-request context from host meta using the remote path', async () => {
-      const worktreeId = 'repo-1::/remote/repo'
-      getSshGitProviderMock.mockReturnValue({
-        exec: vi.fn(),
-        executeCommitMessagePlan: vi.fn()
-      })
-      const linkedStore = {
-        ...store,
-        getWorktreeMeta: (id: string) => (id === worktreeId ? { linkedIssue: 77 } : undefined)
-      }
+    it('refuses SSH pull-request generation as not served without preparing a local branch', async () => {
+      registerFilesystemHandlers(store as never)
 
-      registerFilesystemHandlers(linkedStore as never)
-
-      await handlers.get('git:generatePullRequestFields')!(null, {
-        ...PULL_REQUEST_ARGS,
-        worktreePath: '/remote/repo',
-        worktreeId,
-        connectionId: 'conn-1'
-      })
-
-      expect(generatePullRequestFieldsFromContextMock).toHaveBeenCalledWith(
-        { ...PULL_REQUEST_CONTEXT, linkedIssue: 77 },
-        params,
-        expect.objectContaining({ kind: 'remote' })
-      )
+      await expect(
+        handlers.get('git:generatePullRequestFields')!(null, {
+          ...PULL_REQUEST_ARGS,
+          worktreePath: '/remote/repo',
+          connectionId: 'conn-1'
+        })
+      ).resolves.toEqual({ success: false, error: SSH_HOST_NOT_SERVED_MESSAGE })
+      expect(getPullRequestDraftContextMock).not.toHaveBeenCalled()
+      expect(loadPullRequestLinkedIssueMock).not.toHaveBeenCalled()
     })
 
     it('ignores a pull-request worktree id that does not own the requested path', async () => {
@@ -271,15 +247,10 @@ describe('registerFilesystemHandlers pull request field generation', () => {
       )
     })
 
-    it('forwards PR-context command limits through local and SSH adapters', async () => {
+    it('forwards PR-context command limits through the local adapter', async () => {
       const localGitExec = vi
         .spyOn(gitRunner, 'gitExecFileAsync')
         .mockResolvedValue({ stdout: '', stderr: '' })
-      const sshExec = vi.fn().mockResolvedValue({ stdout: '', stderr: '' })
-      getSshGitProviderMock.mockReturnValue({
-        exec: sshExec,
-        executeCommitMessagePlan: vi.fn()
-      })
       getPullRequestDraftContextMock.mockImplementation(async (execute) => {
         await execute(['show-ref', '--verify'], { maxBuffer: 123, timeoutMs: 456 })
         await execute(['legacy-probe'], { timeout: 789 })
@@ -302,19 +273,6 @@ describe('registerFilesystemHandlers pull request field generation', () => {
         expect(localGitExec).toHaveBeenCalledWith(['legacy-probe'], {
           cwd: WORKTREE_FEATURE_PATH,
           timeout: 789
-        })
-
-        await handlers.get('git:generatePullRequestFields')!(null, {
-          ...PULL_REQUEST_ARGS,
-          worktreePath: '/remote/repo',
-          connectionId: 'conn-1'
-        })
-
-        expect(sshExec).toHaveBeenCalledWith(['show-ref', '--verify'], '/remote/repo', {
-          timeoutMs: 456
-        })
-        expect(sshExec).toHaveBeenCalledWith(['legacy-probe'], '/remote/repo', {
-          timeoutMs: 789
         })
       } finally {
         localGitExec.mockRestore()

@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { structuredAgentSessionHostKey } from '@/runtime/structured-agent-session-host-capability'
 import type {
   AgentSessionQueuedMessage,

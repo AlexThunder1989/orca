@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { cn } from '@/lib/utils'
 import { openHttpLink } from '@/lib/http-link-routing'
 import {
   NATIVE_CHAT_VISUAL_FRAME_NAME_PREFIX,
@@ -28,22 +27,20 @@ function newChannel(): string {
 }
 
 /**
- * One agent-written visual in an opaque-origin frame that may run scripts and nothing else. Inline
- * it fits its height to the page; in a panel it fills the panel. A theme change restyles the page in
- * place, so interaction state survives it. On desktop the main process refuses the frame's
+ * One agent-written visual in an opaque-origin frame that may run scripts and nothing else. It fits
+ * its height to the page. A theme change restyles the page in place, so interaction state survives
+ * it. On desktop the main process refuses the frame's
  * navigation; a later load that nothing answers (the frame gone blank or showing another page)
  * retires it, as a tripwire rather than a boundary.
  */
 export function NativeChatVisualFrame({
   document: visual,
   title,
-  layout,
   themeScope,
   onRetired
 }: {
   document: NativeChatVisualDocument
   title: string
-  layout: 'inline' | 'panel'
   /** An element already mounted where the frame sits, so the first paint wears that scope's theme. */
   themeScope: RefObject<Element | null>
   onRetired: () => void
@@ -111,11 +108,9 @@ export function NativeChatVisualFrame({
         return
       }
       if (message.kind === 'size') {
-        if (layout === 'inline') {
-          latestReported = message.height
-          if (!deferred) {
-            applyHeight()
-          }
+        latestReported = message.height
+        if (!deferred) {
+          applyHeight()
         }
         return
       }
@@ -140,7 +135,7 @@ export function NativeChatVisualFrame({
         clearTimeout(deferred)
       }
     }
-  }, [built.channel, layout])
+  }, [built.channel])
 
   // A frame rebuilt for a new revision, or unmounted, owes no answer.
   useEffect(
@@ -163,10 +158,7 @@ export function NativeChatVisualFrame({
   }, [built.channel, theme])
 
   return (
-    <div
-      className={cn('w-full', layout === 'panel' && 'flex min-h-0 flex-1')}
-      style={layout === 'inline' ? { height } : undefined}
-    >
+    <div className="w-full" style={{ height }}>
       <iframe
         key={built.channel}
         ref={frameRef}

@@ -1,5 +1,6 @@
 // Resolve the host launch identity, then commit an at-rest create or the compatible acquired path.
 
+import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from '../../../../shared/agent-chat-permission-mode'
 import { refuse, AgentSessionRefusalError } from '../../../../shared/agent-session-wire-refusals'
 import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-session-mutation-envelope'
 import type {
@@ -129,8 +130,13 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     attachParams: {
       ...resolvedAttach,
       // The ledger covers explicit overrides, never defaults that settings can change on replay.
+      // Explicit picks replace the saved selection; the permission default is the chat's own.
       ...(args.options
-        ? { options: atRest ? { ...resolved.options, ...args.options } : args.options }
+        ? {
+            options: atRest
+              ? { ...resolved.options, ...args.options }
+              : { ...seededPermissionMode(resolved.options), ...args.options }
+          }
         : {}),
       ...(args.tabId ? { surfaceTabId: args.tabId } : {}),
       provider: resolved.provider,
@@ -237,4 +243,11 @@ export async function createStructuredAgentSessionForWorktree(args: {
     prepared,
     activate: args.activate
   })
+}
+
+function seededPermissionMode(
+  options: Readonly<Record<string, string>> | undefined
+): Record<string, string> {
+  const mode = options?.[AGENT_CHAT_PERMISSION_MODE_OPTION_ID]
+  return mode ? { [AGENT_CHAT_PERMISSION_MODE_OPTION_ID]: mode } : {}
 }

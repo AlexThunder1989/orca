@@ -7,7 +7,7 @@
 import type { ServeReadiness } from '../server/serve-readiness'
 import type { OrcadActivationExpectation } from './orcad-activation-gate'
 import { ORCAD_INSTALL_MODEL } from './remote-install-model'
-import { computeRemoteInstallDir } from './ssh-relay-versioned-install'
+import { computeRemoteInstallDir } from './remote-versioned-install'
 import { readRemoteOrcadBuildHash } from './orcad-remote-build-hash'
 import {
   launchOrcadSlotAndAwaitReadiness,

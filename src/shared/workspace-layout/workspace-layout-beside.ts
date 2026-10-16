@@ -60,9 +60,9 @@ export type ViewSessionField = FieldsOwnedBy<'view'>
 export type FactSessionField = FieldsOwnedBy<'fact'>
 export type CarriedSessionField = FieldsOwnedBy<'carried'>
 
-export const VIEW_SESSION_FIELDS = sessionFieldsOwnedBy('view')
-export const FACT_SESSION_FIELDS = sessionFieldsOwnedBy('fact')
-export const CARRIED_SESSION_FIELDS = sessionFieldsOwnedBy('carried')
+export const VIEW_SESSION_FIELDS = /* @__PURE__ */ sessionFieldsOwnedBy('view')
+export const FACT_SESSION_FIELDS = /* @__PURE__ */ sessionFieldsOwnedBy('fact')
+export const CARRIED_SESSION_FIELDS = /* @__PURE__ */ sessionFieldsOwnedBy('carried')
 
 function sessionFieldsOwnedBy<Owner extends SessionFieldOwner>(
   owner: Owner

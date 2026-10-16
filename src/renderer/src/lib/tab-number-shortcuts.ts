@@ -4,10 +4,8 @@ import type { AppState } from '@/store/types'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { dedupeTabOrder } from '../../../shared/workspace-layout/tab-order'
 import type { Tab } from '../../../shared/tab-types'
-import {
-  activateWebRuntimeSessionTab,
-  isWebRuntimeSessionActive
-} from '@/runtime/web-runtime-session'
+import { activateWebRuntimeSessionTab } from '@/runtime/web-runtime-session-tab-lifecycle'
+import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session-environment'
 
 type TabNumberShortcutState = Pick<
   AppState,

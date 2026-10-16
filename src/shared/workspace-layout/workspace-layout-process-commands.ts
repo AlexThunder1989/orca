@@ -10,7 +10,7 @@ import {
   setLeaf,
   type Applied
 } from './workspace-layout-command-steps'
-import type { CommandOf } from './workspace-layout-command-types'
+import type { CommandOf, LayoutContext } from './workspace-layout-command-types'
 import {
   paneKeyOf,
   type WorkspaceLayout,
@@ -27,17 +27,28 @@ function workspacePanes(workspace: WorkspaceLayout): { paneKey: string; leafId: 
   )
 }
 
-/** Idempotent: starts or restores a pane that has no live terminal. */
-export function startPane(model: WorkspaceLayoutModel, command: CommandOf<'startPane'>): Applied {
+/**
+ * Idempotent: starts or restores a pane that has no live terminal. A bound pane, or one whose
+ * start is in flight, is left alone; only restartPane replaces a terminal.
+ */
+export function startPane(
+  model: WorkspaceLayoutModel,
+  command: CommandOf<'startPane'>,
+  context: LayoutContext
+): Applied {
   const workspace = model.workspaces[command.workspace]!
   const pane = locatePane(workspace, command.paneKey)
   if (!pane) {
     return refuse('pane_not_found')
   }
-  if (workspace.leaves?.[pane.leafId]?.sleeping) {
+  const leaf = workspace.leaves?.[pane.leafId]
+  if (leaf?.sleeping) {
     return refuse('pane_sleeping')
   }
-  return applied(model, {}, { startPaneKeys: [command.paneKey] })
+  if (leaf?.ptyId || context.isStarting?.(pane.leafId)) {
+    return applied(model)
+  }
+  return applied(model, {}, { startPaneKeys: [command.paneKey] }, { [pane.leafId]: null })
 }
 
 /** Stops then starts in place: the pane keeps its id, its terminal binding is cleared until the new one starts. */
@@ -58,7 +69,8 @@ export function restartPane(
       setLeaf(workspace, pane.leafId, omitStoredFields(leaf, ['ptyId', 'incarnationId']))
     ),
     {},
-    { stopPtyIds: leaf.ptyId ? [leaf.ptyId] : [], startPaneKeys: [command.paneKey] }
+    { stopPtyIds: leaf.ptyId ? [leaf.ptyId] : [], startPaneKeys: [command.paneKey] },
+    { [pane.leafId]: null }
   )
 }
 

@@ -21,36 +21,30 @@ import { worktreeRefreshOptions } from './add-repo-runtime-owner'
 import { addRuntimeSshRepo } from '@/runtime/runtime-ssh-target-management'
 import type { Repo } from '../../../../shared/repo-types'
 
-// Why: with a server set, the SSH target is that server's own host and only the server adds it.
+// Why: the SSH target is a paired server's own host, and only that server adds a project on it.
 async function addSshFolderProject(args: {
   connectionId: string
   runtimeEnvironmentId: string | null
   remotePath: string
   displayName: string
-}): Promise<{ repo: Repo; ownerOptions: ReturnType<typeof worktreeRefreshOptions> }> {
-  const request = {
+}): Promise<{
+  repo: Repo
+  ownerOptions: ReturnType<typeof worktreeRefreshOptions>
+}> {
+  if (!args.runtimeEnvironmentId) {
+    throw new Error(`SSH connection "${args.connectionId}" not found or not connected`)
+  }
+  const added = await addRuntimeSshRepo(args.runtimeEnvironmentId, {
     connectionId: args.connectionId,
     remotePath: args.remotePath,
-    kind: 'folder' as const,
+    kind: 'folder',
     ...(args.displayName ? { displayName: args.displayName } : {})
-  }
-  if (args.runtimeEnvironmentId) {
-    const added = await addRuntimeSshRepo(args.runtimeEnvironmentId, request)
-    return {
-      repo: upsertAddedRepoWithProjectHostSetup(added, {
-        runtimeEnvironmentId: args.runtimeEnvironmentId
-      }).repo,
-      ownerOptions: worktreeRefreshOptions(args.runtimeEnvironmentId)
-    }
-  }
-  const result = await window.api.repos.addRemote(request)
-  if ('error' in result) {
-    throw new Error(result.error)
-  }
+  })
   return {
-    repo: upsertAddedRepoWithProjectHostSetup(result.repo, { sshConnectionId: args.connectionId })
-      .repo,
-    ownerOptions: worktreeRefreshOptions(undefined, args.connectionId)
+    repo: upsertAddedRepoWithProjectHostSetup(added, {
+      runtimeEnvironmentId: args.runtimeEnvironmentId
+    }).repo,
+    ownerOptions: worktreeRefreshOptions(args.runtimeEnvironmentId)
   }
 }
 
@@ -128,7 +122,7 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
             })
           }
         } catch (err) {
-          // This code path calls addRemote directly (not through the store),
+          // This code path calls the server directly (not through the store),
           // so the store's toast handling does not apply.
           toast.error(
             err instanceof Error

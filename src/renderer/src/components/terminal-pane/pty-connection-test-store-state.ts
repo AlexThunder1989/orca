@@ -114,7 +114,6 @@ export type StoreState = {
   automaticAgentResumeClaimsByTabId?: Record<string, unknown>
   registerAgentLaunchConfig: ReturnType<typeof vi.fn>
   clearAgentLaunchConfig: ReturnType<typeof vi.fn>
-  markWorktreeUnread: ReturnType<typeof vi.fn>
   observeTerminalGitHubPullRequestLink: ReturnType<typeof vi.fn>
   recordTerminalInput: ReturnType<typeof vi.fn>
   setAgentStatus: ReturnType<typeof vi.fn>
@@ -124,9 +123,8 @@ export type StoreState = {
   restoreAgentPaneAuthority: ReturnType<typeof vi.fn>
   setPaneForegroundAgent: ReturnType<typeof vi.fn>
   clearPaneForegroundAgent: ReturnType<typeof vi.fn>
-  markTerminalTabUnread: ReturnType<typeof vi.fn>
-  markTerminalPaneUnread: ReturnType<typeof vi.fn>
-  markAgentCompletionPaneUnread: ReturnType<typeof vi.fn>
+  markTerminalBell: ReturnType<typeof vi.fn>
+  markAgentAttentionUnread: ReturnType<typeof vi.fn>
 }
 
 export type WindowsShiftEnterPaneState = Parameters<

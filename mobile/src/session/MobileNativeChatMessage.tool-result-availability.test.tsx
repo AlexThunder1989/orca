@@ -116,9 +116,9 @@ describe('mobile tool result availability', () => {
         output: `preview ${index}\ncomplete output ${index}`
       }))
     )
-    const [row] = foldMobileNativeChatMessages([raw])
+    const [row] = foldMobileNativeChatMessages([raw], 'claude')
     expect(row?.role).toBe('tool')
-    expect(foldMobileNativeChatMessages([row!])).toEqual([row])
+    expect(foldMobileNativeChatMessages([row!], 'claude')).toEqual([row])
     const tree = render(row!)
     expect(textIn(tree.root)).toContain('8×')
     expect(
@@ -151,7 +151,7 @@ describe('mobile tool result availability', () => {
       ...calls,
       { type: 'tool-result', callId: 'call-17', output: 'late named output' }
     ])
-    const [row] = foldMobileNativeChatMessages([raw])
+    const [row] = foldMobileNativeChatMessages([raw], 'claude')
     const pairs = toolFold.pairToolBlocks(row!.blocks)
     expect(pairs.slice(0, 17).every((pair) => pair.result === undefined)).toBe(true)
     expect(pairs[17]?.result?.output).toBe('late named output')
@@ -254,7 +254,7 @@ describe('mobile tool result availability', () => {
         const raw = projectStructuredItemsToNativeChat(journal).map((row) =>
           row.id === 'queued' ? { ...row, queued: true as const } : row
         )
-        const rows = foldMobileNativeChatMessages(raw)
+        const rows = foldMobileNativeChatMessages(raw, 'claude')
         const disclosure = useMobileNativeChatTurnDisclosure({
           messages: rows,
           enabled: true,
@@ -300,7 +300,7 @@ describe('mobile tool result availability', () => {
       expect(drawn.find((row) => row.role === 'tool')?.id).toBe(orphan.id)
       expect(waiting).toEqual(['queued'])
       expect(button(tree.root, 'output one')).toBe(firstOutput)
-      expect(foldMobileNativeChatMessages(drawn)).toEqual(drawn)
+      expect(foldMobileNativeChatMessages(drawn, 'claude')).toEqual(drawn)
     }
   )
 

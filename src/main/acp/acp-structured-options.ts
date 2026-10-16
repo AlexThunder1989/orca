@@ -11,6 +11,7 @@ import type {
 import { isAcpStructuredOptionKey } from './acp-structured-agent-definitions'
 import { AcpRpcError } from './acp-errors'
 import type { AcpStructuredConnection } from './acp-structured-connection'
+import type { AcpLaunchSpec } from './acp-launch-specs'
 import type { AcpDialect } from './acp-dialects/acp-dialect'
 import {
   unpickedSessionConfiguredChoice,
@@ -205,6 +206,26 @@ export class AcpStructuredOptions {
     )
     return option && isSelect(option) ? option : null
   }
+}
+
+/** Images go only where the agent's row offers them and its start advertised them. */
+export async function acpSessionAcceptsImages(session: {
+  spec: Pick<AcpLaunchSpec, 'imagePrompts'>
+  connection: Pick<AcpStructuredConnection, 'initialize'>
+}): Promise<boolean> {
+  return (
+    session.spec.imagePrompts === true &&
+    (await session.connection.initialize()).agentCapabilities?.promptCapabilities?.image === true
+  )
+}
+
+/** A running child's options, and whether a message to it may carry images. */
+export async function readAcpLiveOptions(
+  session: Parameters<typeof acpSessionAcceptsImages>[0] & { options: AcpStructuredOptions }
+) {
+  const acceptsImages = await acpSessionAcceptsImages(session)
+  // Only the start says what the config resolved: the session may have moved since.
+  return { ...withLiveCatalogListing(session.options.read()), acceptsImages }
 }
 
 /** Sends a pick and adopts the agent's answer, even one that lands after the wait gave up: that is

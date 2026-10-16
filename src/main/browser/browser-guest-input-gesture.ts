@@ -44,10 +44,12 @@ export function trackBrowserGuestInputGesture(
     consume: () => {
       const observedAt = lastGestureAt
       lastGestureAt = null
+      const elapsed = observedAt === null ? -1 : now() - observedAt
       return (
         attached &&
         observedAt !== null &&
-        now() - observedAt <= BROWSER_GUEST_INPUT_GESTURE_WINDOW_MS
+        elapsed >= 0 &&
+        elapsed <= BROWSER_GUEST_INPUT_GESTURE_WINDOW_MS
       )
     },
     dispose: () => {

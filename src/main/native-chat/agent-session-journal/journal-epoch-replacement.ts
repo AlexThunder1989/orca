@@ -38,6 +38,9 @@ export type JournalReplacementItem = AgentJournalProducerLinkage & {
   /** Absent for history rebuilt from a source that never stated one: derived from position, as
    *  a legacy row's is, and then written down. */
   turnScope?: AgentJournalTurnScope
+  /** Carried from the epoch it came from (`JournalItemRow.ownerFence`), never the replacing
+   *  writer's fence: replacing history does not make it the current generation's work. */
+  ownerFence: number
 }
 
 export function replaceJournalEpoch(input: {
@@ -71,6 +74,7 @@ export function replaceJournalEpoch(input: {
       body: item.body,
       seq: state.lastSequence + 1,
       fence: input.fence,
+      ownerFence: item.ownerFence,
       ts: item.observedAt ?? input.now(),
       linkage: item,
       turnScope: item.turnScope ?? state.derivedTurnScope.scopeFor(item.body)

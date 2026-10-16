@@ -9,10 +9,20 @@ const mocks = vi.hoisted(() => ({
 
 class MockWebContents extends EventEmitter {
   readonly id: number
+  url = ''
+  title = ''
 
   constructor(id: number) {
     super()
     this.id = id
+  }
+
+  getURL(): string {
+    return this.url
+  }
+
+  getTitle(): string {
+    return this.title
   }
 
   loadURL(): Promise<void> {
@@ -125,6 +135,30 @@ describe('OffscreenBrowserBackend lifecycle', () => {
     expect(webContents.listenerCount('did-fail-load')).toBe(0)
     expect(vi.getTimerCount()).toBe(0)
     vi.useRealTimers()
+  })
+
+  it('reports each committed navigation, so a saved tab can follow its page', async () => {
+    const onPageNavigated = vi.fn()
+    const browserManager = {
+      registerOffscreenGuest: vi.fn(registerOffscreenGuestLikeBrowserManager),
+      unregisterGuest: vi.fn()
+    }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: createTab reads only these two BrowserManager members.
+    const backend = new OffscreenBrowserBackend(browserManager as never, { onPageNavigated })
+
+    await backend.createTab({
+      browserPageId: 'page-1',
+      url: 'https://example.com/a',
+      worktreeId: 'wt'
+    })
+    const webContents = mocks.windows[0].webContents
+    webContents.url = 'https://example.com/b'
+    webContents.title = 'B'
+    webContents.emit('did-stop-loading')
+
+    expect(onPageNavigated.mock.calls).toEqual([
+      [{ worktreeId: 'wt', pageId: 'page-1', url: 'https://example.com/b', title: 'B' }]
+    ])
   })
 
   // Why the unregister assertion and not just the destroy: a refused id is one the document half

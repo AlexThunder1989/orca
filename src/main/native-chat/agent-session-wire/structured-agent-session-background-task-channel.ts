@@ -7,10 +7,7 @@ import type { AgentChildWorkView } from '../../../shared/agent-status-child-work
 import { structuredChildWorkLegacyTasks } from '../../../shared/structured-agent-session-child-work-legacy'
 import { structuredRunningChildWork } from '../../../shared/agent-child-work-listing'
 import { readStructuredAgentSessionHistoryResult } from './structured-agent-session-history-result'
-import {
-  structuredQueueSendGate,
-  tryReadQueuePublication
-} from './structured-agent-session-queued-publication'
+import { hostStructuredAgentSessionCurrentWork } from './structured-agent-session-host-current-work'
 import type { AgentSessionHistoryScope } from './agent-session-history-page'
 import type {
   AgentSessionSubscribers,
@@ -25,8 +22,8 @@ import { structuredAgentSessionConversationFence } from './structured-agent-sess
 
 /** The chat strip's roster: the host's running child records for one session, the same selection
  *  the session list carries, with the legacy task rows an older client reads derived from them. No
- *  running child is `null`, and the strip hides. Each subscriber's frames carry it; see
- *  `agent-session-subscriber-frame-fields`. */
+ *  running child, and none the host failed to record, is `null`, and the strip hides. Each
+ *  subscriber's frames carry it; see `agent-session-subscriber-frame-fields`. */
 export class StructuredAgentSessionBackgroundTaskChannel {
   constructor(
     private readonly deps: StructuredAgentSessionHostDeps,
@@ -36,7 +33,8 @@ export class StructuredAgentSessionBackgroundTaskChannel {
     private readonly conversation: (
       sessionId: string
     ) => Promise<StructuredAgentSessionHostSession>,
-    private readonly readChildWork: (sessionId: string) => AgentChildWorkView[] | undefined
+    private readonly readChildWork: (sessionId: string) => AgentChildWorkView[] | undefined,
+    private readonly childWorkIncomplete: (sessionId: string) => boolean = () => false
   ) {}
 
   /** `scope` is for in-process readers; a wire request reads every agent's rows. */
@@ -45,17 +43,19 @@ export class StructuredAgentSessionBackgroundTaskChannel {
     scope?: AgentSessionHistoryScope
   ): Promise<AgentSessionHistoryResult> {
     const journal = (await this.conversation(request.sessionId)).journal
+    const work = hostStructuredAgentSessionCurrentWork(
+      { store: this.deps.store, sessions: this.sessions },
+      request.sessionId
+    )
     const result = readStructuredAgentSessionHistoryResult({
       journal,
       record: this.deps.store.getRecord(request.sessionId),
       request,
-      scope
+      scope,
+      ...(work ? { work } : {})
     })
     const backgroundTasks = this.read(request.sessionId)
-    const queue = tryReadQueuePublication(
-      journal,
-      structuredQueueSendGate(this.deps.store, request.sessionId)
-    )
+    const queue = this.subscribers.readQueuePublication(request.sessionId)
     const hostNow = this.deps.now?.() ?? Date.now()
     return {
       ...result,
@@ -101,7 +101,9 @@ export class StructuredAgentSessionBackgroundTaskChannel {
   read(sessionId: string): AgentSessionBackgroundTaskState | null {
     const session = this.sessions.get(sessionId)
     const views = structuredRunningChildWork((session && this.readChildWork(sessionId)) ?? [])
-    if (!session || views.length === 0) {
+    // Untracked work keeps the strip, and its Stop, even with nothing listed.
+    const incomplete = this.childWorkIncomplete(sessionId)
+    if (!session || (views.length === 0 && !incomplete)) {
       return null
     }
     const stops = this.deps.adapter.backgroundTaskStops?.(sessionId)
@@ -113,7 +115,8 @@ export class StructuredAgentSessionBackgroundTaskChannel {
       ...(stops?.supportsTaskStop ? { supportsTaskStop: true } : {}),
       // A session no live provider holds has nothing a stop could reach.
       ...(stops?.supportsStopAll ? {} : { supportsStopAll: false }),
-      children: views
+      children: views,
+      ...(incomplete ? { incomplete: true } : {})
     }
   }
 }

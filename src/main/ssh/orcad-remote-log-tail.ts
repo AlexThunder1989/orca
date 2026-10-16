@@ -6,7 +6,7 @@
 import { redactString } from '../observability/redactor'
 import { shellEscape } from './ssh-connection-utils'
 import { ORCAD_LOG_FILENAME } from './orcad-remote-host-support'
-import { execCommand } from './ssh-relay-deploy-helpers'
+import { execCommand } from './ssh-relay-exec-command'
 import { isWindowsRemoteHost, joinRemotePath, type RemoteHostPlatform } from './ssh-remote-platform'
 import {
   orcadWindowsSlotOpCommand,

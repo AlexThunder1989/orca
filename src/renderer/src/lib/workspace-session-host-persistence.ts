@@ -58,7 +58,6 @@ export type HostPersistenceState = WorkspaceTabOwnerCatalog & {
 type SessionApi = {
   get: (hostId?: ExecutionHostId) => Promise<WorkspaceSessionState>
   patch: (args: WorkspaceSessionPatch, hostId?: ExecutionHostId) => Promise<void>
-  setSync: (args: WorkspaceSessionState, hostId?: ExecutionHostId) => void
 }
 
 type DurableSessionApi = SessionApi & {

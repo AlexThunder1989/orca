@@ -24,6 +24,7 @@ describe('startHostWorktreeRefresh', () => {
   let eventListener: ((payload: unknown) => void) | null
   let fetchWorktrees: ReturnType<typeof vi.fn>
   let fetchRepoMetadata: ReturnType<typeof vi.fn>
+  let syncViewSettings: ReturnType<typeof vi.fn>
   let unsubscribe: ReturnType<typeof vi.fn>
   let stop: (() => void) | null
 
@@ -35,6 +36,7 @@ describe('startHostWorktreeRefresh', () => {
     eventListener = null
     fetchWorktrees = vi.fn().mockResolvedValue(undefined)
     fetchRepoMetadata = vi.fn().mockResolvedValue(undefined)
+    syncViewSettings = vi.fn().mockResolvedValue(undefined)
     unsubscribe = vi.fn()
     stop = null
   })
@@ -48,7 +50,7 @@ describe('startHostWorktreeRefresh', () => {
         }
       )
     } as unknown as RpcClient
-    stop = startHostWorktreeRefresh({ client, fetchWorktrees, fetchRepoMetadata })
+    stop = startHostWorktreeRefresh({ client, fetchWorktrees, fetchRepoMetadata, syncViewSettings })
   }
 
   afterEach(() => {
@@ -97,6 +99,18 @@ describe('startHostWorktreeRefresh', () => {
     fetchRepoMetadata.mockClear()
     appState.currentState = 'background'
     await vi.advanceTimersByTimeAsync(9_000)
+    expect(fetchWorktrees).not.toHaveBeenCalled()
+    expect(fetchRepoMetadata).not.toHaveBeenCalled()
+  })
+
+  it('re-reads only the shared Workspace options on workspaceViewChanged', () => {
+    start()
+    fetchWorktrees.mockClear()
+    fetchRepoMetadata.mockClear()
+
+    eventListener?.({ type: 'workspaceViewChanged' })
+
+    expect(syncViewSettings).toHaveBeenCalledOnce()
     expect(fetchWorktrees).not.toHaveBeenCalled()
     expect(fetchRepoMetadata).not.toHaveBeenCalled()
   })

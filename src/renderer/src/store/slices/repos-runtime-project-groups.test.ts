@@ -6,6 +6,7 @@ import {
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 import { createTestStore } from './store-test-helpers'
+import { stubRuntimeEnvironmentBridge } from '../../runtime/runtime-environment-bridge-fixture'
 
 const runtimeEnvironmentCall = vi.fn()
 const runtimeEnvironmentTransportCall = vi.fn()
@@ -17,11 +18,7 @@ beforeEach(() => {
   runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
     return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
   })
-  vi.stubGlobal('window', {
-    api: {
-      runtimeEnvironments: { call: runtimeEnvironmentTransportCall }
-    }
-  })
+  stubRuntimeEnvironmentBridge({ call: runtimeEnvironmentTransportCall })
 })
 
 describe('repo slice runtime project groups', () => {

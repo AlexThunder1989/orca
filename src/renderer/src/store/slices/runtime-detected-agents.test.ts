@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTestStore } from './store-test-helpers'
+import { createRuntimeDetectedAgentsTestStore as createTestStore } from './runtime-detected-agents.test-fixture'
 import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
 import { getRuntimeAgentInventoryKey } from './runtime-agent-inventory-key'
 import {
@@ -8,10 +8,11 @@ import {
   RUNTIME_PROTOCOL_VERSION
 } from '../../../../shared/protocol-version'
 import { clearRuntimeCompatibilityCacheForTests } from '@/runtime/runtime-rpc-client'
+import { stubRuntimeEnvironmentBridge } from '../../runtime/runtime-environment-bridge-fixture'
 
 const runtimeEnvironmentCall = vi.fn()
 
-vi.stubGlobal('window', { api: { runtimeEnvironments: { call: runtimeEnvironmentCall } } })
+stubRuntimeEnvironmentBridge({ call: runtimeEnvironmentCall })
 
 type ServedHostStatus = { hostPlatform?: NodeJS.Platform; scoped: boolean }
 

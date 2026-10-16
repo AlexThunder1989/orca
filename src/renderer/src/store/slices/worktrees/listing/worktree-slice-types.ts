@@ -12,7 +12,7 @@ import type { DirectSshAuthority } from '../../../../../../shared/ssh-types'
 import type { HostQualifiedDetectedWorktreeResult } from '../../../../../../shared/detected-worktree-provider-contract'
 import type { ProjectHostSetup } from '../../../../../../shared/project-types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
-import type { RuntimeClientTarget } from '../../../../runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 
 export type WorktreeSliceGet = Parameters<StateCreator<AppState>>[1]
 export type WorktreeSliceSet = Parameters<StateCreator<AppState, [], [], WorktreeSlice>>[0]

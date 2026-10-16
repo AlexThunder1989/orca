@@ -1,9 +1,7 @@
 import { useAppStore } from '@/store'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
-import {
-  activateWebRuntimeSessionTab,
-  isWebRuntimeSessionActive
-} from '@/runtime/web-runtime-session'
+import { activateWebRuntimeSessionTab } from '@/runtime/web-runtime-session-tab-lifecycle'
+import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session-environment'
 import { resolveWebSessionVisibleTabId } from '@/runtime/web-session-focus-intent'
 
 /**

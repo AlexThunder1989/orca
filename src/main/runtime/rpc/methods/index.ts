@@ -19,6 +19,7 @@ import { ORCHESTRATION_METHODS } from './orchestration'
 import { NOTIFICATION_METHODS } from './notifications'
 import { STATS_METHODS } from './stats'
 import { DIAGNOSTICS_METHODS } from './diagnostics'
+import { TERMINAL_DAEMON_METHODS } from './terminal-daemon'
 import { ACCOUNT_METHODS } from './accounts'
 import { ANTIGRAVITY_ACCOUNT_METHODS } from './antigravity-accounts'
 import { PREFLIGHT_METHODS } from './preflight'
@@ -48,6 +49,7 @@ import { RUNTIME_CLIENT_CAPABILITY_METHODS } from './runtime-client-capabilities
 import { EMULATOR_METHODS } from './emulator'
 import { PAIRING_METHODS } from './pairing'
 import { MOBILE_RELAY_HOSTS_METHODS } from './mobile-relay-hosts'
+import { MOBILE_PROJECT_SECTIONS_METHODS } from './mobile-project-sections'
 import { UPDATER_METHODS } from './updater'
 import { AUTOMATIC_WORK_METHODS } from './automatic-work'
 import { AGENT_SESSION_METHODS } from './agent-session'
@@ -58,7 +60,8 @@ import { STRUCTURED_AGENT_SESSION_AGENTS_METHODS } from './structured-agent-sess
 import { ARTIFACT_METHODS } from './artifacts'
 import { AGENT_HOOK_METHODS } from './agent-hooks'
 import { AGENT_LAUNCH_METHODS } from './agent-launch'
-import { WORKSPACE_LAYOUT_METHODS } from './workspace-layout'
+import { LAYOUT_APPLY_METHODS, WORKSPACE_LAYOUT_METHODS } from './workspace-layout'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -93,12 +96,15 @@ export const ALL_RPC_METHODS = [
   ...NOTIFICATION_METHODS,
   ...STATS_METHODS,
   ...DIAGNOSTICS_METHODS,
+  ...TERMINAL_DAEMON_METHODS,
   ...ACCOUNT_METHODS,
   ...ANTIGRAVITY_ACCOUNT_METHODS,
   ...PREFLIGHT_METHODS,
   ...COMPUTER_METHODS,
   ...SESSION_TAB_METHODS,
   ...WORKSPACE_LAYOUT_METHODS,
+  // Switch point: a window-owned build registers no layout command.
+  ...(ORCA_LAYOUT_OWNER_IS_MAIN ? LAYOUT_APPLY_METHODS : []),
   ...NATIVE_CHAT_METHODS,
   ...FILE_METHODS,
   ...GIT_METHODS,
@@ -123,6 +129,7 @@ export const ALL_RPC_METHODS = [
   ...EMULATOR_METHODS,
   ...PAIRING_METHODS,
   ...MOBILE_RELAY_HOSTS_METHODS,
+  ...MOBILE_PROJECT_SECTIONS_METHODS,
   ...UPDATER_METHODS,
   ...AUTOMATIC_WORK_METHODS
 ]

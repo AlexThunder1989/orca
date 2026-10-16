@@ -3,8 +3,6 @@ import type { Store } from '../persistence'
 
 const mocks = vi.hoisted(() => ({
   gitExec: vi.fn(),
-  getProvider: vi.fn(),
-  getProviderGeneration: vi.fn(),
   resolveRegisteredPath: vi.fn(),
   getLocalRepo: vi.fn(),
   getLocalOptions: vi.fn(),
@@ -12,11 +10,6 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../git/runner', () => ({ gitExecFileAsync: mocks.gitExec }))
-vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: mocks.getProvider,
-  getSshGitProviderGeneration: mocks.getProviderGeneration,
-  SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE: 'unavailable'
-}))
 vi.mock('./registered-worktree-roots-cache', () => ({
   resolveRegisteredWorktreePath: mocks.resolveRegisteredPath
 }))
@@ -34,7 +27,6 @@ import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 describe('applyGitStatusUpstreamRefWatchRequest', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.getProviderGeneration.mockReturnValue(0)
     mocks.resolveRegisteredPath.mockResolvedValue('/resolved/repo')
     mocks.getLocalOptions.mockReturnValue({})
     mocks.setWatch.mockImplementation(
@@ -68,11 +60,7 @@ describe('applyGitStatusUpstreamRefWatchRequest', () => {
     )
   })
 
-  it('keeps the SSH provider generation but refuses to resolve on an SSH host', async () => {
-    const exec = vi.fn()
-    mocks.getProvider.mockReturnValue({ exec })
-    mocks.getProviderGeneration.mockReturnValue(7)
-
+  it('binds the SSH watch but refuses to resolve on an SSH host', async () => {
     await expect(
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the SSH refusal throws before any store read.
       applyGitStatusUpstreamRefWatchRequest({} as Store, {
@@ -86,10 +74,9 @@ describe('applyGitStatusUpstreamRefWatchRequest', () => {
     ).rejects.toThrow(SshHostNotServedError)
 
     expect(mocks.setWatch).toHaveBeenCalledWith(
-      expect.objectContaining({ connectionId: 'ssh-1', providerGeneration: 7 }),
+      expect.objectContaining({ connectionId: 'ssh-1' }),
       expect.any(Function)
     )
-    expect(exec).not.toHaveBeenCalled()
     expect(mocks.gitExec).not.toHaveBeenCalled()
   })
 })

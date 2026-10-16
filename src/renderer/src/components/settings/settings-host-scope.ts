@@ -1,4 +1,4 @@
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 
 /** Host whose accounts, agents and terminal capabilities Settings shows; chosen in the page. */
 export type SettingsHostScope = {
@@ -7,8 +7,6 @@ export type SettingsHostScope = {
   available: boolean
 }
 
-export type SettingsHostChoice = { kind: 'local' } | { kind: 'environment'; environmentId: string }
-
 export const LOCAL_SETTINGS_HOST_SCOPE: SettingsHostScope = {
   target: { kind: 'local' },
   available: true
@@ -16,7 +14,7 @@ export const LOCAL_SETTINGS_HOST_SCOPE: SettingsHostScope = {
 
 export function resolveSettingsHostScope(args: {
   /** Null until the user picks a host in the page. */
-  choice: SettingsHostChoice | null
+  choice: RuntimeClientTarget | null
   /** The "default host for new projects" setting; only the initial default, never a later override. */
   defaultEnvironmentId: string | null | undefined
   savedEnvironmentIds: readonly string[]
@@ -36,8 +34,4 @@ export function resolveSettingsHostScope(args: {
     // Why: an unhydrated catalog is not evidence the server is gone.
     available: !args.catalogHydrated || args.savedEnvironmentIds.includes(environmentId)
   }
-}
-
-export function getSettingsHostScopeEnvironmentId(scope: SettingsHostScope): string | null {
-  return scope.target.kind === 'environment' ? scope.target.environmentId : null
 }

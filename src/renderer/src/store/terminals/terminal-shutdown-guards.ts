@@ -3,7 +3,7 @@ import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import {
   restorePtyDataHandlersAfterFailedShutdown,
   unregisterPtyDataHandlers
-} from '@/components/terminal-pane/pty-transport'
+} from '@/components/terminal-pane/pty-dispatcher'
 import type { PtyDataHandlerShutdownSnapshot } from '@/components/terminal-pane/pty-shutdown-data-suspension'
 import { disposeParkedTerminalWatchersForPtyIds } from '@/components/terminal-pane/terminal-parked-watcher-registry'
 import {

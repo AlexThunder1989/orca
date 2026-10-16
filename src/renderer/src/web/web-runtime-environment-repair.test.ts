@@ -48,8 +48,8 @@ describe('web re-pairing the same server', () => {
     const pending: { answer?: () => void } = {}
     vi.doMock('./web-runtime-client', () => ({
       WebRuntimeClient: class {
-        constructor(offer: { deviceToken: string }) {
-          tokens.push(offer.deviceToken)
+        constructor(connection: { credential: { deviceToken: string } }) {
+          tokens.push(connection.credential.deviceToken)
         }
 
         call(method: string): Promise<RuntimeRpcResponse<unknown>> {

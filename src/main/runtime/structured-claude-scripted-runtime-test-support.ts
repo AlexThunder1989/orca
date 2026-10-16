@@ -230,7 +230,7 @@ export function createScriptedClaudeRuntime(sessionIds: readonly string[]) {
     children: (sessionId: string): ScriptedClaudeChild[] =>
       children.filter((entry) => entry.sessionId === sessionId),
     install: async (): Promise<StructuredAgentSessionHost> => {
-      root = await mkdtemp(join(tmpdir(), 'orca-scripted-claude-runtime-'))
+      root ??= await mkdtemp(join(tmpdir(), 'orca-scripted-claude-runtime-'))
       await mkdir(join(root, 'claude-home'), { recursive: true })
       const directory = root
       host = await ensureStructuredAgentSessionHost({

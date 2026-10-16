@@ -45,6 +45,9 @@ export function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     disableCodexSharedServerAutoStart: () => Promise.resolve(false),
     stopCodexSharedServer: () => Promise.resolve(false),
     openedBeforeClaudeAccounts: () => Promise.resolve(false),
+    // Why: the paired host owns its daemons; this client has none to stop.
+    readNewerDaemonHeldScreen: () => Promise.resolve(null),
+    reopenNewerDaemonTerminals: () => Promise.resolve({ reopened: false }),
     getCwd: () => Promise.resolve('~'),
     getSize: () => Promise.resolve(null),
     listSessions: () => Promise.resolve([]),
@@ -100,6 +103,7 @@ export function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     clearPendingPaneSerializer: () => Promise.resolve(),
     reportRendererSerializerReady: () => Promise.resolve(),
     management: {
+      asyncIoHealth: () => Promise.resolve({ state: 'unsupported' as const }),
       listSessions: () => Promise.resolve({ sessions: [], degraded: false }),
       killAll: () => Promise.resolve({ killedCount: 0, remainingCount: 0, killedSessionIds: [] }),
       killOne: () => Promise.resolve({ success: false }),
@@ -108,7 +112,11 @@ export function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
       macTccAttribution: () =>
         Promise.resolve({ health: 'unknown' as const, folderAccessMismatch: null }),
       // Why: the TCC row belongs to the host's app bundle, which a web client cannot reach.
-      resetFolderAccess: () => Promise.resolve({ outcome: 'unsupported' as const })
+      resetFolderAccess: () => Promise.resolve({ outcome: 'unsupported' as const }),
+      // Why: the host daemon's /proc evidence is not reachable from a web client.
+      severedDaemon: () => Promise.resolve({ severed: null }),
+      restartSeveredDaemon: () =>
+        Promise.resolve({ status: 'refused' as const, reason: 'not-severed' as const })
     }
   }
 }
@@ -152,7 +160,7 @@ export function createSshApi(): NonNullable<Partial<PreloadApi>['ssh']> {
     connect: async (args) => {
       const { state } = await callRuntimeResult<{ state: SshConnectionState | null }>(
         'ssh.connect',
-        { targetId: args.targetId }
+        { targetId: args.targetId, automatic: args.automatic }
       )
       return state
     },

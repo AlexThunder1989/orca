@@ -1,4 +1,4 @@
-import { setLocalPtyProvider } from '../ipc/pty'
+import { setLocalPtyProvider } from '../ipc/pty/provider/registry'
 import { DegradedDaemonPtyProvider } from './degraded-daemon-pty-provider'
 import { getDaemonRuntimeDir as getRuntimeDir } from './daemon-launch-paths'
 import { readDaemonPidRecord as readDaemonPidRecordAt } from './daemon-endpoint-incarnation'

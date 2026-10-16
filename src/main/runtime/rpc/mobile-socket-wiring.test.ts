@@ -10,7 +10,7 @@ import {
 import { sealMobileE2EEV2Frame } from '../../../shared/mobile-e2ee-v2-framing'
 import type { DeviceRegistry } from '../device-registry'
 import { deriveSharedKey, encrypt, generateKeyPair } from './e2ee-crypto'
-import { deriveMobileE2EEV2KeySchedule } from './mobile-e2ee-v2-key-schedule'
+import { deriveMobileE2EEV2KeySchedule } from '../../../shared/mobile-e2ee-v2-node-key-schedule'
 import {
   MobileSocketWiring,
   type MobileSocketTransport,

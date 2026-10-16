@@ -4,6 +4,26 @@ import '@testing-library/jest-dom/vitest'
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+
+// Why: these fixtures have neither inline visual owners nor sender navigation.
+const unusedChatLeaves = vi.hoisted(() => ({
+  inlineVisual: vi.fn(() => {
+    throw new Error('Unexpected inline visual in transcript fixture')
+  }),
+  openSender: vi.fn(() => {
+    throw new Error('Unexpected sender navigation in transcript fixture')
+  })
+}))
+vi.mock('./NativeChatInlineVisual', () => ({
+  NativeChatInlineVisual: unusedChatLeaves.inlineVisual
+}))
+vi.mock('@/lib/open-agent-message-sender', () => ({
+  openAgentMessageSender: unusedChatLeaves.openSender
+}))
+afterEach(() => {
+  expect(unusedChatLeaves.inlineVisual).not.toHaveBeenCalled()
+  expect(unusedChatLeaves.openSender).not.toHaveBeenCalled()
+})
 import { agentSessionFailureWords } from '../../../../shared/agent-session-failure-words'
 import type {
   AgentJournalItemBody,
@@ -229,20 +249,27 @@ afterEach(cleanup)
   // says the turn is stopping, and the bar settles to "Interrupted after" once the turn ends.
   describe("the turn bar while a person's Stop ends the turn", () => {
     it('keeps the running clock above the Stopping tail line', () => {
-      render(
+      const transcript = (stopping: boolean) => (
         <NativeChatMessageList
           session={session}
           journalItems={[journalItem(1, turnItem)]}
+          turnActivity={{ kind: 'description', text: 'Running pnpm test' }}
           isWorking
-          stopping
+          stopping={stopping}
           expandSignal={false}
         />
       )
+      const { rerender } = render(transcript(false))
+      expect(screen.getByText('Running pnpm test')).toBeInTheDocument()
+      expect(screen.queryByText('Stopping…')).toBeNull()
+
+      rerender(transcript(true))
 
       const bar = screen.getByText('Working for 0s')
       const stopping = screen.getByText('Stopping…')
       expect(bar.compareDocumentPosition(stopping)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
       expect(screen.getAllByText(/Stopping/)).toHaveLength(1)
+      expect(screen.queryByText('Running pnpm test')).toBeNull()
     })
   })
 

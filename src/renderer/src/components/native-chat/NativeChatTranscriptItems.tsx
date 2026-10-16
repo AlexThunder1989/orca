@@ -5,6 +5,7 @@ import {
 } from './NativeChatTranscriptRow'
 import { nativeChatSlotKey, type NativeChatTranscriptSlot } from './native-chat-transcript-slots'
 import type { NativeChatTranscriptWindow } from './use-native-chat-transcript-window'
+import type { NativeChatNewRowsMarkerState } from './native-chat-new-rows-marker'
 import {
   NativeChatReplyRevealsContext,
   useNativeChatReplyReveals
@@ -13,15 +14,19 @@ import {
 /** Mounted rows own their height; only unloaded gaps use cached measurements. */
 export function NativeChatTranscriptItems({
   slots,
+  loadedMessageIds,
   context,
-  window
+  window,
+  newRowsMarker
 }: {
   slots: readonly NativeChatTranscriptSlot[]
+  loadedMessageIds: ReadonlySet<string>
   context: NativeChatTranscriptRowContext
   window: NativeChatTranscriptWindow
+  newRowsMarker?: NativeChatNewRowsMarkerState
 }): React.JSX.Element {
   const rowKeys = useMemo(() => slots.map(nativeChatSlotKey), [slots])
-  const replyReveals = useNativeChatReplyReveals(rowKeys)
+  const replyReveals = useNativeChatReplyReveals(rowKeys, loadedMessageIds)
   return (
     <NativeChatReplyRevealsContext.Provider value={replyReveals}>
       <div ref={window.sizerRef} data-native-chat-window className="relative w-full">
@@ -35,7 +40,13 @@ export function NativeChatTranscriptItems({
             <Fragment key={item.key}>
               <div aria-hidden style={{ height: Math.max(0, item.start - previousEnd) }} />
               <div data-index={item.index} ref={window.measureRow} className="flow-root w-full">
-                <NativeChatTranscriptRow slot={slot} context={context} />
+                <NativeChatTranscriptRow
+                  slot={slot}
+                  context={context}
+                  newRowsMarker={
+                    rowKeys[item.index] === newRowsMarker?.key ? newRowsMarker : undefined
+                  }
+                />
               </div>
             </Fragment>
           )

@@ -26,14 +26,15 @@ function admissionFor(args: AdmittedSpawnArgs): TerminalPaneAdmission {
       newLeafId: leafId
     }
   }
-  const viewMode = placement?.kind === 'new-tab' ? placement.row?.viewMode : undefined
+  const row = placement?.kind === 'new-tab' ? placement.row : undefined
   return {
     type: 'createTerminalTab',
     workspace,
     tabId,
     leafId,
     ...(args.groupId ? { groupId: args.groupId } : {}),
-    ...(viewMode ? { viewMode } : {}),
+    ...(row?.viewMode ? { viewMode: row.viewMode } : {}),
+    ...(row?.customTitle ? { title: row.customTitle } : {}),
     ...(args.cwd ? { creation: { startupCwd: args.cwd } } : {})
   }
 }
@@ -60,7 +61,7 @@ export async function withdrawRuntimePane(
  */
 export async function spawnInAdmittedPane(
   store: RuntimeStore | null | undefined,
-  controller: Required<Pick<RuntimePtyController, 'spawn'>>,
+  controller: Pick<RuntimePtyController, 'spawn'>,
   args: AdmittedSpawnArgs
 ): ReturnType<Spawn> {
   const outcome = await store?.admitTerminalPane?.(admissionFor(args), hostIdOf(args))
@@ -71,7 +72,8 @@ export async function spawnInAdmittedPane(
   const { groupId: _groupId, ...spawnArgs } = args
   let result: Awaited<ReturnType<Spawn>>
   try {
-    result = await controller.spawn(spawnArgs)
+    // SAFETY: Callers require spawn; a lost capability during admission keeps the original failure.
+    result = await controller.spawn!(spawnArgs)
   } catch (error) {
     if (outcome === 'admitted') {
       await withdrawRuntimePane(store, args)

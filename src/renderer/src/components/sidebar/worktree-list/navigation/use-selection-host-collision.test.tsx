@@ -21,7 +21,6 @@ function row(worktree: Worktree): HostSectionRow {
     repo: undefined,
     depth: 0,
     groupDepth: 0,
-    lineageTrail: [],
     isLastLineageChild: false,
     lineageChildCount: 0
   }

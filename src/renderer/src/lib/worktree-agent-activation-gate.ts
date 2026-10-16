@@ -152,6 +152,12 @@ export async function runWorktreeAgentActivationGate(
   let structuredInventory: StructuredActivationInventory | null = null
   try {
     const reportedStructuredSession = await deps.hasStructuredSession?.(worktreeId)
+    if (
+      typeof reportedStructuredSession === 'object' &&
+      reportedStructuredSession.snapshot.initialSurfaceLaunch
+    ) {
+      return 'blocked'
+    }
     structuredInventory =
       typeof reportedStructuredSession === 'object' ? reportedStructuredSession : null
     structured = Boolean(

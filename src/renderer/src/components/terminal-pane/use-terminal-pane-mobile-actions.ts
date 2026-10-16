@@ -9,10 +9,8 @@ import {
   isPrimarySelectionEnabled,
   readPrimarySelectionText
 } from '@/lib/primary-selection'
-import { getConnectionId } from '@/lib/connection-context'
 import { getShortcutPlatform } from '@/lib/shortcut-platform'
 import { resolveTerminalPasteRuntime } from './terminal-paste-runtime'
-import { getTerminalPasteSshRemotePlatform } from './terminal-paste-ssh-platform'
 import { isTerminalPanePasteTargetCurrent } from './terminal-paste-target-state'
 import { pasteTextIntoTerminalPane } from './terminal-pane-paste-dispatch'
 import { formatTerminalPasteExecutionError } from './terminal-paste-errors'
@@ -153,7 +151,6 @@ export function useTerminalPaneMobileActions(controller: TerminalPaneContextCont
         }
         const transport = paneTransportsRef.current.get(clickedPane.id)
         const ptyId = transport?.getPtyId() ?? null
-        const connectionId = getConnectionId(worktreeId) ?? null
         const targetStillMounted = (): boolean =>
           isTerminalPanePasteTargetCurrent({
             manager: managerRef.current,
@@ -171,8 +168,6 @@ export function useTerminalPaneMobileActions(controller: TerminalPaneContextCont
           runtime: resolveTerminalPasteRuntime({
             platform: getShortcutPlatform(),
             ptyId,
-            connectionId,
-            remotePlatform: getTerminalPasteSshRemotePlatform(connectionId),
             transport
           }),
           transport,
@@ -188,7 +183,7 @@ export function useTerminalPaneMobileActions(controller: TerminalPaneContextCont
       })
     },
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- Preserve the pre-split dependency contract.
-    [findTerminalPaneForMiddleClick, tabId, worktreeId]
+    [findTerminalPaneForMiddleClick, tabId]
   )
   const handlePrimarySelectionAuxClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>): void => {

@@ -1,9 +1,10 @@
-import type { DirectE2EEFraming, DirectE2EEFramingPolicy } from './direct-e2ee-framing-policy'
+import type { PairedE2EEFraming } from '../../../src/shared/paired-e2ee-client-handshake'
+import type { PairedE2EEFramingPolicy } from '../../../src/shared/paired-e2ee-framing-policy'
 import { createDirectSocketFraming, type DirectSocketFraming } from './direct-socket-framing'
 import { isRpcResponse } from './rpc-response-shape'
 import { isStaleRpcSocketEvent, logRpcSocketClose } from './rpc-socket-close-evidence'
 import { describeSocketEvent, redactSocketEndpoint } from './socket-event-debug'
-import type { ConnectionLogEmitter, ConnectionState, RpcResponse } from './types'
+import type { ConnectionLogEmitter, ConnectionState, RpcRequest, RpcResponse } from './types'
 
 const CONNECT_TIMEOUT_MS = 12_000
 const HANDSHAKE_TIMEOUT_MS = 5_000
@@ -13,9 +14,8 @@ const UNAUTHORIZED_CLOSE_CODE = 4001
 type SocketSessionOptions = {
   endpoint: string
   deviceToken: string
-  serverPublicKey: Uint8Array
   serverPublicKeyB64: string
-  framingPolicy: DirectE2EEFramingPolicy
+  framingPolicy: PairedE2EEFramingPolicy
   getCurrentSocket: () => WebSocket | null
   getState: () => ConnectionState
   getReconnectAttempt: () => number
@@ -37,7 +37,7 @@ export class RpcClientSocketSession {
   readonly constructedAt = Date.now()
   private framing: DirectSocketFraming | null = null
   // Why: chosen when the socket opens, so a latch recorded while it was dialing applies.
-  private framingKind: DirectE2EEFraming | null = null
+  private framingKind: PairedE2EEFraming | null = null
   private readyAccepted = false
   private authenticated = false
   private lastInboundAt: number | null = null
@@ -50,7 +50,7 @@ export class RpcClientSocketSession {
     this.armConnectTimeout()
   }
 
-  sendEncrypted(request: unknown): boolean {
+  sendEncrypted(request: RpcRequest): boolean {
     if (this.socket.readyState === WebSocket.OPEN && this.framing) {
       try {
         if (this.framing.sendText(JSON.stringify(request))) {
@@ -171,7 +171,6 @@ export class RpcClientSocketSession {
       framing: this.framingKind,
       mayUseLegacy: policy.mayUseLegacy,
       socket: this.socket,
-      serverPublicKey: this.options.serverPublicKey,
       serverPublicKeyB64: this.options.serverPublicKeyB64,
       deviceToken: this.options.deviceToken,
       emitLog: this.options.emitLog,

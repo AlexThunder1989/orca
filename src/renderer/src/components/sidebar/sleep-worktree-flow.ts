@@ -136,8 +136,34 @@ function describeSleepFailure(error: unknown): string {
 }
 
 export async function runSleepWorktrees(worktreeIds: readonly string[]): Promise<void> {
+  const { errors } = await sleepWorktreesReportingFailures(worktreeIds)
+  if (errors.length > 0) {
+    // Why: callers are fire-and-forget; surface actionable teardown failures after restoring retryable UI state.
+    toast.error(
+      worktreeIds.length === 1
+        ? translate(
+            'auto.components.sidebar.sleep.worktree.flow.8bc3fc0671',
+            'Failed to sleep workspace'
+          )
+        : translate(
+            'auto.components.sidebar.sleep.worktree.flow.c460fecc4a',
+            'Failed to sleep some workspaces'
+          ),
+      {
+        description: errors.join('\n')
+      }
+    )
+  }
+}
+
+export type WorktreeSleepOutcome = { failedWorktreeIds: string[]; errors: string[] }
+
+/** The sleep without the toast, for callers that report failures themselves. */
+export async function sleepWorktreesReportingFailures(
+  worktreeIds: readonly string[]
+): Promise<WorktreeSleepOutcome> {
   if (worktreeIds.length === 0) {
-    return
+    return { failedWorktreeIds: [], errors: [] }
   }
   const {
     activeWorktreeId,
@@ -214,21 +240,5 @@ export async function runSleepWorktrees(worktreeIds: readonly string[]): Promise
       setActiveWorktree(sleptActiveWorktreeId)
     }
   }
-  if (errors.length > 0) {
-    // Why: callers are fire-and-forget; surface actionable teardown failures after restoring retryable UI state.
-    toast.error(
-      worktreeIds.length === 1
-        ? translate(
-            'auto.components.sidebar.sleep.worktree.flow.8bc3fc0671',
-            'Failed to sleep workspace'
-          )
-        : translate(
-            'auto.components.sidebar.sleep.worktree.flow.c460fecc4a',
-            'Failed to sleep some workspaces'
-          ),
-      {
-        description: errors.join('\n')
-      }
-    )
-  }
+  return { failedWorktreeIds: [...failedWorktreeIds], errors }
 }

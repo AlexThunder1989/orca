@@ -1,10 +1,7 @@
 import type { StructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import type { AgentJournalDispatchRejection } from '../../shared/agent-session-failure-words'
 import type { SubmissionRejectionFact } from '../../shared/agent-session-failure'
-import type {
-  AgentJournalItemIdentity,
-  AgentSessionJournalIdentity
-} from '../../shared/agent-session-journal-types'
+import type { AgentJournalItemIdentity } from '../../shared/agent-session-journal-types'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import type {
   StructuredAgentSessionOptionsReportedEvent,
@@ -16,6 +13,7 @@ import type {
   openClaudeStreamJsonConnection
 } from './claude-stream-json-connection'
 import type { ClaudeStructuredLaunch } from './claude-structured-launch-resolution'
+import type { StructuredLaunchRequest } from '../runtime/structured-agent-launch-composition'
 import type { ClaudeJournalTranslator } from './claude-journal-translator-contract'
 import type { ClaudePendingPrompt, ClaudePromptRegistry } from './claude-structured-prompt-replies'
 import { cancelProcessAcquisition } from '@orca/process-host/cancel-process-acquisition'
@@ -50,6 +48,8 @@ export type ClaudeStructuredSessionEvent =
       requestedAt?: number
       /** The submission this replay acknowledged, which opens the turn. */
       clientMessageId?: string
+      /** On any other frame: the send the CLI started and has not echoed, whose turn output opens. */
+      startedSend?: ClaudeStartedSend
       /** Host clock at receipt; stamped on turn boundaries only. */
       observedAt?: number
     }
@@ -86,6 +86,8 @@ export type ClaudeStructuredSessionEvent =
       startupUnanswered?: true
     }
 
+export type ClaudeStartedSend = { clientMessageId: string; requestedAt?: number }
+
 export type ClaudeLateDispatchOutcome =
   | {
       clientMessageId: string
@@ -98,9 +100,7 @@ export type ClaudeLateDispatchOutcome =
 export type ClaudeStructuredSessionAdapterDeps = {
   /** The `/` surface of a chat whose Claude is not running. */
   atRestCommands?: ClaudeAtRestCommandCatalog
-  resolveLaunch: (input: {
-    identity: AgentSessionJournalIdentity
-  }) => Promise<ClaudeStructuredLaunch>
+  resolveLaunch: (input: StructuredLaunchRequest) => Promise<ClaudeStructuredLaunch>
   onEvent?: (event: ClaudeStructuredSessionEvent) => void
   /** Direct settlement path for provider-proven late dispatch outcomes. */
   onDispatchSettledLate?: (input: { sessionId: string } & ClaudeLateDispatchOutcome) => void

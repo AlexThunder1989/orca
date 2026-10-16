@@ -8,10 +8,8 @@ import {
   setRuntimeBrowserCommandsFactory,
   setRuntimeBrowserUnavailableCause
 } from '../runtime/runtime-browser-commands-factory'
-import type {
-  RuntimeBrowserCommandHost,
-  RuntimeBrowserCommands
-} from '../runtime/orca-runtime-browser'
+import type { RuntimeBrowserCommandHost } from '../runtime/browser/browser-command-contracts'
+import type { RuntimeBrowserCommands } from '../runtime/browser/browser-commands'
 
 vi.mock('./orcad-browser-provider', () => ({ resolveOrcadBrowserProvider: vi.fn() }))
 afterEach(() => {

@@ -17,6 +17,7 @@ import type {
 } from '../../../shared/agent-session-wire'
 import { agentSessionLeaseAdmitsWriter } from '../../../shared/agent-session-lease-adjudication'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import type { AgentChatPermissionMode } from '../../../shared/agent-chat-permission-mode'
 import {
   admitAttachOrRefuse,
   attachJournal,
@@ -36,6 +37,8 @@ import type { StructuredAgentRegistry } from './structured-agent-registry'
 import type { StructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
 import { resolveAgentSessionReplayOutcome } from './structured-agent-session-replay-outcome'
 import { readAgentSessionHydrationPage } from './agent-session-history-page'
+import { withPublishedWork } from './agent-session-published-work'
+import { heldStructuredAgentSessionCurrentWork } from './structured-agent-session-host-current-work'
 import { acquireOwner } from './structured-agent-session-acquisition'
 import {
   importAdoptedTranscript,
@@ -75,6 +78,10 @@ export type AttachFlowInput = {
   onStartCatalogListing?: (listing: AgentModelCatalogLiveListing) => void
   /** The conversation's option revision, which the child's reports are stamped with. */
   optionRevision: () => number
+  /** The permission mode a start of this record launches with; absent or undefined for none. */
+  launchPermissionMode?: (
+    record: AgentSessionRecord
+  ) => Promise<AgentChatPermissionMode | undefined>
   /** Publishes the journal before clients can send against the new owner. `acquiredOwner` is
    *  true only when this attach spawned the provider child, so a re-attach to a live one is not
    *  mistaken for a cold acquire. */
@@ -284,7 +291,11 @@ export async function performAttach(
     value: {
       sessionId,
       fence,
-      page: readAgentSessionHydrationPage(attached.journal, fence),
+      // The lease this attach just took is the live generation.
+      page: withPublishedWork(
+        readAgentSessionHydrationPage(attached.journal, fence),
+        heldStructuredAgentSessionCurrentWork(store, sessionId, attached.journal, undefined)
+      ),
       unconfirmedClientMessageIds: attached.unconfirmedClientMessageIds,
       ...(tabId ? { tabId } : {})
     }

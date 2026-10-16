@@ -346,9 +346,7 @@ it('admits Stop with the create-returned fence after acquisition advances it and
       }
     ])
     expect(
-      projectStructuredAgentSessionMessages(snapshot.items, [], snapshot.submissions, {
-        rejectedInPlace: true
-      })
+      projectStructuredAgentSessionMessages(snapshot.items, [], snapshot.submissions)
     ).toMatchObject([
       { role: 'user', blocks: first.body.blocks },
       { blocks: [{ type: 'text', text: NATIVE_CHAT_STOPPED_BEFORE_START_TEXT }] }

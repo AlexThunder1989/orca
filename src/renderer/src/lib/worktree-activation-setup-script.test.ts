@@ -4,7 +4,8 @@ import { ensureWorktreeHasInitialTerminal } from './worktree-initial-terminal-se
 import {
   createMockStore,
   registerWorktreeActivationReset,
-  setSetupScriptLaunchMode
+  setSetupScriptLaunchMode,
+  createdTabStartups
 } from './worktree-activation-test-harness'
 
 registerWorktreeActivationReset()
@@ -29,7 +30,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
     expect(store.setTabCustomTitle).toHaveBeenCalledWith('tab-2', 'Setup', {
       recordInteraction: false
     })
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-2', {
+    expect(createdTabStartups(store)['tab-2']).toEqual({
       command: 'bash /tmp/repo/.git/orca/setup-runner.sh',
       env: {
         ORCA_ROOT_PATH: '/tmp/repo',
@@ -53,7 +54,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
       }
     })
 
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-2', {
+    expect(createdTabStartups(store)['tab-2']).toEqual({
       command: 'bash /c/repo/.git/orca/setup-runner.sh',
       env: {
         ORCA_ROOT_PATH: 'C:\\repo',
@@ -83,7 +84,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
     expect(store.setTabCustomTitle).toHaveBeenCalledWith('tab-2', 'Setup', {
       recordInteraction: false
     })
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-2', {
+    expect(createdTabStartups(store)['tab-2']).toEqual({
       command: 'bash -lc wrapped-setup',
       env: { ORCA_ROOT_PATH: '/tmp/repo' }
     })
@@ -112,14 +113,12 @@ describe('ensureWorktreeHasInitialTerminal', () => {
 
     expect(result).toBe('tab-1')
     expect(createTab).toHaveBeenCalledTimes(1)
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-2',
+    expect(createdTabStartups(store)['tab-2']).toEqual(
       expect.objectContaining({
         command: expect.stringContaining('bash /tmp/repo/.git/orca/setup-runner.sh')
       })
     )
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-2',
+    expect(createdTabStartups(store)['tab-2']).toEqual(
       expect.objectContaining({
         command: expect.stringContaining('printf')
       })
@@ -141,7 +140,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
       }
     })
 
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-2', {
+    expect(createdTabStartups(store)['tab-2']).toEqual({
       command: 'bash /mnt/c/repo/.git/orca/setup-runner.sh',
       env: {
         ORCA_ROOT_PATH: 'C:\\repo',
@@ -167,8 +166,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
       }
     )
 
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-1',
+    expect(createdTabStartups(store)['tab-1']).toEqual(
       expect.objectContaining({
         env: expect.objectContaining({
           [SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV]: expect.stringContaining(
@@ -177,22 +175,19 @@ describe('ensureWorktreeHasInitialTerminal', () => {
         })
       })
     )
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-1',
+    expect(createdTabStartups(store)['tab-1']).toEqual(
       expect.objectContaining({
         env: expect.objectContaining({
           [SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV]: expect.stringContaining('exec claude')
         })
       })
     )
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-2',
+    expect(createdTabStartups(store)['tab-2']).toEqual(
       expect.objectContaining({
         command: expect.stringContaining('printf')
       })
     )
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-2',
+    expect(createdTabStartups(store)['tab-2']).toEqual(
       expect.objectContaining({
         command: expect.stringContaining('bash /tmp/repo/.git/orca/setup-runner.sh')
       })
@@ -216,10 +211,10 @@ describe('ensureWorktreeHasInitialTerminal', () => {
       }
     )
 
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-1', {
+    expect(createdTabStartups(store)['tab-1']).toEqual({
       command: 'claude'
     })
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-2', {
+    expect(createdTabStartups(store)['tab-2']).toEqual({
       command: 'bash /tmp/repo/.git/orca/setup-runner.sh',
       env: { ORCA_ROOT_PATH: '/tmp/repo' }
     })
@@ -240,8 +235,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
       }
     )
 
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-1',
+    expect(createdTabStartups(store)['tab-1']).toEqual(
       expect.objectContaining({
         env: expect.objectContaining({
           [SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV]: expect.stringContaining('exec claude')
@@ -276,8 +270,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
       }
     )
 
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-1',
+    expect(createdTabStartups(store)['tab-1']).toEqual(
       expect.objectContaining({
         env: expect.objectContaining({
           [SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV]: expect.stringContaining(
@@ -344,7 +337,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
     expect(store.setTabCustomTitle).toHaveBeenCalledWith('tab-2', 'Setup', {
       recordInteraction: false
     })
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-2', {
+    expect(createdTabStartups(store)['tab-2']).toEqual({
       command: 'bash /tmp/repo/.git/orca/setup-runner.sh',
       env: { ORCA_ROOT_PATH: '/tmp/repo' }
     })

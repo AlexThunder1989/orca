@@ -4,6 +4,7 @@ import type {
   RuntimeTerminalOrphanAdoptionRequest,
   RuntimeTerminalOrphanAdoptionResult
 } from '../../shared/runtime-types'
+import type { ExecutionHostId } from '../../shared/execution-host'
 import { makePaneKey } from '../../shared/stable-pane-id'
 import { hasClosedTerminalTabRecord } from '../../shared/closed-terminal-tab-tombstones'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
@@ -36,6 +37,8 @@ type RuntimeTerminalOrphanAdoptionPorts = {
 }
 
 export async function adoptRuntimeTerminalOrphansFromInventory(args: {
+  /** The partition the session is read from and written to. */
+  hostId: ExecutionHostId
   request: RuntimeTerminalOrphanAdoptionRequest
   workspace: TerminalWorkspaceLaunchScope
   inventory: PtyControllerInventory
@@ -221,6 +224,7 @@ export async function adoptRuntimeTerminalOrphansFromInventory(args: {
   }
 
   const persisted = buildRuntimeTerminalOrphanSession({
+    hostId: args.hostId,
     session,
     sessionWorktreeId,
     worktreeId: workspace.id,

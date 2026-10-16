@@ -4,11 +4,11 @@ import { DaemonPtyAdapterSubscriptionFanout } from './daemon-pty-adapter-subscri
 import type {
   IPtyProvider,
   PtyBackgroundStreamEvent,
-  PtyProviderBufferSnapshot,
   PtyProcessInfo,
+  PtyProviderBufferSnapshot,
   PtySpawnOptions,
   PtySpawnResult
-} from '../providers/types'
+} from '../providers/pty-provider-contract'
 import type { PtyProcessInspection } from '../providers/pty-process-inspection'
 import { isDaemonEndpointGoneError } from './daemon-errors'
 import { LegacyDaemonExitProof } from './daemon-legacy-exit-proof'
@@ -17,6 +17,7 @@ import type { DaemonPtyRouterDataEvent, DaemonPtyRouterExitEvent } from './daemo
 import { DaemonSessionOwnerResolver } from './daemon-session-owner-resolution'
 import type { DaemonIdleRetirementResult } from './daemon-pty-runtime-state'
 import { DaemonRouterRetirement } from './daemon-router-retirement'
+import { routeSpawnOrHold } from './daemon-router-newer-daemon-hold'
 import type { WriteSettlement } from '../../shared/pty-write-settlement'
 import type { TerminalOscColorQueryReplyColors } from '../../shared/terminal-osc-color-reply'
 
@@ -59,7 +60,7 @@ export class DaemonPtyRouter implements IPtyProvider {
         return await this.ownerResolver.spawnAttachOnly({ ...opts, sessionId: opts.sessionId })
       }
       const adapter = opts.sessionId ? this.sessionAdapters.get(opts.sessionId) : undefined
-      const target = adapter ?? this.current
+      const target = await routeSpawnOrHold(opts, adapter, this.current, this.ownerResolver)
       const result = await target.spawn(opts)
       // Why: the adapter filters intentional recovery exits and canonical-ID races before publishing proof.
       if (!result.exitedBeforeSpawnReply) {

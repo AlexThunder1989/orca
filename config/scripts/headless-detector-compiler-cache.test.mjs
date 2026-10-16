@@ -74,6 +74,7 @@ it('activates the compiler and workspace-policy parser and preserves import grap
     'node-server-change-scope',
     'node-server-test-paths',
     'node-server-qualification',
+    'node-server-native-compat-scope',
     'orcad-entry-build',
     'workspace-source-exports'
   ]) {
@@ -195,9 +196,7 @@ it('uses exact optional restores, seeds only main and retains full dependency fa
   ).toBe(
     "steps.scope.outputs.graph_required == 'true' && steps.compiler.outputs.available != 'true'"
   )
-  for (const event of ['push', 'pull_request']) {
-    expect(workflow.on[event].paths).toContain('.github/actions/prepare-headless-compiler/**')
-  }
+  expect(workflow.on.pull_request.paths).toContain('.github/actions/prepare-headless-compiler/**')
   const warmer = parse(readFileSync('.github/workflows/ci-cache-warmup.yml', 'utf8'))
   const warmSteps = warmer.jobs.warm.steps
   expect(

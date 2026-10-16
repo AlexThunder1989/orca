@@ -17,7 +17,13 @@ import {
   resolveVsCodeRemoteSshLaunchSpec
 } from '../external-editor-launch'
 import { resolveVsCodeSshAuthority } from '../ssh/vscode-ssh-authority'
-import { parseRoutableExecutionHostId, toSshExecutionHostId } from '../../shared/execution-host'
+import { toSshExecutionHostId } from '../../shared/execution-host'
+import {
+  isLocallyOwned,
+  pathExists,
+  resolveOwnedPathTarget,
+  validateLocalPathTarget
+} from './shell-owned-path-target'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
 
@@ -25,43 +31,11 @@ const REPO_ICON_IMAGE_MIME_TYPES: Record<string, string> = {
   '.png': 'image/png'
 }
 
-async function pathExists(pathValue: string): Promise<boolean> {
-  try {
-    await stat(pathValue)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function validateLocalPathTarget(
-  pathValue: string
-): Promise<{ ok: true; path: string } | { ok: false; reason: 'not-absolute' | 'not-found' }> {
-  const normalizedPath = normalize(pathValue)
-  if (!isAbsolute(normalizedPath)) {
-    return { ok: false, reason: 'not-absolute' }
-  }
-  if (!(await pathExists(normalizedPath))) {
-    return { ok: false, reason: 'not-found' }
-  }
-  return { ok: true, path: normalizedPath }
-}
-
-// Why: the path's owner decides, never the focused server; an absent owner is refused.
-function isLocallyOwned(ownerHostId: unknown): boolean {
-  return (
-    typeof ownerHostId === 'string' && parseRoutableExecutionHostId(ownerHostId)?.kind === 'local'
-  )
-}
-
 async function openInFileManager(
   pathValue: string,
   ownerHostId: unknown
 ): Promise<ShellOpenLocalPathResult> {
-  if (!isLocallyOwned(ownerHostId)) {
-    return { ok: false, reason: 'remote-runtime-unsupported' }
-  }
-  const target = await validateLocalPathTarget(pathValue)
+  const target = await resolveOwnedPathTarget(pathValue, ownerHostId)
   if (!target.ok) {
     return target
   }
@@ -76,7 +50,7 @@ async function openInFileManager(
 }
 
 async function openInExternalEditor(
-  store: Store,
+  store: Pick<Store, 'getSshTarget'>,
   request: ShellOpenExternalEditorRequest
 ): Promise<ShellOpenExternalEditorResult> {
   const connectionId = request.connectionId?.trim()
@@ -114,14 +88,12 @@ async function openInExternalEditor(
     }
   }
 
-  if (!isLocallyOwned(request.ownerHostId)) {
-    return { ok: false, reason: 'remote-runtime-unsupported' }
-  }
-  const target = await validateLocalPathTarget(request.path)
+  const target = await resolveOwnedPathTarget(request.path, request.ownerHostId)
   if (!target.ok) {
     return target
   }
   try {
+    // Why the UNC path for a WSL owner: VS Code and Cursor turn it into `--remote wsl+<distro>`.
     await launchExternalEditor(resolveExternalEditorLaunchSpec(request.command, target.path))
     return { ok: true }
   } catch {
@@ -145,7 +117,7 @@ async function openWithSystemDefault(pathValue: string, ownerHostId: unknown): P
   }
 }
 
-export function registerShellHandlers(store: Store): void {
+export function registerShellHandlers(store: Pick<Store, 'getSshTarget'>): void {
   ipcMain.handle(
     'shell:openPath',
     async (_event, path: string, ownerHostId: unknown): Promise<void> => {

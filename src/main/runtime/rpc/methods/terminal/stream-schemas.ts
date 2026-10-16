@@ -32,13 +32,6 @@ export const TerminalMultiplexLegacyAckFrame = z
   })
   .strict()
 
-export const TerminalMultiplexSourceRangeAckFrame = z
-  .object({
-    streamGeneration: z.string().min(1),
-    ackedEndByte: z.number().int().nonnegative()
-  })
-  .strict()
-
 export const TerminalMultiplexSnapshotRequestFrame = z.object({
   requestId: z.number().int().positive().optional(),
   scrollbackRows: z.number().finite().optional()

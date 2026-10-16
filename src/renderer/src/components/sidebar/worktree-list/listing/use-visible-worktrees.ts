@@ -9,7 +9,7 @@ import { computeVisibleWorktrees } from '../../visible-worktrees'
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
-} from '../../workspace-creator-visibility'
+} from '../../../../../../shared/workspace-creator-visibility'
 import {
   getVisibleWorktreeBrowserActivityTabs,
   getVisibleWorktreeTerminalActivityTabs,

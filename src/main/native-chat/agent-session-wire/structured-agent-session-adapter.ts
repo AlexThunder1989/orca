@@ -1,3 +1,4 @@
+import type { AiVaultConversationCopy } from '../../../shared/ai-vault-resume-preparation'
 import type {
   AgentSessionAccountKind,
   AgentSessionUnavailable
@@ -14,7 +15,10 @@ import type {
 // take this?" — and it answers `unknown` rather than guessing, because the
 // journal renders that as delivery unconfirmed instead of as failure.
 
-import type { AgentSessionBackgroundTaskStops } from '../../../shared/agent-child-work-stop-targets'
+import type {
+  AgentChildWorkStopAcknowledgement,
+  AgentSessionBackgroundTaskStops
+} from '../../../shared/agent-child-work-stop-targets'
 import type {
   AgentJournalAnsweredTurnIdentity,
   AgentJournalItemIdentity,
@@ -33,9 +37,9 @@ import type {
 import type { StructuredAgentSessionAtRestCommands } from './structured-agent-session-at-rest-commands'
 import type {
   AgentSessionOptionsResult,
-  AgentSessionSlashCommand,
-  AgentSessionThreadGoalChange
+  AgentSessionSlashCommand
 } from '../../../shared/agent-session-wire'
+import type { AgentSessionThreadGoalChange } from '../../../shared/agent-session-thread-goal-wire'
 import type { AgentSessionRefusalReason } from '../../../shared/agent-session-wire-refusals'
 import type { SubmissionRejectionFact } from '../../../shared/agent-session-failure'
 import type {
@@ -131,6 +135,7 @@ export type AgentSessionPreSpawnReason = Extract<
   | 'claudeAccountFolderMissing'
   | 'claudeAccountSetupFailed'
   | 'agentCommandNotRunnable'
+  | 'runtimeNotInstalled'
 >
 
 /** Acquisition failed with first-hand proof that no provider process existed. */
@@ -362,11 +367,14 @@ export type StructuredAgentSessionAdapter = StructuredAgentSessionAdapterStop & 
   }): Promise<{ ok: true } | { ok: false; rejected: string }>
   /** Stops exactly the tasks `taskIds` names, which the host resolves from its child records.
    *  `stillRunning` is the provider's own answer that one survived its stop; a throw leaves the
-   *  effect unknown. */
+   *  effect unknown. `acknowledge` names each task the provider accepted the stop of as its answer
+   *  lands, so a later failure in the batch keeps it; the host alone turns it into that run's
+   *  provisional ending. */
   stopBackgroundTasks?(input: {
     sessionId: string
     fence: number
     taskIds: readonly string[]
+    acknowledge?: (acknowledgement: AgentChildWorkStopAcknowledgement) => void
   }): Promise<{ cancelled: boolean; stillRunning?: true }>
   /** The stops this provider honours for a live session's background work; undefined when the
    *  adapter holds no live session for it. */
@@ -433,6 +441,14 @@ export type StructuredAgentSessionAdapter = StructuredAgentSessionAdapterStop & 
     identity: AgentSessionJournalIdentity
     accountHome: AgentSessionAccountHome
   }): Promise<ProviderHistoryWindow | null>
+  /** Copies provider conversation `providerSessionId` of the chat into a new one the agent saves,
+   *  answering the copy's id; the chat keeps its own. Runs whether or not the chat's agent is
+   *  running. Absent where the agent copies through its CLI instead (`agentForksThroughChat`). */
+  copyConversation?(input: {
+    identity: AgentSessionJournalIdentity
+    providerSessionId: string
+    accountHome: AgentSessionAccountHome
+  }): Promise<AiVaultConversationCopy>
   /** Gracefully stops the structured owner after its event stream is drained. */
   /** Returns true only after the provider child exit is proven. A root-exit or processless verdict
    *  is thrown only once the session is finalized; read it through `stopAgentSessionProviderRoot`. */

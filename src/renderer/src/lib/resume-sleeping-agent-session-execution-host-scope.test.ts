@@ -23,7 +23,7 @@ import {
   agentResumeOriginNamesAnotherExecutionHost,
   sleepingRecordNamesAnotherExecutionHost
 } from './sleeping-record-execution-host-scope'
-import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner-state'
 
 const initialAppStoreState = useAppStore.getState()
 

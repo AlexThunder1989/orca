@@ -18,18 +18,12 @@ import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-even
 
 const testState: {
   executionHostId: ExecutionHostId
-  ownerConnectionId: string
-  ownerKind: 'local' | 'not-ready' | 'runtime' | 'ssh'
-  ownerSshGeneration: number
-  ownerWorktreePath: string
+  ownerKind: 'local' | 'not-ready' | 'remote'
   targetIsRemoteRuntime: boolean
   store: { tabsByWorktree: Record<string, { id: string }[]> }
 } = vi.hoisted(() => ({
   executionHostId: 'local',
-  ownerConnectionId: 'ssh-1',
   ownerKind: 'local',
-  ownerSshGeneration: 4,
-  ownerWorktreePath: '/remote/repo',
   targetIsRemoteRuntime: false,
   store: {
     tabsByWorktree: {
@@ -52,17 +46,7 @@ vi.mock('@/lib/worktree-runtime-owner', () => ({
 vi.mock('./native-chat-attachment-upload', async (importOriginal) => ({
   ...(await importOriginal<typeof AttachmentUploadModule>()),
   resolveNativeChatAttachmentHost: () => testState.executionHostId,
-  resolveNativeChatAttachmentOwnerForWorktree: () =>
-    testState.ownerKind === 'ssh'
-      ? {
-          kind: 'ssh',
-          connectionId: testState.ownerConnectionId,
-          worktreePath: testState.ownerWorktreePath,
-          expectedExecutionHostId: `ssh:${testState.ownerConnectionId}`,
-          expectedSshTargetId: testState.ownerConnectionId,
-          expectedSshConnectionGeneration: testState.ownerSshGeneration
-        }
-      : { kind: testState.ownerKind }
+  resolveNativeChatAttachmentOwnerForWorktree: () => ({ kind: testState.ownerKind })
 }))
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback

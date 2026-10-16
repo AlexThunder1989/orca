@@ -268,7 +268,12 @@ function buildPosixCommandLookupSpec(command: string, shell: string): CommandLoo
 function buildShCommandLookupScript(command: string): string {
   // Why: login shells may define aliases or functions that mask the PATH executable.
   return [
-    buildPosixCommandPathLookupScript({ kind: 'literal', value: command }),
+    // Why: WSL appends the Windows PATH, so a Windows-only npm shim would
+    // otherwise read as a guest install; same skip as host-side WSL detection.
+    buildPosixCommandPathLookupScript(
+      { kind: 'literal', value: command },
+      { skipWindowsMountDirs: true }
+    ),
     'if [ -n "$resolved" ]; then',
     `printf '${AGENT_PATH_PREFIX}%s\\n' "$resolved"`,
     'fi'
@@ -276,13 +281,8 @@ function buildShCommandLookupScript(command: string): string {
 }
 
 function buildFishCommandLookupScript(command: string): string {
-  const quotedCommand = shellQuote(command)
-  return [
-    `set -l resolved (command -v ${quotedCommand} 2>/dev/null)`,
-    'if test -n "$resolved"',
-    `printf '${AGENT_PATH_PREFIX}%s\\n' "$resolved"`,
-    'end'
-  ].join('\n')
+  // Why: fish only supplies its login PATH; the POSIX walk owns the Windows-mount skip.
+  return `exec /bin/sh -c ${fishQuote(buildShCommandLookupScript(command))}`
 }
 
 function resolveAccountLoginShell(
@@ -327,6 +327,7 @@ function getShellCommandMode(shell: string): '-lc' | '-ilc' {
   return shellName === 'sh' || shellName === 'dash' ? '-lc' : '-ilc'
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`
+// Fish single quotes treat only `\\` and `\'` as escapes.
+function fishQuote(value: string): string {
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 }

@@ -95,6 +95,18 @@ describe('resolveNativeChatImageRuntimeContext', () => {
     })
   })
 
+  it('reads nothing for an SSH-owned workspace with no paired server to serve it', () => {
+    const worktree = worktreeFixture('wt-1', '/remote/worktree', { hostId: 'ssh:ssh-1' })
+    const sshState = state({
+      activeWorkspaceExecutionHostId: 'ssh:ssh-1',
+      getKnownWorktreeById: () => worktree,
+      repos: [repoFixture({ connectionId: 'ssh-1' })],
+      worktreesByRepo: { repo: [worktree] }
+    })
+
+    expect(resolveNativeChatImageRuntimeContext(sshState, 'tab-1')).toBeNull()
+  })
+
   it('resolves a floating chat to its pinned folder on the local host, and nothing before the pin', () => {
     const floatingTab: Tab = {
       id: 'floating-chat-1',

@@ -30,6 +30,7 @@ export function useWorktreeContextMenuCommands(args: {
   scopeRef: React.RefObject<HTMLDivElement | null>
   setCreateGroupDialogOpen: (open: boolean) => void
   setMenuOpenState: (open: boolean) => void
+  setWorkspaceUnreadByUser: ReturnType<typeof useAppStore.getState>['setWorkspaceUnreadByUser']
   setWorktreesPinnedAndReveal: ReturnType<
     typeof useAppStore.getState
   >['setWorktreesPinnedAndReveal']
@@ -47,10 +48,10 @@ export function useWorktreeContextMenuCommands(args: {
     window.api.ui.writeClipboardText(resolveWorktreeDisplayName(args.worktree))
   }, [args])
   const handleToggleRead = useCallback(() => {
-    args.updateWorktreeMeta(
+    args.setWorkspaceUnreadByUser(
       args.worktree.id,
-      { isUnread: !args.worktree.isUnread },
-      { executionHostId: args.worktree.hostId ?? 'local' }
+      !args.worktree.isUnread,
+      args.worktree.hostId ?? 'local'
     )
   }, [args])
   const handleTogglePin = useCallback(() => {

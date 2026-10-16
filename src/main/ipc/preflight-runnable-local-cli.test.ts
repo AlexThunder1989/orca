@@ -265,6 +265,7 @@ describe.runIf(process.platform === 'win32')('Windows preflight batch shims', ()
     }
   })
 
+  // Include the probe, tree-cleanup deadline, and recovery probe on a busy Windows runner.
   it('recovers after a hung batch launcher and terminates its Node child', async () => {
     const first = path.join(root, 'hung')
     const second = path.join(root, 'working')
@@ -273,7 +274,7 @@ describe.runIf(process.platform === 'win32')('Windows preflight batch shims', ()
     const name = `${COMMAND}.CMD`
     await writeFile(
       path.join(first, 'hang.js'),
-      `require('node:fs').writeFileSync(require('node:path').join(__dirname, 'child.pid'), String(process.pid)); setTimeout(function () {}, 30000);`
+      `require('node:fs').writeFileSync(require('node:path').join(__dirname, 'child.pid'), String(process.pid)); setTimeout(function () {}, 60000);`
     )
     await writeFile(path.join(first, name), `@echo off\r\n"${process.execPath}" "%~dp0hang.js"\r\n`)
     await writeFile(
@@ -290,5 +291,5 @@ describe.runIf(process.platform === 'win32')('Windows preflight batch shims', ()
     const childPid = Number(await readFile(path.join(first, 'child.pid'), 'utf8'))
     expect(Number.isSafeInteger(childPid) && childPid > 0).toBe(true)
     expect(() => process.kill(childPid, 0)).toThrow()
-  }, 15_000)
+  }, 30_000)
 })

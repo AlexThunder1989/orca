@@ -3,7 +3,7 @@
 // that fails is only logged; nothing here ever blocks typing, Save or Cancel.
 
 import { callStructuredAgentSession } from '@/runtime/structured-agent-session-client'
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type {
   AgentSessionQueuedMessageEditHoldParams,
   AgentSessionQueuedMessageEditHoldResult

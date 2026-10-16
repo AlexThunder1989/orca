@@ -11,7 +11,7 @@ import {
   rejectPendingSnapshotRequest
 } from './remote-runtime-terminal-snapshot-state'
 import type { TerminalMultiplexEvent } from './remote-runtime-terminal-multiplexer-types'
-import { unwrapRuntimeRpcResult } from './runtime-rpc-client'
+import { unwrapRuntimeRpcResult } from './runtime-rpc-result'
 
 type SubscribedCapabilities = {
   ackOutputSourceRanges: boolean
@@ -85,6 +85,9 @@ export abstract class RemoteRuntimeTerminalResponseController extends RemoteRunt
       stream.supportsInputAck = stream.inputLedgerId !== null
       if (stream.supportsOutputPause) {
         stream.callbacks.onOutputPauseCapability?.()
+      }
+      if (!stream.initialSnapshotReceived) {
+        stream.callbacks.onSubscribeAcknowledged?.()
       }
     } else if (event.type === 'end') {
       disposeRemoteTerminalStreamState(stream, 'Remote terminal stream ended.')

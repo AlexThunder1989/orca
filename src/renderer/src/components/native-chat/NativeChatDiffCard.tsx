@@ -94,8 +94,8 @@ function DiffRow({ line, gutterWidth }: { line: NativeChatEditLine; gutterWidth:
       <span
         className={cn(
           'w-3 shrink-0 select-none text-center',
-          line.kind === 'add' && 'text-[var(--git-decoration-added)]',
-          line.kind === 'del' && 'text-[var(--git-decoration-deleted)]'
+          line.kind === 'add' && 'text-chat-diff-added',
+          line.kind === 'del' && 'text-chat-diff-removed'
         )}
         aria-hidden
       >
@@ -122,7 +122,7 @@ function DiffCardRows({
     <div
       data-native-chat-code-content
       tabIndex={0}
-      className="ml-6 mt-1 max-h-72 overflow-auto rounded-lg border border-chat-code-border bg-chat-code-surface py-1 font-mono text-xs leading-relaxed text-chat-foreground scrollbar-sleek focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+      className="ml-6 mt-1 max-h-72 overflow-auto rounded-lg border border-chat-code-border bg-chat-code-surface py-1 font-mono text-chat-code leading-relaxed text-chat-foreground scrollbar-sleek focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
       {lines.map((line) => {
         const signature = `${line.kind}:${line.oldLineNumber}:${line.newLineNumber}:${line.text}`
@@ -144,6 +144,7 @@ export function NativeChatDiffCard({
   revealSignal,
   onReveal,
   disclosureKey,
+  initialOpen = false,
   onLinkClick
 }: {
   file: NativeChatEditFile
@@ -152,8 +153,12 @@ export function NativeChatDiffCard({
   onLinkClick?: CommentMarkdownLinkClickHandler
   /** Identity this card's open state is remembered under while it is unmounted. */
   disclosureKey?: string
+  initialOpen?: boolean
 }): React.JSX.Element {
-  const { open: expanded, setOpen: setExpanded } = useNativeChatDisclosure(disclosureKey, false)
+  const { open: expanded, setOpen: setExpanded } = useNativeChatDisclosure(
+    disclosureKey,
+    initialOpen
+  )
   const cardRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (revealSignal && cardRef.current) {
@@ -179,8 +184,8 @@ export function NativeChatDiffCard({
           type="button"
           onClick={() => hasBody && setExpanded(!expanded)}
           className={cn(
-            'flex min-h-[26px] min-w-0 flex-1 items-center gap-2 text-left font-sans text-[13px]',
-            hasBody ? 'cursor-pointer hover:bg-accent/30' : 'cursor-default'
+            'flex min-h-6.5 min-w-0 flex-1 items-center gap-2 rounded-md text-left font-sans text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+            hasBody ? 'cursor-pointer hover:bg-accent/20' : 'cursor-default'
           )}
           aria-expanded={hasBody ? expanded : undefined}
         >

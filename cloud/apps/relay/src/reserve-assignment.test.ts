@@ -52,6 +52,7 @@ function setup(
     databaseBusy?: () => boolean
     mode?: 'off' | 'dry-run' | 'on'
     startedAt?: number
+    log?: (line: string) => void
   } = {}
 ) {
   const now = { value: 100_000 }
@@ -88,7 +89,7 @@ function setup(
     ...(options.databaseBusy ? { databaseBusy: options.databaseBusy } : {}),
     now: () => now.value,
     random: () => 0.25,
-    log: () => undefined
+    log: options.log ?? (() => undefined)
   })
   // Starts each cell's refill clock, as a director's first look does.
   for (const cell of assignment.placementCells()) placer.hasBudget(cell)
@@ -350,6 +351,17 @@ describe('reserve assignment on a director', () => {
     expect(demoted).toEqual([{ cellId: 'c1', epoch: 5, joinedAt: 1_000 }])
   })
 
+  // The booking map had not seen the c1 seat (half-open, joined within a poll lag): the feed
+  // demotes it once both joins are in the map, instead of the 75 s silence close.
+  it('tells an old reserve seat the booking missed to go once a newer join shows in the feed', () => {
+    const { assignment, directory, demoted, now } = setup()
+    directory.onOutranked = (seat) => assignment.supersedeOutranked(seat)
+    directory.apply('c2', feed('c2', { full: [seated(6, 3_000)] }), now.value, now.value)
+    expect(demoted).toEqual([])
+    directory.apply('c1', feed('c1', { full: [seated(5, 1_000)] }), now.value, now.value)
+    expect(demoted).toEqual([{ cellId: 'c1', epoch: 5, joinedAt: 1_000 }])
+  })
+
   it('answers a reconnect only at the newest epoch, newest join first', async () => {
     const { assignment, reserved } = setup({
       feeds: [feed('c1', { full: [seated(6, 1_000)] }), feed('c2', { full: [seated(5, 3_000)] })]
@@ -369,5 +381,39 @@ describe('reserve assignment on a director', () => {
     expect(plan.kind).toBe('database')
     expect(plan.kind === 'database' && (await plan.placeFresh?.())).toBeNull()
     expect(reserved).toMatchObject([{ dryRun: true }])
+  })
+
+  it('in dry run counts outcomes per picked cell, and a `full` refusal while the map showed room', async () => {
+    const summaries: Array<{ dryRun: Record<string, unknown> }> = []
+    const dryRunOn = async (units: number, outcome: string) => {
+      const { assignment, now } = setup({
+        mode: 'dry-run',
+        cells: cellList(['c1']),
+        feeds: [feed('c1', { counts: { seats: units, controls: 0, bookings: 0, units, ceiling: 500 } })],
+        reserve: () => ({ outcome }),
+        log: (line) => summaries.push(JSON.parse(line))
+      })
+      for (let index = 0; index < 2; index += 1) {
+        const plan = await assignment.plan(HOST, { reconnect: false, region: US })
+        if (plan.kind === 'database') await plan.placeFresh?.()
+      }
+      // Lets the fire-and-forget dry-run reserves settle before the summary flushes.
+      await Promise.resolve()
+      now.value += 60_000
+      await assignment.plan(HOST, { reconnect: false, region: US })
+    }
+    // 1 free seat of 500 is under the 1% bound; 250 free is far over it.
+    await dryRunOn(499, 'full')
+    await dryRunOn(250, 'full')
+    await dryRunOn(250, 'ok')
+    expect(summaries.map((summary) => summary.dryRun)).toMatchObject([
+      {
+        outcomes: { full: 2 },
+        count: 2,
+        cells: { c1: { outcomes: { full: 2 }, fullWithRoom: 0, minFullFreeShare: 0.002 } }
+      },
+      { outcomes: { full: 2 }, cells: { c1: { outcomes: { full: 2 }, fullWithRoom: 2, minFullFreeShare: 0.5 } } },
+      { outcomes: { ok: 2 }, cells: { c1: { outcomes: { ok: 2 }, fullWithRoom: 0, minFullFreeShare: null } } }
+    ])
   })
 })

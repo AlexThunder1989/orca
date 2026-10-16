@@ -108,3 +108,38 @@ export async function resolveProjectCreateTarget(
     setup
   }
 }
+
+function getRepoSelectorFromWorktreeSelector(selector: string | undefined): string | undefined {
+  if (!selector?.startsWith('id:')) {
+    return undefined
+  }
+  const worktreeId = selector.slice('id:'.length)
+  const separatorIndex = worktreeId.indexOf('::')
+  if (separatorIndex <= 0) {
+    return undefined
+  }
+  return `id:${worktreeId.slice(0, separatorIndex)}`
+}
+
+export async function getCreateRepoSelector(
+  flags: Map<string, string | boolean>,
+  cwdParentWorktree: string | undefined,
+  client: RuntimeClient
+): Promise<string> {
+  const projectRepoSelector = await resolveProjectCreateRepoSelector(flags, client)
+  if (projectRepoSelector) {
+    return projectRepoSelector
+  }
+  const explicitRepo = getPresentStringFlag(flags, 'repo')
+  if (explicitRepo) {
+    return explicitRepo
+  }
+  const inferredRepo = getRepoSelectorFromWorktreeSelector(cwdParentWorktree)
+  if (inferredRepo) {
+    return inferredRepo
+  }
+  throw new RuntimeClientError(
+    'invalid_argument',
+    'Missing repo selector. Pass --repo or run from inside an Orca-managed worktree.'
+  )
+}

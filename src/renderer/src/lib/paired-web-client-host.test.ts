@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  getRuntimeEnvironmentIdForWorktree,
-  type WorktreeRuntimeOwnerState
-} from './worktree-runtime-owner'
+import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner-state'
 import { resolveWorktreeOperationRoute } from './worktree-operation-route'
 import { resolveTerminalHostOwnership } from './terminal-worktree-route'
 import { folderWorkspaceKey } from '../../../shared/workspace-scope'

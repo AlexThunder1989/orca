@@ -99,6 +99,9 @@ describe('mobile transcript roster row', () => {
 
   const markdown = (tree: ReactTestRenderer): unknown[] =>
     tree.root.findAll((node) => String(node.type) === 'MobileMarkdown').map((n) => n.props.content)
+  // A system row's own words draw as a faint aside, never as the agent's prose.
+  const aside = (tree: ReactTestRenderer): string[] =>
+    tree.root.findAll((node) => String(node.type) === 'Text').map(textOf)
   const group = (tree: ReactTestRenderer): ReactTestInstance[] =>
     tree.root.findAll((node) => byTestId(node, 'subagent-group'))
 
@@ -136,16 +139,16 @@ describe('mobile transcript roster row', () => {
       timestamp: null,
       source: 'transcript'
     }
-    expect(markdown(render(textOnly))).toEqual(['Ran 2 subagents'])
+    expect(aside(render(textOnly))).toEqual(['Ran 2 subagents'])
     const childless = render(roster([], 'Ran 2 subagents'))
-    expect(markdown(childless)).toEqual(['Ran 2 subagents'])
+    expect(aside(childless)).toEqual(['Ran 2 subagents'])
     expect(group(childless)).toEqual([])
   })
 
   it('keeps real text beside a group', () => {
-    expect(markdown(render(roster(WORKING, 'Delegating the review.')))).toEqual([
-      'Delegating the review.'
-    ])
+    const tree = render(roster(WORKING, 'Delegating the review.'))
+    expect(aside(tree)[0]).toBe('Delegating the review.')
+    expect(group(tree)).toHaveLength(1)
   })
 
   it('stays visible once its turn settles, outside the tool-run collapse', () => {

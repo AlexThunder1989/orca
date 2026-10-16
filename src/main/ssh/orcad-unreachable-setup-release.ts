@@ -21,6 +21,7 @@ import { managedOrcadSlot } from './orcad-managed-runtime-context'
 import { resolveOrcadRemoteContext } from './orcad-remote-context'
 import { orcadStopFreedTheHost } from './orcad-remote-process-control'
 import { orcadSlotDir, stopOrcadSlot } from './orcad-recovery-slot'
+import { sshOrcadHostTransport } from './orcad-ssh-host-transport'
 import { getSshConnectionManager, getSshTargetRegistryStore } from './ssh-target-registry'
 import { errorMessage } from '../../shared/error-message'
 
@@ -64,7 +65,7 @@ async function stopStrandedOrcad(targetId: string, signal?: AbortSignal): Promis
   }
   const context = await resolveOrcadRemoteContext(
     target,
-    await connectionManager.connect(target),
+    sshOrcadHostTransport(await connectionManager.connect(target)),
     signal
   )
   if (!context.activationRecord.active) {

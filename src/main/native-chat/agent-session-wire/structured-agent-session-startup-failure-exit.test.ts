@@ -57,7 +57,7 @@ function contextFor(session: StructuredAgentSessionChildExitSession) {
     },
     sessions: new Map([[SESSION, session]]),
     flushLifecycle: async () => ({ ok: true }),
-    publishFence: vi.fn(),
+    generationEnded: vi.fn(),
     serialize: async <T>(_sessionId: string, task: () => Promise<T>) => task(),
     now: () => 1
   }

@@ -11,10 +11,11 @@ import { parseDaemonReadyIdentity } from './daemon-ready-identity'
 import { unlinkOwnedDaemonPidFile } from './daemon-spawner'
 import { childProcessHasExited } from '@orca/process-host/process-tree-termination'
 
+/** How long a forked daemon gets to report ready over IPC, unless the caller overrides it. */
+export const DAEMON_CHILD_STARTUP_TIMEOUT_MS = 10_000
 const DAEMON_CHILD_TERMINATION_GRACE_MS = 5_000
 const DAEMON_CHILD_FORCE_EXIT_WAIT_MS = 1_000
 const STARTUP_STDERR_MAX_BYTES = 8192
-const DEFAULT_DAEMON_STARTUP_TIMEOUT_MS = 10_000
 
 export class DaemonEndpointUnavailableError extends Error {
   constructor(
@@ -36,14 +37,22 @@ export type LaunchedDaemonChild = {
 export async function launchDaemonChild(
   options: DaemonChildSpawnOptions
 ): Promise<LaunchedDaemonChild> {
-  // Why once: the probe is a synchronous systemd-run spawn; the AppImage fallback must not repeat it.
+  // Why once: the probe is a synchronous systemd-run spawn; the AppImage fallbacks must not repeat it.
   const scopeSupported = isDurableDaemonScopeSupported()
-  if (options.appImage) {
+  const appImageRungs = [
+    ...(options.extractedGeneration
+      ? [{ from: 'the extracted AppImage copy', options: { ...options, appImage: undefined } }]
+      : []),
+    ...(options.appImage
+      ? [{ from: 'the AppImage', options: { ...options, extractedGeneration: undefined } }]
+      : [])
+  ]
+  for (const rung of appImageRungs) {
     try {
       // Why a fresh nonce: it names the scope unit, and a failed attempt's unit may still hold its
-      // FUSE server when the in-mount retry registers the original name.
+      // FUSE server when the next rung registers the original name.
       return await launchDaemonChildAttempt(
-        { ...options, launchNonce: randomUUID() },
+        { ...rung.options, launchNonce: randomUUID() },
         scopeSupported
       )
     } catch (error) {
@@ -53,15 +62,18 @@ export async function launchDaemonChild(
       ) {
         throw error
       }
-      // Why: a missing/replaced AppImage or a refused FUSE mount must not cost the daemon; the
-      // in-mount launch (with its own scope fallback) still works while this window lives.
+      // Why: a pruned copy, a missing/replaced AppImage or a refused FUSE mount must not cost the
+      // daemon; the next rung, and finally the in-mount launch, still work while this window lives.
       console.warn(
-        '[daemon] AppImage launch failed, retrying from the current mount:',
+        `[daemon] Launch from ${rung.from} failed, ${rung === appImageRungs.at(-1) ? 'retrying from the current mount' : 'falling back'}:`,
         error instanceof Error ? error.message : String(error)
       )
     }
   }
-  return launchDaemonChildInEitherScope({ ...options, appImage: undefined }, scopeSupported)
+  return launchDaemonChildInEitherScope(
+    { ...options, appImage: undefined, extractedGeneration: undefined },
+    scopeSupported
+  )
 }
 
 /**
@@ -225,7 +237,7 @@ async function launchDaemonChildAttempt(
 
     timer = setTimeout(() => {
       void fail(new Error('Daemon startup timed out'))
-    }, options.startupTimeoutMs ?? DEFAULT_DAEMON_STARTUP_TIMEOUT_MS)
+    }, options.startupTimeoutMs ?? DAEMON_CHILD_STARTUP_TIMEOUT_MS)
 
     child.on('message', onReadyMessage)
     child.on('error', onStartupError)

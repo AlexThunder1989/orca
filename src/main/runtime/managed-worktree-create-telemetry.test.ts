@@ -230,34 +230,23 @@ describe('runtime create events', () => {
     expect(mocks.track).toHaveBeenCalledOnce()
   })
 
-  it('carries the SSH create timing the runtime hands to the remote create', async () => {
+  it('refuses an SSH create and still names its host on the failed event', async () => {
     const runtime = makeRuntime({
       id: 'repo-remote',
       path: '/srv/app',
       kind: 'git',
       executionHostId: 'ssh:remote-1'
     })
-    const remoteCreate = vi.fn(
-      async (_repo: unknown, args: { timing?: WorktreeCreateTimingRecorder }) => {
-        // Stands in for createRemoteWorktree, which records into the recorder it is given.
-        args.timing?.recordExecutionHost('ssh')
-        await args.timing?.time('git_worktree_add', async () => {})
-        return { worktree }
-      }
-    )
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: createManagedRemoteWorktree exists on the service; the cast only exposes the protected member to the spy.
-    const internals = runtime as unknown as { createManagedRemoteWorktree: typeof remoteCreate }
-    vi.spyOn(internals, 'createManagedRemoteWorktree').mockImplementation(remoteCreate)
 
-    await runtime.createManagedWorktree({ repoSelector: 'repo-remote', name: 'app' })
-    await vi.waitFor(() => expect(events('workspace_created')).toHaveLength(1))
+    await expect(
+      runtime.createManagedWorktree({ repoSelector: 'repo-remote', name: 'app' })
+    ).rejects.toThrow('Remote connection dropped')
+    await vi.waitFor(() => expect(events('workspace_create_failed')).toHaveLength(1))
 
-    expect(remoteCreate.mock.calls[0]?.[1].timing).toBeDefined()
-    expect(events('workspace_created')[0]).toMatchObject({
+    expect(events('workspace_create_failed')[0]).toMatchObject({
       create_entry_point: 'runtime',
       execution_host: 'ssh'
     })
-    expect(typeof events('workspace_created')[0].git_worktree_add_ms).toBe('number')
     // SSH would need a remote round trip, so the repo is not probed.
     expect(mocks.probe).not.toHaveBeenCalled()
   })

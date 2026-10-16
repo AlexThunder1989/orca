@@ -7,10 +7,8 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import { findIndexedProjectGroupOwner } from '@/lib/worktree-runtime-owner-index'
-import {
-  runtimeTargetForOwnerHostId,
-  type RuntimeClientTarget
-} from '@/runtime/runtime-client-target'
+import { ipcOrRuntimeTargetForHostId } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 
 type ProjectGroupHostParts = Pick<ProjectGroup, 'connectionId' | 'executionHostId'>
 type ProjectGroupOwnerRecord = Pick<ProjectGroup, 'id' | 'connectionId' | 'executionHostId'>
@@ -74,5 +72,5 @@ export function runtimeTargetForProjectGroupOwner(
   hostId?: ExecutionHostId
 ): RuntimeClientTarget | null {
   const owner = findIndexedProjectGroupOwner(state.projectGroups, groupId, hostId)
-  return owner ? runtimeTargetForOwnerHostId(hostId ?? getProjectGroupHostId(owner)) : null
+  return owner ? ipcOrRuntimeTargetForHostId(hostId ?? getProjectGroupHostId(owner)) : null
 }

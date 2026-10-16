@@ -2,24 +2,16 @@
 // (mobile) connections. Each paired device gets its own revocable token so
 // compromising one device doesn't expose others. The registry is a simple
 // JSON file with hardened permissions matching the runtime metadata pattern.
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  hardenExistingSecureFile,
-  isUnreadableError,
-  writeDurableSecureJsonFile,
-  writeSecureJsonFile
-} from '../../shared/secure-file'
+import { writeDurableSecureJsonFile, writeSecureJsonFile } from '../../shared/secure-file'
 import type { DeviceScope } from '../../shared/runtime-types'
 import { removeStaleDurableWriteTempFiles } from '../durable-file-write'
 import { DEVICE_REGISTRY_FILENAME } from './mobile-pairing-files'
 import { mintDeviceCredential } from './device-credential'
 import { planDeviceKeyFork } from './device-key-fork'
-import {
-  corruptRegistryCopyExists,
-  isMissingFileError,
-  quarantineCorruptRegistry
-} from './device-registry-corruption'
+import { planIdleEphemeralPrune, withoutEphemeralRows } from './ephemeral-device-rows'
+import { quarantineCorruptRegistry } from './device-registry-corruption'
+import { readDeviceRegistryFile } from './device-registry-file-read'
 import type { RelayDeviceBinding } from './relay/relay-revoke-outbox'
 import type { MobilePairingConnectionMode } from '../../shared/mobile-pairing-connection-mode'
 import type { RuntimePairingReach } from '../../shared/runtime-pairing-reach'
@@ -29,7 +21,7 @@ import {
   type DelegatedMobileDeviceEntry
 } from './delegated-mobile-devices'
 import type { RuntimeDeviceGrant } from './rpc/rpc-method-permission'
-import { normalizeLoadedDeviceRow, validGrants } from './device-registry-row-validation'
+import { validGrants } from './device-registry-row-validation'
 import {
   isPendingTokenRow,
   mobilePairingConnectionModeOf,
@@ -64,7 +56,7 @@ export class DeviceRegistry {
 
   constructor(userDataPath: string) {
     this.registryPath = join(userDataPath, DEVICE_REGISTRY_FILENAME)
-    // Why: a write killed between writeFile and rename (e.g. a hung icacls, #20497) orphans its temp forever.
+    // Why: a write killed between writeFile and rename (e.g. a crash mid-write, #20497) orphans its temp forever.
     void removeStaleDurableWriteTempFiles(this.registryPath, {
       minimumAgeMs: STALE_WRITE_TEMP_AGE_MS
     })
@@ -247,19 +239,35 @@ export class DeviceRegistry {
   }
 
   /** Forks `legacyDeviceId` into a keyed row; durable before it returns (security transition). */
-  forkDeviceKey(legacyDeviceId: string, devicePublicKeyB64: string, label: string): DeviceEntry {
+  forkDeviceKey(
+    legacyDeviceId: string,
+    devicePublicKeyB64: string,
+    label: string,
+    options: { ephemeral?: boolean } = {}
+  ): DeviceEntry {
     const fork = planDeviceKeyFork(
       this.devices,
       legacyDeviceId,
       devicePublicKeyB64,
       label,
-      Date.now()
+      Date.now(),
+      options
     )
     if (fork.created) {
       this.save(fork.nextDevices, { durable: true })
       this.devices = fork.nextDevices
     }
     return fork.entry
+  }
+
+  /** Drops idle session-only rows; durable, since a removed row is a revocation. */
+  pruneIdleEphemeralDevices(now: number, isLive: (deviceId: string) => boolean): string[] {
+    const plan = planIdleEphemeralPrune(this.devices, now, isLive)
+    if (plan.removed.length > 0) {
+      this.save(plan.nextDevices, { durable: true })
+      this.devices = plan.nextDevices
+    }
+    return plan.removed
   }
 
   /** The row an authenticated socket is still entitled to, or null once revoked or re-credentialed. */
@@ -306,11 +314,15 @@ export class DeviceRegistry {
       return
     }
     this.cancelPendingLastSeenFlush()
+    // Why: matches the async hardening path — a failed bookkeeping write must not take down the runtime.
+    this.saveOrLog({}, 'persist device lastSeen')
+  }
+
+  private saveOrLog(options: { durable?: boolean }, action: string): void {
     try {
-      this.save(this.devices)
+      this.save(this.devices, options)
     } catch (error) {
-      // Why: matches the async hardening path — a failed bookkeeping write must not take down the runtime.
-      console.error('[mobile] Failed to persist device lastSeen:', error)
+      console.error(`[runtime] Failed to ${action}:`, error)
     }
   }
 
@@ -322,25 +334,14 @@ export class DeviceRegistry {
   }
 
   private load(): void {
-    // Why: a set-aside corrupt copy keeps revocation verdicts off until the owner removes it, even
-    // when the rewrite after quarantine never landed and the registry file itself is missing.
-    this.registryDoubtful = corruptRegistryCopyExists(this.registryPath)
-    try {
-      hardenExistingSecureFile(this.registryPath)
-      const parsed = JSON.parse(readFileSync(this.registryPath, 'utf-8')) as DeviceEntry[]
-      this.devices = parsed.map(normalizeLoadedDeviceRow)
-      this.registryUnreadable = false
-    } catch (error) {
-      this.devices = []
-      if (isMissingFileError(error)) {
-        return
-      }
-      // "Cannot read" is not "is empty". Saving an empty list over a registry we were merely
-      // denied would erase every paired device's bearer token, and the write would succeed.
-      this.registryUnreadable = isUnreadableError(error)
-      // Why: a corrupt file is not evidence any device was revoked; never tell a keyed client so.
-      this.registryDoubtful = true
-      this.corruptFilePending = !this.registryUnreadable
+    const read = readDeviceRegistryFile(this.registryPath)
+    this.registryUnreadable = read.unreadable
+    this.registryDoubtful = read.doubtful
+    this.corruptFilePending = read.corruptFilePending
+    this.devices = withoutEphemeralRows(read.devices)
+    // Why: a session-only browser's key died with the last host process; its row must not outlive it.
+    if (this.devices.length !== read.devices.length) {
+      this.saveOrLog({ durable: true }, 'drop session-only devices after restart')
     }
   }
 

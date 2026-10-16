@@ -73,6 +73,11 @@ describe('separator', () => {
     await runWslProcess({ loginPath: 'preferred', distro: 'Ubuntu', program: '/bin/true' })
     expect(lastArgv().slice(0, 3)).toEqual(['-d', 'Ubuntu', '--exec'])
   })
+
+  it('passes the guest user before --exec', async () => {
+    await runWslProcess({ loginPath: 'none', distro: 'Ubuntu', user: 'root', program: '/bin/true' })
+    expect(lastArgv().slice(0, 5)).toEqual(['-d', 'Ubuntu', '-u', 'root', '--exec'])
+  })
 })
 
 describe('probe lane', () => {

@@ -29,7 +29,8 @@ export function planDeviceKeyFork(
   legacyDeviceId: string,
   devicePublicKeyB64: string,
   label: string,
-  now: number
+  now: number,
+  options: { ephemeral?: boolean } = {}
 ): DeviceKeyFork {
   const legacy = devices.find((device) => device.deviceId === legacyDeviceId)
   if (!legacy) {
@@ -70,6 +71,7 @@ export function planDeviceKeyFork(
     credentialKind: 'device-key',
     devicePublicKeyB64,
     forkedFrom: legacy.deviceId,
+    ...(options.ephemeral ? { ephemeral: true as const } : {}),
     // Why: orchestration work owned under the token keeps its owner after migration.
     callerFingerprint: devicePrincipalOf(legacy).callerFingerprint,
     pairedAt: now,

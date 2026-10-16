@@ -7,8 +7,6 @@ import { isWorktreeCatalogVersion } from '../../shared/worktree/catalog-version'
 import { getLocalWorktreeScanGeneration } from '../local-worktree-scan-generation'
 import {
   addWorktreeMock,
-  getActiveMultiplexerMock,
-  getSshGitProviderMock,
   listWorktreesMock,
   removeWorktreeMock
 } from './worktrees-test-module-mocks'
@@ -39,18 +37,11 @@ vi.mock('../github/client', async () =>
 vi.mock('../source-control/hosted-review', async () =>
   (await import('./worktrees-test-module-mocks')).hostedReviewModuleMock()
 )
-vi.mock('../providers/ssh-git-dispatch', async () =>
-  (await import('./worktrees-test-module-mocks')).sshGitDispatchModuleMock()
-)
 vi.mock('../providers/ssh-filesystem-dispatch', async () =>
   (await import('./worktrees-test-module-mocks')).sshFilesystemDispatchModuleMock()
 )
 vi.mock('./worktree-symlinks', async () =>
   (await import('./worktrees-test-module-mocks')).worktreeSymlinksModuleMock()
-)
-vi.mock('./ssh', async () => (await import('./worktrees-test-module-mocks')).sshModuleMock())
-vi.mock('../ssh/ssh-target-registry', async () =>
-  (await import('./worktrees-test-module-mocks')).sshTargetRegistryModuleMock()
 )
 vi.mock('../hooks', async () => (await import('./worktrees-test-module-mocks')).hooksModuleMock())
 vi.mock('../setup-runner-script-text', async (importOriginal) =>
@@ -96,7 +87,12 @@ vi.mock('../workspace-cleanup-removal-snapshot-prune', async () =>
 vi.mock('../runtime/worktree-teardown', async () =>
   (await import('./worktrees-test-module-mocks')).worktreeTeardownModuleMock()
 )
-vi.mock('./pty', async () => (await import('./worktrees-test-module-mocks')).ptyModuleMock())
+vi.mock('./pty/provider/registry', async () =>
+  (await import('./worktrees-test-module-mocks')).ptyRegistryModuleMock()
+)
+vi.mock('./pty/provider/state-cleanup', async () =>
+  (await import('./worktrees-test-module-mocks')).ptyStateCleanupModuleMock()
+)
 
 // Why the first step after the mutation, not the re-list: every await between them is a window in
 // which a listing can begin at the old generation yet see the mutation.
@@ -143,56 +139,6 @@ describe('worktree mutation scan-generation ordering', () => {
     })
 
     expect(store.addRetiredWorktreeName).toHaveBeenCalledWith('repo-1', 'nautilus')
-    expect(witness.after).toBeGreaterThan(witness.during ?? Infinity)
-    expect(replySequence(result)).toBeGreaterThanOrEqual(witness.after ?? Infinity)
-  })
-
-  it('bumps the generation before the first step after an SSH git worktree add', async () => {
-    const repo = {
-      id: 'repo-ssh',
-      path: '/remote/repo',
-      displayName: 'ssh',
-      badgeColor: '#000',
-      addedAt: 0,
-      connectionId: 'conn-1'
-    }
-    const witness: GenerationWitness = {}
-    const provider = {
-      exec: vi.fn(async (args: string[]) => {
-        if (args[0] === 'rev-parse' || args[0] === 'show-ref') {
-          throw Object.assign(new Error('missing ref'), { code: 1 })
-        }
-        // Why sparse: its checkout commands are the first awaited step after an SSH add.
-        if (args[0] === 'sparse-checkout') {
-          witnessAfter(witness, repo.id)
-        }
-        return { stdout: '', stderr: '' }
-      }),
-      fetchRemoteTrackingRef: vi.fn(async () => undefined),
-      addWorktree: vi.fn(async () => {
-        witness.during = getLocalWorktreeScanGeneration(repo.id)
-      }),
-      listWorktrees: vi.fn(async () => [createdRow('/remote/repo-ordered', 'refs/heads/ordered')])
-    }
-    store.getRepos.mockReturnValue([repo])
-    store.getRepo.mockReturnValue(repo)
-    getSshGitProviderMock.mockReturnValue(provider)
-    getActiveMultiplexerMock.mockReturnValue({
-      request: vi.fn(async () => undefined),
-      notify: vi.fn()
-    })
-    store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
-
-    const result: unknown = await handlers['worktrees:create'](null, {
-      repoId: repo.id,
-      name: 'ordered',
-      sparseCheckout: { directories: ['packages/web'] }
-    })
-
-    expect(provider.exec).toHaveBeenCalledWith(
-      ['sparse-checkout', 'init', '--cone'],
-      '/remote/repo-ordered'
-    )
     expect(witness.after).toBeGreaterThan(witness.during ?? Infinity)
     expect(replySequence(result)).toBeGreaterThanOrEqual(witness.after ?? Infinity)
   })

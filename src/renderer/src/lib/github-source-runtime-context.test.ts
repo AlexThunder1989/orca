@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
-import type { RuntimeClientTarget } from '../runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import {
   canUseGitHubRepoContext,
   getGitHubRepoRoutingTarget,

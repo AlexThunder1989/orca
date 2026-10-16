@@ -15,7 +15,6 @@ import {
 import type { IncomingMessage } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { performance } from 'node:perf_hooks'
-import { createRemoteJWKSet } from 'jose'
 import { WebSocketServer } from 'ws'
 import type WebSocket from 'ws'
 import type { RawData } from 'ws'
@@ -45,9 +44,10 @@ import type { AppliedControlFlags } from './relay-control-flag-channel.js'
 import { createRelayLocalReadiness } from './relay-local-readiness.js'
 import { createRelayReadiness } from './relay-readiness.js'
 import { createRelayTokenVerifier, readBearer } from './relay-token-verifier.js'
+import { createStaleIfErrorJWKSet } from './stale-if-error-jwks.js'
 import { closeRelayWebSocket } from './relay-websocket-close.js'
 import { ShadowDirectoryCompare } from './shadow-directory-compare.js'
-import { startShadowSeatPoller } from './shadow-seat-directory.js'
+import { type ShadowSeatPoller, startShadowSeatPoller } from './shadow-seat-directory.js'
 import { CellReserveClient } from './cell-reserve-client.js'
 import { googleMetadataIdentityToken, reusedIdentityToken } from './google-metadata-identity-token.js'
 import { ReserveAssignment } from './reserve-assignment.js'
@@ -158,9 +158,11 @@ export function createRelayServer(
     perMessageDeflate: false,
     maxPayload: 1024 * 1024
   })
-  const relayJwks = createRemoteJWKSet(new URL(config.jwksUrl))
+  const relayJwks = createStaleIfErrorJWKSet(new URL(config.jwksUrl))
   const verifyRelayToken = createRelayTokenVerifier(config, relayJwks)
   const store = new RelayCredentialStore(observedDatabase, options.now)
+  // Bound once the poller below exists; without one, no poll ever reads as dead.
+  const pollEvidence: { deadCellVerdict?: ShadowSeatPoller['deadCellVerdict'] } = {}
   const assignments = new RelayAssignmentStore(observedDatabase, options.now, {
     requireLiveCells: config.role === 'director',
     placementLoadBand: config.role === 'director' ? new PlacementLoadBand(options.random) : undefined,
@@ -169,7 +171,8 @@ export function createRelayServer(
     regionalRehomeDirectorRegion:
       config.role === 'director' ? (config.region ?? RELAY_DEFAULT_REGION) : undefined,
     recordControlRenewal: (durationMs, outcome) =>
-      observability.recordControlRenewal?.(durationMs, outcome)
+      observability.recordControlRenewal?.(durationMs, outcome),
+    deadCellVerdict: (cellId, now) => pollEvidence.deadCellVerdict?.(cellId, now) ?? null
   })
   const readiness = createRelayReadiness(observedDatabase, config.jwksUrl, {
     jwksGraceMs: config.readinessJwksGraceMs,
@@ -185,6 +188,7 @@ export function createRelayServer(
     listCells: () => assignments.seatFeedCells(),
     reserver: () => placing.on
   })
+  pollEvidence.deadCellVerdict = shadowSeatPoller?.deadCellVerdict
   const shadowCompare = shadowSeatPoller
     ? new ShadowDirectoryCompare(shadowSeatPoller.directory, options.now)
     : undefined
@@ -251,6 +255,7 @@ export function createRelayServer(
         epoch: join.epoch
       })
     }
+    directory.onOutranked = (seat) => reservePlacement?.supersedeOutranked(seat)
     reserveLedger.start()
     const reconcile = (): void => {
       const now = (options.now ?? Date.now)()
@@ -465,6 +470,7 @@ export function createRelayServer(
     recordDrainReturnRetryAfter: (seconds) => observability.recordDrainReturnRetryAfter?.(seconds),
     recordAdmissionServiceMs: (lane, durationMs) =>
       observability.recordAdmissionServiceMs?.(lane, durationMs),
+    recordStickySlot: (sample) => observability.recordStickySlot?.(sample),
     recordAssignmentUnavailable: (cause) => observability.recordAssignmentUnavailable?.(cause),
     recordRegionRequest: (region) => observability.recordRegionRequest?.(region),
     shadowSeats: shadowSeatPoller?.directory,

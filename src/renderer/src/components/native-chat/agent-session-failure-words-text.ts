@@ -10,6 +10,9 @@ import {
 } from '../../../../shared/agent-session-failure-copy'
 import { AVAILABILITY_PIECES } from './agent-session-availability-words-text'
 import { ATTACHMENT_FAILURE_PIECES } from './agent-session-failure-attachment-words-text'
+import { STOP_FAILURE_PIECES } from './agent-session-failure-stop-words-text'
+import { PROVIDER_EXIT_PIECES } from './agent-session-provider-exit-words-text'
+import { PROVIDER_RETRY_PIECES } from './agent-session-provider-retry-words-text'
 
 // The pieces a refusal notice says too keep the notice's keys, so each has one translation.
 const PIECES: Record<AgentSessionFailureCopyId, (values: AgentSessionFailureCopyValues) => string> =
@@ -132,6 +135,12 @@ const PIECES: Record<AgentSessionFailureCopyId, (values: AgentSessionFailureCopy
         COPY.agentCommandNotRunnable,
         values
       ),
+    runtimeNotInstalled: (values) =>
+      translate(
+        'components.native-chat.failureWords.runtimeNotInstalled',
+        COPY.runtimeNotInstalled,
+        values
+      ),
     chooseClaudeAccount: () =>
       translate(
         'components.native-chat.failureWords.chooseClaudeAccount',
@@ -148,20 +157,13 @@ const PIECES: Record<AgentSessionFailureCopyId, (values: AgentSessionFailureCopy
         'components.native-chat.failureWords.chooseClaudeAccountThenSend',
         COPY.chooseClaudeAccountThenSend
       ),
-    providerExitedRow: (values) =>
+    ...PROVIDER_EXIT_PIECES,
+    providerRejected: (values) =>
       translate(
-        'components.native-chat.failureWords.providerExitedRow',
-        COPY.providerExitedRow,
+        'components.native-chat.failureWords.providerRejected',
+        COPY.providerRejected,
         values
       ),
-    providerExitedRejection: (values) =>
-      translate(
-        'components.native-chat.failureWords.providerExitedRejection',
-        COPY.providerExitedRejection,
-        values
-      ),
-    providerRejected: () =>
-      translate('components.native-chat.failureWords.providerRejected', COPY.providerRejected),
     providerRejectedQuoted: (values) =>
       translate(
         'components.native-chat.failureWords.providerRejectedQuoted',
@@ -233,18 +235,7 @@ const PIECES: Record<AgentSessionFailureCopyId, (values: AgentSessionFailureCopy
         'components.native-chat.failureWords.compactionUnconfirmed',
         COPY.compactionUnconfirmed
       ),
-    cancelUnconfirmed: () =>
-      translate('components.native-chat.failureWords.cancelUnconfirmed', COPY.cancelUnconfirmed),
-    stopRefused: (values) =>
-      translate('components.native-chat.failureWords.stopRefused', COPY.stopRefused, values),
-    stopRefusedQuoted: (values) =>
-      translate(
-        'components.native-chat.failureWords.stopRefusedQuoted',
-        COPY.stopRefusedQuoted,
-        values
-      ),
-    noTurnToStop: (values) =>
-      translate('components.native-chat.failureWords.noTurnToStop', COPY.noTurnToStop, values),
+    ...STOP_FAILURE_PIECES,
     answerUnconfirmed: () =>
       translate('components.native-chat.failureWords.answerUnconfirmed', COPY.answerUnconfirmed),
     hostFault: () => translate('components.native-chat.failureWords.hostFault', COPY.hostFault),
@@ -252,42 +243,7 @@ const PIECES: Record<AgentSessionFailureCopyId, (values: AgentSessionFailureCopy
       translate('components.native-chat.failureWords.hostFaultTryAgain', COPY.hostFaultTryAgain),
     hostStopped: (values) =>
       translate('components.native-chat.failureWords.hostStopped', COPY.hostStopped, values),
-    providerRateLimited: (values) =>
-      translate(
-        'components.native-chat.failureWords.providerRateLimited',
-        COPY.providerRateLimited,
-        values
-      ),
-    providerRetrying: (values) =>
-      translate(
-        'components.native-chat.failureWords.providerRetrying',
-        COPY.providerRetrying,
-        values
-      ),
-    providerRetryingQuoted: (values) =>
-      translate(
-        'components.native-chat.failureWords.providerRetryingQuoted',
-        COPY.providerRetryingQuoted,
-        values
-      ),
-    providerRetryNumber: (values) =>
-      translate(
-        'components.native-chat.failureWords.providerRetryNumber',
-        COPY.providerRetryNumber,
-        values
-      ),
-    providerRetryNumberOf: (values) =>
-      translate(
-        'components.native-chat.failureWords.providerRetryNumberOf',
-        COPY.providerRetryNumberOf,
-        values
-      ),
-    providerRetryLastError: (values) =>
-      translate(
-        'components.native-chat.failureWords.providerRetryLastError',
-        COPY.providerRetryLastError,
-        values
-      ),
+    ...PROVIDER_RETRY_PIECES,
     previousExitUnverifiable: (values) =>
       translate(
         'components.native-chat.failureWords.previousExitUnverifiable',

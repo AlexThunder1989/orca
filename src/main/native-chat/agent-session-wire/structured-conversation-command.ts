@@ -11,6 +11,7 @@ import { agentSessionOperationKey } from '../../../shared/agent-session-operatio
 import type { StructuredAgentSessionMutationContext } from './structured-agent-session-host-mutations'
 import { sendPreparation } from './structured-agent-session-send-preparation'
 import type { StructuredAgentSessionCaller } from './structured-agent-session-host-types'
+import { hostStructuredAgentSessionCurrentWork } from './structured-agent-session-host-current-work'
 import { conversationCommandBlocked } from './structured-conversation-command-admission'
 import type { AgentSessionFailureFact } from '../../../shared/agent-session-failure'
 import {
@@ -37,7 +38,9 @@ export function conversationCommandFailure(
 export type ConversationCommandParams = {
   envelope: AgentSessionMutationEnvelope
   command: AgentSessionConversationCommand
-  /** /compact only: wait as a card while the agent works, as a queued send does. */
+  /** /compact only: wait as a card while the agent works, as a queued send does. /clear is refused
+   *  instead for now: the queue only hands cards to the agent, and a clear is host work (stop the
+   *  agent, reset its context), so queueing it would need the drain to run host commands. */
   delivery?: 'queue-if-active'
   /** Host-local, set by the client-facing command RPC as for an ordinary send. */
   userSend?: true
@@ -69,6 +72,8 @@ export function runStructuredConversationCommand(
       // Starts the agent only to settle a rewind in doubt, as a send does; a /clear itself starts nothing.
       prepareSession: sendPreparation(context, envelope, { refusesInRun: true }),
       journal: () => context.sessions.get(sessionId)?.journal,
+      currentWork: () =>
+        hostStructuredAgentSessionCurrentWork({ store, sessions: context.sessions }, sessionId),
       publish: (journal) => context.publish(sessionId, journal),
       now: context.now,
       plan: {

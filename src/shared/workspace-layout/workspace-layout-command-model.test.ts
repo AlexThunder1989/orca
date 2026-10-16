@@ -10,7 +10,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../constants'
 import { collectLayoutLeafIdsInOrder } from './terminal-pane-tree'
 import { applyLayoutCommand } from './workspace-layout-commands'
 import type { LayoutCommand, LayoutContext } from './workspace-layout-command-types'
-import { emptyModel, testContext } from './workspace-layout-command.test-fixture'
+import { CLEAN_EXIT, emptyModel, testContext } from './workspace-layout-command.test-fixture'
 import { loadWorkspaceLayout } from './workspace-layout-load'
 import type { WorkspaceLayoutModel } from './workspace-layout-model'
 import { checkWorkspaceLayoutModelRules, emptyLayoutBeside } from './workspace-layout-model-rules'
@@ -164,7 +164,8 @@ function runRace(
             label: `exited ${leafId}`,
             transition: {
               type: 'processExited',
-              surface: { worktreeId: key, terminalTabId: tabId, leafId, ptyId: pane.ptyId! }
+              surface: { worktreeId: key, terminalTabId: tabId, leafId, ptyId: pane.ptyId! },
+              exit: CLEAN_EXIT
             }
           }
   const closing = race === 'close-pane-vs-drag-out' ? closePane : closeTab
@@ -266,7 +267,8 @@ function runSeed(seed: number): string[] {
             terminalTabId: pane.tabId,
             leafId: pane.leafId,
             ptyId: pane.ptyId
-          }
+          },
+          exit: CLEAN_EXIT
         }
       })
       harness.removePane(pane.key, pane.tabId, pane.leafId)

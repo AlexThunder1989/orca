@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { applyLayoutCommand } from './workspace-layout-commands'
 import type { LayoutCommand, LayoutContext } from './workspace-layout-command-types'
 import { collectLayoutLeafIdsInOrder } from './terminal-pane-tree'
-import { build, terminalTab, testContext, WS } from './workspace-layout-command.test-fixture'
+import {
+  build,
+  CLEAN_EXIT,
+  terminalTab,
+  testContext,
+  WS
+} from './workspace-layout-command.test-fixture'
 import type { WorkspaceLayoutModel } from './workspace-layout-model'
 import { checkWorkspaceLayoutModelRules } from './workspace-layout-model-rules'
 import { applyLayoutTransition, type LayoutTransition } from './workspace-layout-transitions'
@@ -79,11 +85,13 @@ describe('layout transitions', () => {
     const surface = { worktreeId: WS, terminalTabId: tabId, leafId, ptyId: 'pty-1' }
     const stale: LayoutTransition = {
       type: 'processExited',
-      surface: { ...surface, incarnationId: 'inc-old' }
+      surface: { ...surface, incarnationId: 'inc-old' },
+      exit: CLEAN_EXIT
     }
     const other: LayoutTransition = {
       type: 'processExited',
-      surface: { ...surface, ptyId: 'pty-other' }
+      surface: { ...surface, ptyId: 'pty-other' },
+      exit: CLEAN_EXIT
     }
     for (const transition of [stale, other]) {
       const result = applyLayoutTransition(model, transition)
@@ -91,7 +99,8 @@ describe('layout transitions', () => {
     }
     const exited = applyLayoutTransition(model, {
       type: 'processExited',
-      surface: { ...surface, incarnationId: 'inc-1' }
+      surface: { ...surface, incarnationId: 'inc-1' },
+      exit: CLEAN_EXIT
     })
     expect(exited.ok && incarnationOf(exited.model, leafId)).toBeUndefined()
     expect(exited.ok && terminalTab(exited.model, tabId).panes!.root).toEqual({
@@ -150,6 +159,38 @@ describe('layout transitions', () => {
   })
 })
 
+describe('workspace removal', () => {
+  it('drops each removed workspace and its records, leaves the rest, and advances no revision', () => {
+    const { model, context } = setup()
+    const other = 'repo-1::/Users/dev/other'
+    const withOther = build(context, [{ type: 'createTerminalTab', workspace: other }], model).model
+    const withRecords: WorkspaceLayoutModel = {
+      ...withOther,
+      records: {
+        defaultTabsAppliedByWorkspace: { [WS]: true, [other]: true },
+        clientHostedBrowserPagesByWorkspace: { [WS]: [], [other]: [] }
+      }
+    }
+    const removed = applyLayoutTransition(withRecords, {
+      type: 'ownerRemoved',
+      workspaces: [WS, 'never-loaded']
+    })
+    if (!removed.ok) {
+      throw new Error(removed.code)
+    }
+    expect(Object.keys(removed.model.workspaces)).toEqual([other])
+    expect(removed.model.records).toEqual({
+      defaultTabsAppliedByWorkspace: { [other]: true },
+      clientHostedBrowserPagesByWorkspace: { [other]: [] }
+    })
+    expect(removed.model.legacy.terminalRowOwners).toEqual({ [other]: true })
+    expect(removed.model.legacy.topologyRevisionByRepoId).toEqual(
+      withRecords.legacy.topologyRevisionByRepoId
+    )
+    expect(checkWorkspaceLayoutModelRules([removed.model], [withRecords])).toEqual([])
+  })
+})
+
 /** Two clients' commands for the same tab or pane: both arrival orders end in a valid layout. */
 describe('concurrent commands, both orders', () => {
   type Step = { command: LayoutCommand } | { transition: LayoutTransition }
@@ -203,7 +244,8 @@ describe('concurrent commands, both orders', () => {
     const exit: Step = {
       transition: {
         type: 'processExited',
-        surface: { worktreeId: WS, terminalTabId: tabId, leafId, ptyId: 'pty-1' }
+        surface: { worktreeId: WS, terminalTabId: tabId, leafId, ptyId: 'pty-1' },
+        exit: CLEAN_EXIT
       }
     }
     const close: Step = { command: { type: 'closeTabs', workspace: WS, tabIds: [tabId] } }

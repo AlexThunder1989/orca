@@ -8,7 +8,6 @@ import { commitPtyIpcSpawn } from '../../ipc/pty/ipc/spawn-commit'
 import { createPtyIpcSpawnState } from '../../ipc/pty/ipc/spawn-state'
 import type { PtySpawnIpcDeps } from '../../ipc/pty/ipc/spawn-types'
 import { registerPersistedPtySpawn } from '../../ipc/pty/pane/spawn-registration'
-import { toSshExecutionHostId } from '../../../shared/execution-host'
 import { clearProviderPtyState } from '../../ipc/pty/provider/state-cleanup'
 import { ptyOwnership, ptyIncarnationById } from '../../ipc/pty/provider/ownership-state'
 import { ptySizes } from '../../ipc/pty/delivery/visibility-state'
@@ -31,26 +30,23 @@ vi.mock('../../ssh/ssh-config-parser', () => ({
 
 it.each(
   [
-    { controller: 'runtime', connectionId: null, exitCode: 0 },
-    { controller: 'runtime', connectionId: 'test-host', exitCode: 0 },
-    { controller: 'ipc', connectionId: null, exitCode: -1 },
-    { controller: 'ipc', connectionId: 'test-host', exitCode: 0 }
+    { controller: 'runtime', exitCode: 0 },
+    { controller: 'ipc', exitCode: -1 }
   ].flatMap((test) => [
     { ...test, stableOwner: false },
     { ...test, stableOwner: true }
   ])
 )(
-  'retires an exited $controller binding on $connectionId after disk finishes (stable: $stableOwner)',
-  async ({ controller, connectionId, exitCode, stableOwner }) => {
+  'retires an exited $controller binding after disk finishes (stable: $stableOwner)',
+  async ({ controller, exitCode, stableOwner }) => {
+    const connectionId = null
     const { store, authority, readState } = await fixture()
     const runtime = new OrcaRuntimeService(store)
     const binding = {
       worktreeId: 'repo-local::/fixture/local',
       tabId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       leafId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      ptyId: connectionId
-        ? `ssh:${connectionId}@@pty-exited-during-durable-bind`
-        : 'pty-exited-during-durable-bind',
+      ptyId: 'pty-exited-during-durable-bind',
       incarnationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
     }
     const owner = stableOwner
@@ -61,10 +57,7 @@ it.each(
         }
       : null
     if (owner) {
-      await store.persistPtyBinding(
-        { ...binding, incarnationId: owner.persistedIncarnationId },
-        connectionId ? toSshExecutionHostId(connectionId) : undefined
-      )
+      await store.persistPtyBinding({ ...binding, incarnationId: owner.persistedIncarnationId })
     }
     runtime.onPtySpawned(binding.ptyId, binding.incarnationId)
     runtime.beginPtyRegistration(binding.ptyId, binding.incarnationId)
@@ -115,11 +108,6 @@ it.each(
     expect(ptyOwnership.has(binding.ptyId)).toBe(false)
     expect(ptyIncarnationById.has(binding.ptyId)).toBe(false)
     expect(ptySizes.has(binding.ptyId)).toBe(false)
-    expect(
-      store
-        .getSshRemotePtyLeases(connectionId ?? undefined)
-        .some((lease) => lease.ptyId.includes('pty-exited-during-durable-bind'))
-    ).toBe(false)
     if (reservation) {
       await expect(reservation.promise).resolves.toMatchObject({ id: binding.ptyId })
       const next = await nextReservation
@@ -127,10 +115,7 @@ it.each(
       resolvePaneSpawnReservation(reservationKey, next, { id: 'next-spawn' })
       expect(paneSpawnReservationsByOwnerKey.has(reservationKey)).toBe(false)
     }
-    const state = readState()
-    const session = connectionId
-      ? state.workspaceSessionsByHostId[toSshExecutionHostId(connectionId)]
-      : state.workspaceSession
+    const session = readState().workspaceSession
     expect(
       session.terminalLayoutsByTabId[binding.tabId]?.ptyIdsByLeafId?.[binding.leafId]
     ).toBeUndefined()

@@ -112,10 +112,8 @@ vi.mock('../ipc/worktree-change-invalidators', () => ({
   runWorktreeChangeInvalidators: runWorktreeChangeInvalidatorsMock
 }))
 
-vi.mock('../ipc/pty', () => ({
-  getLocalPtyProvider: vi.fn(),
-  registerPtyHandlers: registerPtyHandlersMock
-}))
+vi.mock('../ipc/pty/provider/registry', () => ({ getLocalPtyProvider: vi.fn() }))
+vi.mock('../ipc/pty/register-handlers', () => ({ registerPtyHandlers: registerPtyHandlersMock }))
 
 vi.mock('../ipc/ssh', () => ({ registerSshHandlers: registerSshHandlersMock }))
 vi.mock('../ipc/pty-management', () => ({
@@ -158,7 +156,8 @@ vi.mock('../macos-tcc-prompt-notice', () => ({
   releasePendingTccPromptNotice: releasePendingTccPromptNoticeMock
 }))
 
-import { attachMainWindowServices } from './attach-main-window-services'
+import { attachMainWindowServices, registerUpdaterHandlers } from './attach-main-window-services'
+import { registerUpdaterHandlers as registerWindowUpdaterHandlers } from './main-window-updater'
 
 type MockFn = ReturnType<typeof vi.fn>
 
@@ -200,6 +199,10 @@ async function fireReadyToShow(mainWindow: MainWindowStub): Promise<void> {
 }
 
 describe('attachMainWindowServices', () => {
+  it('exports the updater handlers exercised by the recovery tests', () => {
+    expect(registerUpdaterHandlers).toBe(registerWindowUpdaterHandlers)
+  })
+
   afterEach(() => {
     cancelHistoryGc()
   })

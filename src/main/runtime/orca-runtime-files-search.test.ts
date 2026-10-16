@@ -249,7 +249,7 @@ describe('RuntimeFileCommands', () => {
     await expect(resultPromise).rejects.toThrow("Orca's bundled search tool (ripgrep)")
   })
 
-  it('routes runtime rg searches through the registered WSL project runtime', async () => {
+  it('runs host rg for a Windows drive root even under a WSL project runtime', async () => {
     const resolveRuntimeFileTarget = vi.fn(async () => ({
       worktree: {
         id: 'wt-1',
@@ -269,9 +269,7 @@ describe('RuntimeFileCommands', () => {
       query: 'needle',
       maxResults: 10
     })
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushRuntimeSearchMicrotasks()
     child.emit('close', 0, null)
 
     await expect(resultPromise).resolves.toMatchObject({ files: [] })
@@ -280,12 +278,46 @@ describe('RuntimeFileCommands', () => {
       'C:\\repo',
       'C:\\repo'
     )
+    expect(bundledRipgrepCommandMock).toHaveBeenCalledWith({ wsl: false })
+    expect(wslAwareSpawnMock).toHaveBeenCalledWith(
+      '/bundled/rg',
+      expect.any(Array),
+      expect.objectContaining({ cwd: 'C:\\repo' })
+    )
+    expect(wslAwareSpawnMock.mock.calls[0]?.[2]).not.toHaveProperty('wslDistro')
+  })
+
+  it('routes runtime rg searches for a WSL filesystem root through the project runtime', async () => {
+    const wslRoot = '\\\\wsl.localhost\\Ubuntu\\home\\me\\repo'
+    const resolveRuntimeFileTarget = vi.fn(async () => ({
+      worktree: {
+        id: 'wt-1',
+        repoId: 'repo-1',
+        path: wslRoot
+      },
+      executionHostId: 'local'
+    }))
+    const { commands } = createRuntimeFileCommands({ resolveRuntimeFileTarget })
+    const child = createRuntimeSearchChild()
+    Object.defineProperty(child, 'pid', { value: 1 })
+    resolveAuthorizedPathMock.mockResolvedValue(wslRoot)
+    getLocalGitOptionsForRegisteredWorktreeMock.mockReturnValue({ wslDistro: 'Ubuntu' })
+    wslAwareSpawnMock.mockReturnValue(child)
+
+    const resultPromise = commands.searchRuntimeFiles('id:wt-1', {
+      query: 'needle',
+      maxResults: 10
+    })
+    await flushRuntimeSearchMicrotasks()
+    child.emit('close', 0, null)
+
+    await expect(resultPromise).resolves.toMatchObject({ files: [] })
     expect(bundledRipgrepCommandMock).toHaveBeenCalledWith({ wsl: true })
     expect(wslAwareSpawnMock).toHaveBeenCalledWith(
       '/bundled/linux/rg',
       expect.any(Array),
       expect.objectContaining({
-        cwd: 'C:\\repo',
+        cwd: wslRoot,
         wslDistro: 'Ubuntu'
       })
     )

@@ -8,7 +8,6 @@ export function useComposerAttachmentDropState(target: ComposerTargetState) {
     selectedRepoPath: target.asyncComposerState.selectedRepoPath,
     selectedRepo: target.runtimeTargetSelection.selectedRepo,
     selectedRepoExecutionHostId: target.runtimeTargetSelection.selectedRepoExecutionHostId,
-    selectedRepoSettings: target.runtimeTargetSelection.selectedRepoSettings,
     connectionId: target.workspaceIdentityState.connectionId
   })
   return useAttachmentDropState({
@@ -18,7 +17,7 @@ export function useComposerAttachmentDropState(target: ComposerTargetState) {
     promptCaretFrameRef: target.asyncComposerState.promptCaretFrameRef,
     promptTextareaRef: target.asyncComposerState.promptTextareaRef,
     selectedRepoPath: destination.path ?? undefined,
-    selectedRepoSettings: destination.settings,
+    selectedRepoRuntimeEnvironmentId: destination.runtimeEnvironmentId,
     selectedWorktreeId: destination.worktreeId,
     setAgentPrompt: target.sourceContextState.setAgentPrompt,
     setAttachmentPaths: target.sourceContextState.setAttachmentPaths

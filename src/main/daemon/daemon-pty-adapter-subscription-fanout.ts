@@ -1,4 +1,4 @@
-import type { PtyBackgroundStreamEvent } from '../providers/types'
+import type { PtyBackgroundStreamEvent } from '../providers/pty-provider-contract'
 import { combineUnsubscribes } from './combine-unsubscribes'
 import type { DaemonPtyAdapter } from './daemon-pty-adapter'
 import type { DaemonPtyRouterDataEvent, DaemonPtyRouterExitEvent } from './daemon-pty-router-events'

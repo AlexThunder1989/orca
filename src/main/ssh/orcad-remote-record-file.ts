@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { shellEscape } from './ssh-connection-utils'
 import { removeRemoteFileCommand } from './ssh-remote-commands'
 import { execOrcadRemote, type OrcadRemoteExecTarget } from './orcad-remote-runtime-control'
-import { isUnconfirmedSshCommandTermination } from './ssh-relay-deploy-helpers'
+import { isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
 import { isWindowsRemoteHost } from './ssh-remote-platform'
 import {
   orcadRemoteBaseDir,

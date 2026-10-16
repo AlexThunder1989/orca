@@ -9,7 +9,8 @@ import {
 import {
   createMockStore,
   registerWorktreeActivationReset,
-  setSetupScriptLaunchMode
+  setSetupScriptLaunchMode,
+  createdTabStartups
 } from './worktree-activation-test-harness'
 
 const initialAppStoreState = useAppStore.getState()
@@ -49,7 +50,7 @@ describe('seeding beside a caller-provided chat surface', () => {
     expect(store.setTabCustomTitle).toHaveBeenCalledWith('tab-1', 'Setup', {
       recordInteraction: false
     })
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith('tab-1', {
+    expect(createdTabStartups(store)['tab-1']).toEqual({
       command: 'bash /tmp/repo/.git/orca/setup-runner.sh',
       env: setup.envVars
     })

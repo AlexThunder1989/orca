@@ -6,7 +6,7 @@ import {
 import { DegradedDaemonPtyProvider } from '../daemon/degraded-daemon-pty-provider'
 import { getDaemonProvider } from '../daemon/daemon-provider-state'
 import { getAllDaemonAdapters } from '../daemon/daemon-provider-routing'
-import { getLocalPtyProvider } from '../ipc/pty'
+import { getLocalPtyProvider } from '../ipc/pty/provider/registry'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 
 export type LocalBuildCompatibilityResult = {

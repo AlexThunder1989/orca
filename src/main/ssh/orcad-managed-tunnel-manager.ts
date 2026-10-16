@@ -182,6 +182,13 @@ export class OrcadManagedTunnelManager {
     await this.forwards.removeForwardAndWait(active.forwardId)
   }
 
+  /** Quit: supersedes every build in flight and waits for each forward process to exit. */
+  async shutdown(): Promise<void> {
+    this.managerGeneration += 1
+    this.active.clear()
+    await this.forwards.closeAll()
+  }
+
   dispose(): void {
     this.managerGeneration += 1
     this.active.clear()

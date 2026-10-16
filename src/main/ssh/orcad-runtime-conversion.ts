@@ -13,6 +13,7 @@ import type { OrcadMigrationSourceCutover } from '../../shared/orcad-migration-s
 import { recordManagedOrcadMigration } from '../../shared/runtime-environment-managed-orcad-store'
 import { listEnvironments } from '../../shared/runtime-environment-store'
 import {
+  getOrcadSshDeployment,
   redactRuntimeEnvironment,
   type KnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
@@ -24,20 +25,26 @@ import {
   commitOrcadMigrationDestination,
   type OrcadMigrationDestinationCatalog
 } from './orcad-migration-cutover-coordinator'
-import { removeOrcadMigrationJournalsForDestination } from './orcad-migration-cutover-journal'
 import {
-  fenceOrcadMigrationSource,
-  resolveOrcadMigrationFence
-} from './orcad-migration-source-fence'
+  findOrcadMigrationSourceCutoverForTarget,
+  removeOrcadMigrationJournalsForDestination
+} from './orcad-migration-cutover-journal'
 import type { SshTarget } from '../../shared/ssh-types'
-import {
-  assessOrcadMigrationTerminals,
-  type CensusHostRelayTerminals,
-  retireProvenExitedLeases
-} from './orcad-migration-terminal-gate'
+import type { CensusHostRelayTerminals } from './orcad-migration-terminal-gate'
 import { createManagedOrcadEnvironment } from './orcad-runtime-deployment'
+import { createSshRelayMigrationSource } from './orcad-migration-ssh-relay-source'
+import {
+  leaveBehindClearsOrcadMigrationBlockers,
+  onlyLeavableOrcadMigrationBlockers
+} from './ssh-target-orcad-preflight'
+import { ORCAD_MIGRATION_LEAVE_BEHIND_TERMINALS_REASON } from './orcad-migration-source-fence'
 import { retainOrcadMigrationSource } from './orcad-migration-source-retention'
-import { hasRegisteredDirectSshAuthority } from './ssh-target-registry'
+import {
+  linkedOrcadMigrationCutoverPort,
+  linkedOrcadMigrationProjects,
+  linkServerHeldRepositories,
+  type OrcadServerRepository
+} from './orcad-migration-repository-link'
 
 export type OrcadManagedConversionArgs = {
   sshTargetId: string
@@ -46,8 +53,10 @@ export type OrcadManagedConversionArgs = {
   censusHost?: ((target: SshTarget) => ReturnType<CensusHostRelayTerminals>) | null
   /** The destination's T6-9 catalog client, reached through the server's tunnel. */
   destinationFor: (environment: KnownRuntimeEnvironment) => OrcadMigrationDestinationCatalog
+  /** The server's own projects, so ones this host already holds at the same path link to them. */
+  serverRepositoriesFor?: (environment: KnownRuntimeEnvironment) => Promise<OrcadServerRepository[]>
   /** Releases the direct SSH session after the terminal check, before the fence. */
-  releaseDirectSession: (sshTargetId: string) => Promise<void>
+  releaseDirectSession?: (sshTargetId: string) => Promise<void>
   now?: () => Date
   signal?: AbortSignal
 }
@@ -83,28 +92,48 @@ export async function convertSshTargetToManagedOrcad(
   )
   await ensureOrcadManagedTunnel(userDataPath, environment.id)
   const { claims, targetStore } = requireManagedOrcadInfrastructure()
-  const committed = await runTargetLifecycle(fenced.sshTargetId, () =>
-    commitOrcadMigrationDestination(
+  const store = targetStore.getOrcadMigrationSource()
+  const destination = args.destinationFor(marked)
+  const serverRepositoriesFor = args.serverRepositoriesFor
+  let linkedRepositoryIds: string[] | undefined
+  const committed = await runTargetLifecycle(fenced.sshTargetId, async () => {
+    const journaled = requireJournaledCutover(userDataPath, fenced)
+    const cutover = serverRepositoriesFor
+      ? await linkServerHeldRepositories({
+          userDataPath,
+          store,
+          claims,
+          cutover: journaled,
+          destination,
+          serverRepositories: () => serverRepositoriesFor(marked),
+          now: args.now
+        })
+      : journaled
+    linkedRepositoryIds = cutover.linkedRepositoryIds
+    return commitOrcadMigrationDestination(
       {
         userDataPath,
-        store: targetStore.getOrcadMigrationSource(),
+        store,
         claims,
-        destination: args.destinationFor(marked),
+        source: linkedOrcadMigrationCutoverPort({ userDataPath, store, claims, cutover }),
+        destination,
         now: args.now
       },
-      fenced.migrationId
+      cutover.migrationId
     )
-  )
+  })
   if (committed.phase !== 'destination-committed' && committed.phase !== 'source-retired') {
     throw new Error(`orcad_migration_commit_not_proven:${committed.phase}`)
   }
   if (committed.phase === 'destination-committed') {
     retainOrcadMigrationSource(userDataPath, committed.migrationId, args.now)
   }
+  const linkedProjects = linkedOrcadMigrationProjects(store, { linkedRepositoryIds })
   return {
     outcome: 'converted',
     environment: redactRuntimeEnvironment(marked),
-    migrationId: committed.migrationId
+    migrationId: committed.migrationId,
+    ...(linkedProjects.length > 0 ? { linkedProjects } : {})
   }
 }
 
@@ -119,7 +148,16 @@ async function fenceOrResume(
   if (!target) {
     return refuse('unverifiable', 'orcad_migration_target_not_found', 'The SSH host is gone.')
   }
-  const existing = resolveOrcadMigrationFence(userDataPath, target)
+  const store = targetStore.getOrcadMigrationSource()
+  const censusHost = args.censusHost
+  const source = createSshRelayMigrationSource({
+    userDataPath,
+    store,
+    claims,
+    target,
+    censusHost: censusHost ? () => censusHost(target) : null
+  })
+  const existing = source.resolveFence()
   if (existing.state === 'fenced') {
     return existing.cutover
   }
@@ -133,7 +171,7 @@ async function fenceOrResume(
     )
   }
   const converted = listEnvironments(userDataPath).some(
-    (environment) => environment.orcadDeployment?.sshTargetId === target.id
+    (environment) => getOrcadSshDeployment(environment)?.sshTargetId === target.id
   )
   if (converted) {
     return refuse(
@@ -142,29 +180,18 @@ async function fenceOrResume(
       'This SSH host is already a managed server.'
     )
   }
-  const store = targetStore.getOrcadMigrationSource()
   // The fence re-checks leases once it holds.
-  const censusHost = args.censusHost
-  const terminalProof = await assessOrcadMigrationTerminals(
-    store,
-    target.id,
-    censusHost ? () => censusHost(target) : null
-  )
-  if (terminalProof.verdict !== 'exited') {
+  const terminalProof = await source.assessTerminals()
+  if (terminalProof.verdict === 'live' || terminalProof.verdict === 'unverifiable') {
     return refuse(terminalProof.verdict, 'orcad_migration_terminals', terminalProof.reason)
   }
-  retireProvenExitedLeases(store, target.id, terminalProof)
-  await args.releaseDirectSession(target.id)
+  source.retireProvenExitedTerminals(terminalProof)
+  await args.releaseDirectSession?.(target.id)
   const result = await runTargetLifecycle(target.id, () =>
-    fenceOrcadMigrationSource({
-      userDataPath,
-      store,
-      claims,
-      targetId: target.id,
+    source.acquireFence({
       destinationEnvironmentId: randomUUID(),
       destinationName: args.name,
       terminalProof,
-      hasDirectSshAuthority: hasRegisteredDirectSshAuthority,
       now: args.now,
       signal: args.signal
     })
@@ -185,7 +212,37 @@ async function fenceOrResume(
       )
     )
   }
-  return refuse(result.verdict, result.code, result.reason)
+  // Already moving anyway: what still refuses is what can't be left behind.
+  const leavable =
+    result.blockers &&
+    onlyLeavableOrcadMigrationBlockers(result.blockers) &&
+    !target.managedServerLeaveBehind
+  if (leavable && terminalProof.verdict !== 'exited') {
+    // Why no offer: leaving tabs behind would strand terminals the relay bridge still serves.
+    return refuse(
+      result.verdict,
+      result.code,
+      `${result.reason} ${ORCAD_MIGRATION_LEAVE_BEHIND_TERMINALS_REASON}`
+    )
+  }
+  return {
+    ...refuse(result.verdict, result.code, result.reason),
+    // Why previewed: an offer the confirmed export would refuse again is a dead end.
+    ...(leavable && leaveBehindClearsOrcadMigrationBlockers(store, target.id)
+      ? { canLeaveBehind: true }
+      : {})
+  }
+}
+
+function requireJournaledCutover(
+  userDataPath: string,
+  fenced: OrcadMigrationSourceCutover
+): OrcadMigrationSourceCutover {
+  const journaled = findOrcadMigrationSourceCutoverForTarget(userDataPath, fenced.sshTargetId)
+  if (journaled?.migrationId !== fenced.migrationId) {
+    throw new Error('orcad_migration_source_fence_lost')
+  }
+  return journaled
 }
 
 function isRegistered(userDataPath: string, environmentId: string): boolean {

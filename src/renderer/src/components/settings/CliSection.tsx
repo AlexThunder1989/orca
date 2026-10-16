@@ -6,8 +6,7 @@ import type { CliInstallStatus } from '../../../../shared/cli-install-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   ORCA_CLI_SKILL_INSTALL_COMMAND,
-  ORCA_CLI_SKILL_NAME,
-  ORCA_CLI_SKILL_UPDATE_COMMAND
+  ORCA_CLI_SKILL_NAME
 } from '@/lib/agent-feature-install-commands'
 import {
   GLOBAL_AGENT_SKILL_SOURCE_KINDS,
@@ -98,10 +97,6 @@ export function CliSection({
   })
   const cliSkillInstallCommand = buildSkillCommandForRuntime(
     ORCA_CLI_SKILL_INSTALL_COMMAND,
-    agentRuntime
-  )
-  const cliSkillUpdateCommand = buildSkillCommandForRuntime(
-    ORCA_CLI_SKILL_UPDATE_COMMAND,
     agentRuntime
   )
   const cliSkillTerminalShellOverride = getAgentSkillTerminalShellOverride(
@@ -331,7 +326,6 @@ export function CliSection({
                 'Enables agents to use Orca workspace, terminal, and progress commands.'
               )}
               command={cliSkillInstallCommand}
-              installedCommand={cliSkillUpdateCommand}
               terminalTitle="CLI skill setup"
               terminalAriaLabel="CLI skill install terminal"
               terminalWorktreeId={`settings-cli-skill-terminal-${agentRuntime.runtime}`}

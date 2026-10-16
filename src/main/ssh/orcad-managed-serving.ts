@@ -13,7 +13,7 @@ import { orcadBoundPort } from './orcad-managed-bound-port'
 import { managedOrcadSlot } from './orcad-managed-runtime-context'
 import { wakeStoppedManagedOrcad } from './orcad-managed-wake'
 import { resolveOrcadRemoteContext } from './orcad-remote-context'
-import type { SshConnection } from './ssh-connection'
+import type { OrcadHostTransport } from './orcad-host-transport'
 
 export type OrcadManagedServing =
   | { state: 'serving' }
@@ -24,7 +24,7 @@ export type OrcadManagedServing =
 export type OrcadManagedServingInput = {
   environment: KnownRuntimeEnvironment
   target: SshTarget
-  connection: SshConnection
+  connection: OrcadHostTransport
   remotePort: number
   probe: (environment: KnownRuntimeEnvironment, timeoutMs: number) => Promise<boolean>
 }
@@ -42,7 +42,7 @@ const PROBE_TIMEOUT_MS = 5_000
 // transport and port only, so a kill, reboot or rebind is never answered from cache.
 const VERDICT_REUSE_MS = 5_000
 
-type ServingTransport = { connection: SshConnection; generation: number; remotePort: number }
+type ServingTransport = { connection: OrcadHostTransport; generation: number; remotePort: number }
 // Why per transport: a check on a dropped connection fails, and a caller on the reconnected one
 // must run its own instead of inheriting that failure as "could not be started".
 type ServingCheck = ServingTransport & { check: Promise<OrcadManagedServing>; settledAt?: number }

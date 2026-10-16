@@ -16,8 +16,6 @@ import {
   resolveFilesystemRouteForHost,
   resolveGitRouteForHost
 } from './providers/execution-host-provider-dispatch'
-import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
-import { getSshGitProvider } from './providers/ssh-git-dispatch'
 import { createFolderWorktree, listRepoWorktrees } from './repo-worktrees'
 import { mergeWorktree } from './ipc/worktree-logic'
 import { getLocalProjectWorktreeGitOptions } from './project-runtime-git-options'
@@ -28,7 +26,6 @@ import {
   type AsyncLimiter
 } from './workspace-space-scan-control'
 import { createUnavailableWorkspaceSpaceRow } from './workspace-space-worktree-row'
-import { scanRemoteWorkspaceSpaceWorktree } from './workspace-space-remote-scan'
 import {
   scanLocalWorkspaceSpaceWorktree,
   type ReadLocalDuDepthOne
@@ -48,7 +45,6 @@ export type WorkspaceSpaceAnalyzeOptions = {
 
 export type WorkspaceSpaceScanLimiters = {
   localWorktree: AsyncLimiter
-  remoteFallbackTraversal: AsyncLimiter
 }
 
 export type WorkspaceSpaceRepoScanResult = {
@@ -104,17 +100,11 @@ async function listWorktreesForSpaceScan(
       }
     }
     if (route.kind === 'ssh') {
-      const provider = getSshGitProvider(route.connectionId)
-      if (!provider) {
-        return {
-          ok: false,
-          status: 'unavailable',
-          error: `SSH connection "${route.connectionId}" is not connected.`
-        }
+      return {
+        ok: false,
+        status: 'unavailable',
+        error: `SSH connection "${route.connectionId}" is not connected.`
       }
-      const worktrees = await provider.listWorktrees(repo.path, { signal })
-      throwIfWorkspaceSpaceScanAborted(signal)
-      return { ok: true, worktrees }
     }
     const worktrees = await listRepoWorktrees(repo, {
       ...getLocalProjectWorktreeGitOptions(store, repo),
@@ -208,8 +198,6 @@ export async function scanWorkspaceSpaceRepo(args: {
     options.onProgress
   )
   const filesystemRoute = resolveFilesystemRouteForHost(getRepoExecutionHostId(repo))
-  const sshFilesystemProvider =
-    filesystemRoute.kind === 'ssh' ? getSshFilesystemProvider(filesystemRoute.connectionId) : null
   const rows = await mapWithConcurrency(worktrees, WORKTREE_SCAN_CONCURRENCY, async (worktree) => {
     throwIfWorkspaceSpaceScanAborted(options.signal)
     reportProgress(
@@ -222,24 +210,15 @@ export async function scanWorkspaceSpaceRepo(args: {
     )
     const row =
       filesystemRoute.kind !== 'local'
-        ? sshFilesystemProvider
-          ? await scanRemoteWorkspaceSpaceWorktree(
-              repo,
-              worktree,
-              scannedAt,
-              sshFilesystemProvider,
-              limiters.remoteFallbackTraversal,
-              options.signal
-            )
-          : createUnavailableWorkspaceSpaceRow(
-              repo,
-              worktree,
-              scannedAt,
-              'unavailable',
-              filesystemRoute.kind === 'ssh'
-                ? `SSH filesystem for "${filesystemRoute.connectionId}" is not connected.`
-                : `Host ${filesystemRoute.hostId} is not reachable from this process.`
-            )
+        ? createUnavailableWorkspaceSpaceRow(
+            repo,
+            worktree,
+            scannedAt,
+            'unavailable',
+            filesystemRoute.kind === 'ssh'
+              ? `SSH filesystem for "${filesystemRoute.connectionId}" is not connected.`
+              : `Host ${filesystemRoute.hostId} is not reachable from this process.`
+          )
         : await limiters.localWorktree(() =>
             scanLocalWorkspaceSpaceWorktree(
               repo,

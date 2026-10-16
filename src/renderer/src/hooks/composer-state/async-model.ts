@@ -2,7 +2,6 @@ import type * as React from 'react'
 import type { RefObject } from 'react'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import type { OrcaHooks, SetupAgentStartupPolicy } from '../../../../shared/orca-yaml-hook-types'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { GitHubRepositoryIdentity } from '../../../../shared/github/pull-request-types'
 import type { WorkspaceCreateErrorDisplay } from '@/lib/workspace-create-error-format'
 import type { IssueCommandReadResult } from '@/runtime/runtime-hooks-client'
@@ -78,5 +77,4 @@ export type ComposerAsyncModel = {
   setSelectedRepoSlug: React.Dispatch<React.SetStateAction<GitHubRepositoryIdentity | null>>
   selectedRepoPath: string | undefined
   selectedRepoPathRef: RefObject<string | undefined>
-  selectedRepoSettingsRef: RefObject<Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null>
 }

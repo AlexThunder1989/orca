@@ -20,9 +20,11 @@ import {
   fileReferenceContent,
   NativeChatFileReference,
   NativeChatSkill,
+  promptLeafText,
+  promptText,
   promptTextContent,
-  promptTextMap,
-  promptTextOffset
+  promptTextOffset,
+  promptTextPosition
 } from './native-chat-prompt-document'
 import type { NativeChatComposerInput } from './native-chat-composer-input'
 
@@ -103,9 +105,7 @@ export function NativeChatPromptEditor({
           return true
         },
         clipboardTextSerializer: (slice) =>
-          slice.content.textBetween(0, slice.content.size, '\n', (node) =>
-            node.type.name === 'hardBreak' ? '\n' : String(node.attrs.token ?? '')
-          )
+          slice.content.textBetween(0, slice.content.size, '\n', promptLeafText)
       },
       onTransaction: ({ editor: current, transaction }) => {
         // Why: a value set from the store with no change of this window behind it (another
@@ -117,11 +117,7 @@ export function NativeChatPromptEditor({
           (!transaction.getMeta('preventUpdate') ||
             hasUnsavedNativeChatComposerDraftChange(scopeKey))
         ) {
-          writeNativeChatDraftDocument(
-            scopeKey,
-            promptTextMap(current.state.doc).text,
-            current.getJSON()
-          )
+          writeNativeChatDraftDocument(scopeKey, promptText(current.state.doc), current.getJSON())
         }
       },
       onUpdate: () => {
@@ -153,11 +149,12 @@ export function NativeChatPromptEditor({
               )
             },
             get value() {
-              return promptTextMap(editor.state.doc).text
+              return promptText(editor.state.doc)
             },
             set value(value: string) {
-              const old = promptTextMap(editor.state.doc)
-              if (old.text === value) {
+              const { doc } = editor.state
+              const old = promptText(doc)
+              if (old === value) {
                 return
               }
               // A draft loaded or adopted whole keeps its skill chips: its stored document wins.
@@ -171,40 +168,27 @@ export function NativeChatPromptEditor({
                 return
               }
               let start = 0
-              while (
-                start < old.text.length &&
-                start < value.length &&
-                old.text[start] === value[start]
-              ) {
+              while (start < old.length && start < value.length && old[start] === value[start]) {
                 start++
               }
               let end = 0
               while (
-                end < old.text.length - start &&
+                end < old.length - start &&
                 end < value.length - start &&
-                old.text[old.text.length - 1 - end] === value[value.length - 1 - end]
+                old[old.length - 1 - end] === value[value.length - 1 - end]
               ) {
                 end++
               }
               // A text replacement intersecting an atom replaces its entire serialized token.
-              while (start > 0 && old.positions[start - 1] === old.positions[start]) {
-                start--
-              }
-              while (
-                end > 0 &&
-                old.positions[old.text.length - end] === old.positions[old.text.length - end - 1]
-              ) {
-                end--
-              }
+              const from = promptTextPosition(doc, start, 'before')
+              const to = promptTextPosition(doc, old.length - end, 'after')
+              start = promptTextOffset(doc, from)
+              end = old.length - promptTextOffset(doc, to)
               const content = editor.schema.nodeFromJSON(
                 promptTextContent(value.slice(start, value.length - end))
               )
               editor.commands.command(({ tr }) => {
-                tr.replaceRange(
-                  old.positions[start],
-                  old.positions[old.text.length - end],
-                  new Slice(content.content, 1, 1)
-                )
+                tr.replaceRange(from, to, new Slice(content.content, 1, 1))
                 tr.setMeta('preventUpdate', true)
                 return true
               })
@@ -235,13 +219,13 @@ export function NativeChatPromptEditor({
               if (!selection.empty) {
                 return false
               }
-              const { text } = promptTextMap(doc)
+              const before = promptText(doc, 0, selection.from)
+              const after = promptText(doc, selection.from)
               // An empty composer has one line: no layout read on the path every recall starts from.
-              if (text === '') {
+              if (before === '' && after === '') {
                 return true
               }
-              const caret = promptTextOffset(doc, selection.from)
-              const beyond = edge === 'start' ? text.slice(0, caret) : text.slice(caret)
+              const beyond = edge === 'start' ? before : after
               // Why both: the text check covers other paragraphs, the view covers soft wraps.
               return (
                 !beyond.includes('\n') &&
@@ -252,18 +236,19 @@ export function NativeChatPromptEditor({
               editor.commands.selectAll()
             },
             setSelectionRange: (from, to) => {
-              const { positions } = promptTextMap(editor.state.doc)
+              const { doc } = editor.state
               editor.commands.setTextSelection({
-                from: positions[Math.min(from ?? 0, positions.length - 1)],
-                to: positions[Math.min(to ?? 0, positions.length - 1)]
+                from: promptTextPosition(doc, from ?? 0),
+                to: promptTextPosition(doc, to ?? 0)
               })
             },
             insertSkill: (from, to, token) => {
-              const { positions } = promptTextMap(editor.state.doc)
+              const { doc } = editor.state
+              const range = { from: promptTextPosition(doc, from), to: promptTextPosition(doc, to) }
               editor.view.dispatch(closeHistory(editor.state.tr))
               editor
                 .chain()
-                .insertContentAt({ from: positions[from], to: positions[to] }, [
+                .insertContentAt(range, [
                   { type: 'nativeChatSkill', attrs: { token } },
                   { type: 'text', text: ' ' }
                 ])

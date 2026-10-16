@@ -1,3 +1,4 @@
+import { createClaudeStructuredLaunchResolver } from '../runtime/structured-agent-launch-composition.test-support'
 import { chmodSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
@@ -9,11 +10,8 @@ import {
   CLAUDE_DEFAULT_SETTING_SOURCES,
   CLAUDE_SESSION_STATE_EVENTS_ENV,
   CLAUDE_STRUCTURED_BASE_OPTIONS,
-  claudeSessionIdForOrcaSession,
-  createClaudeStructuredLaunchResolver,
-  type ClaudeStructuredLaunchResolverDeps
+  claudeSessionIdForOrcaSession
 } from './claude-structured-launch-resolution'
-import { claudeStructuredPermissionModeForSettings } from './claude-structured-permission-mode'
 import { CLAUDE_THINKING_DISPLAY_FLAG, type ClaudeCliFlag } from './claude-cli-flag-support'
 import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 
@@ -57,8 +55,6 @@ function resolverFor(
   value: AgentSessionRecord | null,
   resolveEnv?: () => Record<string, string>,
   account: 'managed' | 'system' = 'system',
-  // Manual by default so a test that is not about permissions is not silently about them.
-  agentDefaultArgs: Record<string, string> = { claude: '' },
   hasTranscript: () => Promise<boolean> = async () => true,
   resolveLaunchArgs?: () => string[],
   attachmentDirectory?: string
@@ -68,7 +64,6 @@ function resolverFor(
     resolveWorkspacePath: async (id) => `/repos/${id}`,
     resolveCommand: () => '/usr/local/bin/claude',
     resolveAuthPolicy: () => ({ account }),
-    resolvePermissionMode: () => claudeStructuredPermissionModeForSettings({ agentDefaultArgs }),
     hasTranscript,
     resolveLaunchArgs: resolveLaunchArgs ?? (() => value?.launchArgs ?? []),
     ...(resolveEnv ? { resolveEnv } : {}),
@@ -117,6 +112,8 @@ describe('claude structured launch resolution', () => {
       supportedDialogKinds: [],
       extraArgs: { 'replay-user-messages': null },
       systemPrompt: { type: 'preset', preset: 'claude_code' },
+      // A start the host named no mode for asks.
+      permissionMode: 'default',
       sessionId: first.providerSessionId
     })
     expect(first.options.resume).toBeUndefined()
@@ -137,7 +134,6 @@ describe('claude structured launch resolution', () => {
         value,
         undefined,
         'system',
-        undefined,
         hasTranscript
       )({ identity: identityAt('old-leaf') })
       const expected = claudeSessionIdForOrcaSession(SESSION_ID, boundary.operationId)
@@ -154,7 +150,6 @@ describe('claude structured launch resolution', () => {
         value,
         undefined,
         'system',
-        undefined,
         hasTranscript
       )({ identity: IDENTITY })
       expect(retry.providerSessionId).toBe(expected)
@@ -162,7 +157,6 @@ describe('claude structured launch resolution', () => {
         { ...value, providerContextBoundary: { ...boundary, operationId: 'clear-two' } },
         undefined,
         'system',
-        undefined,
         async () => false
       )({ identity: IDENTITY })
       expect(next.providerSessionId).not.toBe(expected)
@@ -261,7 +255,6 @@ describe('claude structured launch resolution', () => {
       }),
       undefined,
       'system',
-      { claude: '' },
       hasTranscript
     )({ identity: identityAt(null) })
 
@@ -280,15 +273,11 @@ describe('claude structured launch resolution', () => {
     })
   })
 
-  // Agent Permissions is stored as the bypass flag inside the launch arguments, so presence of
-  // that flag — not the whole string — is what Yolo means, exactly as a terminal launch reads it.
-  it.each([
-    ['--dangerously-skip-permissions'],
-    ['--dangerously-skip-permissions --model Opus'],
-    ['--model Opus --dangerously-skip-permissions']
-  ])('starts a Yolo session in bypassPermissions for args %s', async (claude) => {
-    const launch = await resolverFor(record(), undefined, 'system', { claude })({
-      identity: IDENTITY
+  // Full access is the owned bypass flag, never the SDK's typed option older binaries reject.
+  it('starts a Full access chat with the bypass flag and no permission mode', async () => {
+    const launch = await resolverFor(record())({
+      identity: IDENTITY,
+      permissionMode: 'full-access'
     })
 
     expect(launch.options.extraArgs).toEqual({
@@ -299,31 +288,30 @@ describe('claude structured launch resolution', () => {
     expect(launch.options.allowDangerouslySkipPermissions).toBeUndefined()
   })
 
-  // The common profile: the toggle has never been used, so it has written nothing, and the
-  // default for the key it did not write is the bypass flag — the posture the terminal has
-  // always given these users.
-  it('starts a session that never opened Agent settings in bypassPermissions', async () => {
-    const launch = await resolverFor(record(), undefined, 'system', {})({ identity: IDENTITY })
+  it.each([
+    ['ask', 'default'],
+    ['accept-edits', 'acceptEdits'],
+    ['auto', 'auto']
+  ] as const)('starts a %s chat in permission mode %s', async (permissionMode, expected) => {
+    const launch = await resolverFor(record())({ identity: IDENTITY, permissionMode })
 
-    expect(launch.options.extraArgs).toEqual({
-      'replay-user-messages': null,
-      'dangerously-skip-permissions': null
-    })
+    expect(launch.options.permissionMode).toBe(expected)
+    expect(launch.options.extraArgs).toEqual({ 'replay-user-messages': null })
   })
 
-  // Manual is stored as an empty string, which owns the key and so beats the shipped default.
-  it.each([[''], ['--model Opus']])(
-    'leaves a Manual session prompting for args %s',
-    async (claude) => {
-      const launch = await resolverFor(record(), undefined, 'system', { claude })({
-        identity: IDENTITY
-      })
+  // The chat's own mode replaces Agent Permissions: a Yolo terminal setting grants a chat nothing.
+  it('ignores the bypass flag the agent Arguments carry', async () => {
+    const launch = await resolverFor(
+      record(),
+      undefined,
+      'system',
+      async () => true,
+      () => ['--dangerously-skip-permissions']
+    )({ identity: IDENTITY, permissionMode: 'ask' })
 
-      expect(launch.options.permissionMode).toBeUndefined()
-      expect(launch.options.extraArgs).toEqual({ 'replay-user-messages': null })
-      expect(launch.options.allowDangerouslySkipPermissions).toBeUndefined()
-    }
-  )
+    expect(launch.options.permissionMode).toBe('default')
+    expect(launch.options.extraArgs).toEqual({ 'replay-user-messages': null })
+  })
 
   it('passes configured arguments on start without taking over permission or session flags', async () => {
     const launch = await resolverFor(
@@ -344,7 +332,7 @@ describe('claude structured launch resolution', () => {
       model: 'claude-sonnet-4-5',
       'replay-user-messages': null
     })
-    expect(launch.options.permissionMode).toBeUndefined()
+    expect(launch.options.permissionMode).toBe('default')
     expect(launch.options.sessionId).toBe(launch.providerSessionId)
   })
 
@@ -354,7 +342,6 @@ describe('claude structured launch resolution', () => {
       record({ ...RESUMABLE, launchArgs: ['--model', 'stale'] }),
       undefined,
       'system',
-      { claude: '' },
       async () => true,
       () => args
     )
@@ -414,7 +401,6 @@ describe('claude structured launch resolution', () => {
       record(),
       undefined,
       'system',
-      { claude: '' },
       async () => true,
       undefined,
       '/state/agent-session-attachments'
@@ -429,7 +415,6 @@ describe('claude structured launch resolution', () => {
       record(),
       undefined,
       'system',
-      { claude: '' },
       async () => true,
       () => ['--add-dir', '/extra'],
       '/state/agent-session-attachments'
@@ -574,7 +559,7 @@ describe('claude structured launch resolution', () => {
 
 describe('readable Claude thinking', () => {
   const launchWith = (
-    cliFlags?: ClaudeStructuredLaunchResolverDeps['cliFlags'],
+    cliFlags?: Parameters<typeof createClaudeStructuredLaunchResolver>[0]['cliFlags'],
     command = '/usr/local/bin/claude',
     launchArgs: string[] = []
   ) =>

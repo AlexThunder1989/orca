@@ -108,6 +108,10 @@ export function registerRuntimeClientIpcBridge(
       applyNativeChatLaunchDraftResolved(useAppStore.getState(), event)
       return
     }
+    // A paired desktop keeps its own Workspace options; only the host's phone mirrors them.
+    if (event.type === 'workspaceViewChanged') {
+      return
+    }
     if (event.type === 'reposChanged') {
       requestProjectRefresh(environmentId)
       return

@@ -1,4 +1,4 @@
-import type { OrcaRuntimeService } from '../../../../orca-runtime'
+import type { WorkerTerminalReleaseRuntime } from '../../../../orchestration/worker-terminal-release-runtime'
 import type { OrchestrationDb } from '../../../../orchestration/db'
 import type { WorkerTerminalResourceRow } from '../../../../orchestration/worker-terminal-ownership'
 import type { WorkerDispatchRow } from '../../../../orchestration/types'
@@ -6,7 +6,7 @@ import { resolveStructuredWorkerIdentity } from '../../../../structured-worker-a
 import { isStructuredWorkerHandle } from '../../../../structured-worker-identity'
 
 export function workerTerminalLeaseIsCurrent(
-  runtime: OrcaRuntimeService,
+  runtime: WorkerTerminalReleaseRuntime,
   db: OrchestrationDb,
   dispatchId: string,
   resource: WorkerTerminalResourceRow,

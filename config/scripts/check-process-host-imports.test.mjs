@@ -5,8 +5,7 @@ import path from 'node:path'
 import {
   assessProcessHostImports,
   collectProcessHostSources,
-  main,
-  readProcessHostBaseline
+  main
 } from './check-process-host-imports.mjs'
 import { collectModuleSpecifiers } from './static-module-specifiers.mjs'
 
@@ -239,11 +238,5 @@ describe('process-host import boundary', () => {
       'config/process-host-direct-import-baseline.txt': ''
     })
     expect(() => main(root)).toThrow('Missing process-host implementation')
-  })
-
-  it('reads a commented baseline without allowing formatting to invent entries', () => {
-    expect(readProcessHostBaseline('# migration debt\n\n src/main/legacy.ts \n')).toEqual([
-      'src/main/legacy.ts'
-    ])
   })
 })

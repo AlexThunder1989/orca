@@ -4,7 +4,7 @@ import type { MarkdownDocument } from '../../../../shared/filesystem-entry-types
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { getConnectionIdFromState } from '@/lib/connection-context'
-import { statRuntimePath } from '@/runtime/runtime-file-client'
+import { statRuntimePath } from '@/runtime/runtime-file-metadata-client'
 import {
   getRuntimeTargetForFileOwner,
   requireRuntimeTargetForFileOwner

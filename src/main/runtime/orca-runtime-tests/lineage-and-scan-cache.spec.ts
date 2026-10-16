@@ -1,16 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   OrcaRuntimeService,
-  getSshGitProviderMock,
   join,
   listWorktrees,
   lstat,
   mkdir,
   mkdtemp,
-  registerSshFilesystemProvider,
   rm,
-  tmpdir,
-  unregisterSshFilesystemProvider
+  tmpdir
 } from '../orca-runtime-test-mocks.spec'
 import type {
   WorkspaceLineage,
@@ -63,71 +60,6 @@ describe('OrcaRuntimeService', () => {
     ).resolves.toEqual({ refs: [], refDetails: [], truncated: true })
   })
 
-  it('resolves SSH worktrees when manually updating lineage', async () => {
-    const remoteRepo = {
-      id: 'remote-repo',
-      path: '/home/user/repo',
-      displayName: 'remote',
-      badgeColor: 'blue',
-      addedAt: 1,
-      connectionId: 'ssh-1'
-    }
-    const childId = `${remoteRepo.id}::/home/user/repo-child`
-    const parentId = `${remoteRepo.id}::/home/user/repo-parent`
-    const metaById: Record<string, WorktreeMeta> = {
-      [childId]: makeWorktreeMeta({ instanceId: 'child-instance' }),
-      [parentId]: makeWorktreeMeta({ instanceId: 'parent-instance' })
-    }
-    const setWorktreeLineage = vi.fn((_worktreeId, lineage) => lineage)
-    const listSshWorktrees = vi.fn().mockResolvedValue([
-      {
-        path: '/home/user/repo-child',
-        head: 'abc',
-        branch: 'feature/child',
-        isBare: false,
-        isMainWorktree: false
-      },
-      {
-        path: '/home/user/repo-parent',
-        head: 'def',
-        branch: 'feature/parent',
-        isBare: false,
-        isMainWorktree: false
-      }
-    ])
-    getSshGitProviderMock.mockReturnValue({ listWorktrees: listSshWorktrees })
-    const runtimeStore = {
-      ...store,
-      getRepo: (id: string) => (id === remoteRepo.id ? remoteRepo : undefined),
-      getRepos: () => [remoteRepo],
-      getAllWorktreeMeta: () => metaById,
-      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
-      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
-        metaById[worktreeId] = { ...metaById[worktreeId], ...meta }
-        return metaById[worktreeId]
-      },
-      getWorktreeLineage: () => undefined,
-      setWorktreeLineage
-    }
-    const runtime = new OrcaRuntimeService(runtimeStore as never)
-
-    await runtime.updateManagedWorktreeMeta(`id:${childId}`, {
-      lineage: { parentWorktree: `id:${parentId}` }
-    })
-
-    expect(listSshWorktrees).toHaveBeenCalledWith(remoteRepo.path)
-    expect(setWorktreeLineage).toHaveBeenCalledWith(
-      childId,
-      expect.objectContaining({
-        worktreeId: childId,
-        worktreeInstanceId: 'child-instance',
-        parentWorktreeId: parentId,
-        parentWorktreeInstanceId: 'parent-instance',
-        origin: 'manual'
-      })
-    )
-  })
-
   it('resolves SSH lineage updates from stored metadata when the scan cache misses', async () => {
     const remoteRepo = {
       id: 'remote-repo',
@@ -144,16 +76,6 @@ describe('OrcaRuntimeService', () => {
       [parentId]: makeWorktreeMeta({ instanceId: 'parent-instance' })
     }
     const setWorktreeLineage = vi.fn((_worktreeId: string, lineage: WorktreeLineage) => lineage)
-    const listSshWorktrees = vi.fn().mockResolvedValue([
-      {
-        path: '/home/user/repo',
-        head: 'abc',
-        branch: 'main',
-        isBare: false,
-        isMainWorktree: true
-      }
-    ])
-    getSshGitProviderMock.mockReturnValue({ listWorktrees: listSshWorktrees })
     const runtimeStore = {
       ...store,
       getRepo: (id: string) => (id === remoteRepo.id ? remoteRepo : undefined),
@@ -199,16 +121,6 @@ describe('OrcaRuntimeService', () => {
     const metaById: Record<string, WorktreeMeta> = {
       [parentId]: makeWorktreeMeta({ instanceId: 'parent-instance' })
     }
-    const listSshWorktrees = vi.fn().mockResolvedValue([
-      {
-        path: '/home/user/repo',
-        head: 'abc',
-        branch: 'main',
-        isBare: false,
-        isMainWorktree: true
-      }
-    ])
-    getSshGitProviderMock.mockReturnValue({ listWorktrees: listSshWorktrees })
     const runtimeStore = {
       ...store,
       getRepo: (id: string) => (id === remoteRepo.id ? remoteRepo : undefined),
@@ -229,73 +141,6 @@ describe('OrcaRuntimeService', () => {
         lineage: { parentWorktree: `id:${parentId}` }
       })
     ).rejects.toThrow('selector_not_found')
-  })
-
-  it('rejects SSH lineage updates when Orca worktree identity is missing', async () => {
-    const remoteRepo = {
-      id: 'remote-repo',
-      path: '/home/user/repo',
-      displayName: 'remote',
-      badgeColor: 'blue',
-      addedAt: 1,
-      connectionId: 'ssh-1'
-    }
-    const childId = `${remoteRepo.id}::/home/user/repo-child`
-    const parentId = `${remoteRepo.id}::/home/user/repo-parent`
-    const metaById: Record<string, WorktreeMeta> = {}
-    const setWorktreeLineage = vi.fn((_worktreeId: string, lineage: WorktreeLineage) => lineage)
-    const fsProvider = {
-      readFile: vi.fn(),
-      createDir: vi.fn().mockResolvedValue(undefined),
-      writeFile: vi.fn().mockResolvedValue(undefined)
-    }
-    getSshGitProviderMock.mockReturnValue({
-      listWorktrees: vi.fn().mockResolvedValue([
-        {
-          path: '/home/user/repo-child',
-          head: 'abc',
-          branch: 'feature/child',
-          isBare: false,
-          isMainWorktree: false
-        },
-        {
-          path: '/home/user/repo-parent',
-          head: 'def',
-          branch: 'feature/parent',
-          isBare: false,
-          isMainWorktree: false
-        }
-      ])
-    })
-    registerSshFilesystemProvider('ssh-1', fsProvider as never)
-    const runtimeStore = {
-      ...store,
-      getRepo: (id: string) => (id === remoteRepo.id ? remoteRepo : undefined),
-      getRepos: () => [remoteRepo],
-      getAllWorktreeMeta: () => metaById,
-      getWorktreeMeta: (worktreeId: string) => metaById[worktreeId],
-      setWorktreeMeta: (worktreeId: string, meta: Partial<WorktreeMeta>) => {
-        metaById[worktreeId] = { ...(metaById[worktreeId] ?? makeWorktreeMeta()), ...meta }
-        return metaById[worktreeId]
-      },
-      getWorktreeLineage: () => undefined,
-      setWorktreeLineage
-    }
-    const runtime = new OrcaRuntimeService(runtimeStore as never)
-
-    try {
-      await expect(
-        runtime.updateManagedWorktreeMeta(`id:${childId}`, {
-          lineage: { parentWorktree: `id:${parentId}` }
-        })
-      ).rejects.toThrow('Worktree instance identity was unavailable')
-    } finally {
-      unregisterSshFilesystemProvider('ssh-1')
-    }
-
-    expect(fsProvider.createDir).not.toHaveBeenCalled()
-    expect(fsProvider.writeFile).not.toHaveBeenCalled()
-    expect(setWorktreeLineage).not.toHaveBeenCalled()
   })
 
   it('rejects local lineage updates when Orca worktree identity is missing', async () => {
@@ -443,23 +288,26 @@ describe('OrcaRuntimeService', () => {
       childRepoId: 'repo-child',
       parentRepoId: 'repo-parent',
       childMeta: {},
-      parentMeta: {}
+      parentMeta: {},
+      accepted: true
     },
     {
       boundary: 'known host',
       childRepoId: TEST_REPO_ID,
       parentRepoId: TEST_REPO_ID,
       childMeta: { hostId: 'runtime:child-host' as const },
-      parentMeta: { hostId: 'runtime:parent-host' as const }
+      parentMeta: { hostId: 'runtime:parent-host' as const },
+      accepted: false
     },
     {
       boundary: 'known project',
       childRepoId: TEST_REPO_ID,
       parentRepoId: TEST_REPO_ID,
       childMeta: { projectId: 'project-child' },
-      parentMeta: { projectId: 'project-parent' }
+      parentMeta: { projectId: 'project-parent' },
+      accepted: true
     }
-  ])('rejects manual lineage writes across a $boundary boundary', async (scenario) => {
+  ])('checks manual lineage writes across a $boundary boundary', async (scenario) => {
     const repos = [...new Set([scenario.childRepoId, scenario.parentRepoId])].map((id) => ({
       id,
       path: join(tmpdir(), id),
@@ -499,16 +347,21 @@ describe('OrcaRuntimeService', () => {
     ])
     const runtime = new OrcaRuntimeService(runtimeStore as never)
 
-    await expect(
-      runtime.updateManagedWorktreeMeta(`id:${childId}`, {
-        lineage: { parentWorktree: `id:${parentId}` }
-      })
-    ).rejects.toThrow(
-      'Parent worktree must belong to the same repository, execution host, and project.'
-    )
-
-    expect(setWorktreeLineage).not.toHaveBeenCalled()
-    expect(setWorkspaceLineage).not.toHaveBeenCalled()
+    const update = runtime.updateManagedWorktreeMeta(`id:${childId}`, {
+      lineage: { parentWorktree: `id:${parentId}` }
+    })
+    if (scenario.accepted) {
+      await update
+      expect(setWorktreeLineage).toHaveBeenCalledWith(
+        childId,
+        expect.objectContaining({ parentWorktreeId: parentId })
+      )
+      expect(setWorkspaceLineage).toHaveBeenCalled()
+    } else {
+      await expect(update).rejects.toThrow('Parent worktree must be on the same execution host.')
+      expect(setWorktreeLineage).not.toHaveBeenCalled()
+      expect(setWorkspaceLineage).not.toHaveBeenCalled()
+    }
   })
 
   it('clears workspace lineage when manually removing a parent', async () => {

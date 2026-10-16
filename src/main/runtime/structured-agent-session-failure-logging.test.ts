@@ -302,7 +302,7 @@ describe('installing the runtime', () => {
 
     await expect(
       ensureStructuredAgentSessionHost(
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: deliberately missing the logger, as a `@ts-nocheck` caller could drop it.
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: deliberately omits the logger to verify installation rejects it.
         {
           stateDirectory: root,
           hostId: 'local',

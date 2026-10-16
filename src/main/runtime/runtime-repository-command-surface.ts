@@ -45,6 +45,8 @@ export type RuntimeRepositoryCommandSurface = {
   deleteProjectHostSetup: RuntimeProjectHostSetupController['deleteSetup']
   listProjectGroups: RuntimeProjectGroupController['listGroups']
   listFolderWorkspaces: RuntimeProjectGroupController['listFolderWorkspaces']
+  listVisibleProjectGroups: RuntimeProjectGroupController['listVisibleGroups']
+  listVisibleFolderWorkspaces: RuntimeProjectGroupController['listVisibleFolderWorkspaces']
   createProjectGroup: RuntimeProjectGroupController['createGroup']
   updateProjectGroup: RuntimeProjectGroupController['updateGroup']
   deleteProjectGroup: RuntimeProjectGroupController['deleteGroup']
@@ -121,6 +123,8 @@ export function installRuntimeRepositoryCommandSurface(
     deleteProjectHostSetup: host.deleteSetup.bind(host),
     listProjectGroups: groups.listGroups.bind(groups),
     listFolderWorkspaces: groups.listFolderWorkspaces.bind(groups),
+    listVisibleProjectGroups: groups.listVisibleGroups.bind(groups),
+    listVisibleFolderWorkspaces: groups.listVisibleFolderWorkspaces.bind(groups),
     createProjectGroup: groups.createGroup.bind(groups),
     updateProjectGroup: groups.updateGroup.bind(groups),
     deleteProjectGroup: groups.deleteGroup.bind(groups),

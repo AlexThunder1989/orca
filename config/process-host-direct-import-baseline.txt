@@ -6,7 +6,6 @@ src/cli/handlers/core.ts
 src/cli/handlers/interactive-login-interruption.ts
 src/cli/handlers/skills.ts
 src/cli/runtime/launch.ts
-src/cli/runtime/serve-update-supervisor.ts
 src/main/agent-hooks/managed-hook-owner-identity.ts
 src/main/agent-hooks/wsl-hook-relay-launch.ts
 src/main/agent-hooks/wsl-hook-relay-link.ts
@@ -111,15 +110,8 @@ src/main/ssh/system-ssh-forward-process.ts
 src/main/ssh/system-ssh-operation-lifecycle.ts
 src/main/startup/ensure-virtual-display.ts
 src/main/startup/hydrate-shell-path.ts
-src/main/startup/windows-install-dir-acl-probe.ts
-src/main/startup/windows-user-data-acl.ts
-src/main/win32-utils.ts
-src/main/window/clipboard-ipc-handlers.ts
 src/main/windows-process-tree-kill.ts
 src/main/workspace-space-analysis.ts
-src/main/wsl-availability.ts
-src/main/wsl-unc-delete.ts
-src/main/wsl.ts
 src/main/zsh-startup-hook-pty-harness.ts
 src/shared/ephemeral-vm-recipe-process.ts
 src/shared/ephemeral-vm-recipe-runner.ts

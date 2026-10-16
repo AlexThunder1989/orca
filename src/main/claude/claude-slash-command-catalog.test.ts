@@ -57,6 +57,25 @@ describe('claude slash command catalog', () => {
     ])
   })
 
+  it('keeps a project skill a skill after the agent cds out of the launch folder', () => {
+    // Captured on 2.1.280: after `cd` into an --add-dir, `skills` drops the launch folder's
+    // project skills while `slash_commands` still lists them.
+    const catalog = new ClaudeSlashCommandCatalog(
+      init({ cwd: '/repo', slash_commands: ['qa-project'], skills: ['qa-project'] })
+    )
+    catalog.observe(
+      init({
+        cwd: '/scratch',
+        slash_commands: ['qa-project', 'found-here'],
+        skills: ['found-here']
+      })
+    )
+    expect(catalog.commands).toEqual([
+      { name: 'qa-project', kind: 'skill' },
+      { name: 'found-here', kind: 'skill' }
+    ])
+  })
+
   it('notices a name that only changed kind', () => {
     const catalog = new ClaudeSlashCommandCatalog(
       init({ slash_commands: ['review'], skills: [], terminal_slash_commands: [] })

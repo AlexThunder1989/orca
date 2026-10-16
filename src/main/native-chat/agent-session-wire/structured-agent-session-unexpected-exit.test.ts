@@ -115,7 +115,7 @@ describe('provider-exit settlement', () => {
           now = 60_000
           return { ok: false, error: new Error('sink unavailable') }
         },
-        publishFence: vi.fn(),
+        generationEnded: vi.fn(),
         serialize: async (_sessionId, task) => task(),
         now: () => now
       } as never,
@@ -191,11 +191,12 @@ describe('provider-exit settlement', () => {
     }
 
     await settleStructuredAgentSessionChildExit(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the exit settlement reads only these members of its context; the store double is partial.
       {
         store,
         sessions: new Map([[SESSION, session]]),
         flushLifecycle: async () => ({ ok: true }),
-        publishFence: vi.fn(),
+        generationEnded: vi.fn(),
         serialize: async (_sessionId, task) => task(),
         now: () => 1_234
       } as never,
@@ -308,7 +309,7 @@ describe('provider-exit settlement', () => {
           ]
           return { ok: true }
         },
-        publishFence: vi.fn(),
+        generationEnded: vi.fn(),
         serialize: async <T>(_sessionId: string, task: () => Promise<T>) => task(),
         now: () => 1_234
       }
@@ -357,7 +358,7 @@ describe('provider-exit settlement', () => {
       store,
       sessions: new Map([[SESSION, session]]),
       flushLifecycle: async () => ({ ok: true }),
-      publishFence: vi.fn(),
+      generationEnded: vi.fn(),
       serialize: async <T>(_sessionId: string, task: () => Promise<T>) => task(),
       now: () => 1
     }
@@ -411,7 +412,7 @@ describe('provider-exit settlement', () => {
       }
     }
     const log = recordingStructuredAgentSessionLogger()
-    const publishFence = vi.fn()
+    const generationEnded = vi.fn()
     const event = {
       type: 'ended' as const,
       sessionId: SESSION,
@@ -425,7 +426,7 @@ describe('provider-exit settlement', () => {
       store,
       sessions: new Map([[SESSION, session]]),
       flushLifecycle: async () => ({ ok: false, error: new Error('sink failed') }),
-      publishFence,
+      generationEnded,
       serialize: async (_sessionId, task) => task(),
       now: () => 1,
       logger: log.logger
@@ -433,7 +434,9 @@ describe('provider-exit settlement', () => {
     await settleStructuredAgentSessionChildExit(context, event)
 
     expect(session.child).toBeNull()
-    expect(publishFence).toHaveBeenCalledTimes(1)
+    expect(generationEnded).toHaveBeenCalledTimes(2)
+    expect(generationEnded).toHaveBeenNthCalledWith(1, SESSION)
+    expect(generationEnded).toHaveBeenLastCalledWith(SESSION, { restate: true })
     expect(log.scopes()).toEqual(['exit-lifecycle-barrier', 'exit-settlement'])
   })
 })

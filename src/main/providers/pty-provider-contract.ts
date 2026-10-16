@@ -264,6 +264,8 @@ export type IPtyProvider = {
       incarnationId?: PtyIncarnationId
       /** Absent when the provider predates exit causes; readers must not infer one from `code`. */
       cause?: TerminalExitCause
+      /** Main ended the session to restart the daemon; the pane stays for its next process. */
+      replacedByRestart?: true
     }) => void
   ): () => void
 }

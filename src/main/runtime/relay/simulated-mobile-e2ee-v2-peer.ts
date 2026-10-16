@@ -10,7 +10,7 @@ import {
   sealMobileE2EEV2Frame
 } from '../../../shared/mobile-e2ee-v2-framing'
 import { deriveSharedKey } from '../rpc/e2ee-crypto'
-import { deriveMobileE2EEV2KeySchedule } from '../rpc/mobile-e2ee-v2-key-schedule'
+import { deriveMobileE2EEV2KeySchedule } from '../../../shared/mobile-e2ee-v2-node-key-schedule'
 
 // Why: desktop-side tests need an independent mobile-side wire peer
 // without importing Expo modules into the desktop Node TypeScript project.

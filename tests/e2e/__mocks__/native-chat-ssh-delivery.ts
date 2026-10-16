@@ -11,7 +11,7 @@ import {
   type WriteSettlement
 } from '../../../src/shared/pty-write-settlement'
 import { createPtyWriteInput } from '../../../src/main/ipc/pty/ipc/write-input'
-import type { IPtyProvider } from '../../../src/main/providers/types'
+import type { IPtyProvider } from '../../../src/main/providers/pty-provider-contract'
 import type * as PtyProviderRegistry from '../../../src/main/ipc/pty/provider/registry'
 import { ptyOwnership } from '../../../src/main/ipc/pty/provider/ownership-state'
 import { OrcaRuntimeService } from '../../../src/main/runtime/orca-runtime'

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { subscribeRuntimeFileChanges } from './runtime-file-client'
+import { subscribeRuntimeFileChanges } from './runtime-file-watch-client'
 import {
   fsOnChanged,
   runtimeEnvironmentCall,

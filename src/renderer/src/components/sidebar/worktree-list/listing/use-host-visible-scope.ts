@@ -7,7 +7,7 @@ import {
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import type { SidebarWorktreeFilters } from './use-filters'
-import { filterFolderWorkspacesFromOtherDevices } from '../../workspace-creator-visibility'
+import { filterFolderWorkspacesFromOtherDevices } from '../../../../../../shared/workspace-creator-visibility'
 import {
   filterFolderWorkspacesForVisibleHosts,
   filterProjectGroupsForVisibleHosts,

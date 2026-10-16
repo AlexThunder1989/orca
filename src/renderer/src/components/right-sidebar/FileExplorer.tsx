@@ -39,6 +39,7 @@ import { useFileExplorerVisibleRowProjection } from './useFileExplorerVisibleRow
 import { useFileExplorerBackgroundMenu } from './use-file-explorer-background-menu'
 import { useFileExplorerNameFilter } from './use-file-explorer-name-filter'
 import { useFileExplorerTreePaneState } from './use-file-explorer-tree-pane-state'
+import { useWslHostUnavailableReason } from '../terminal-pane/use-wsl-host-unavailable-reason'
 import { translate } from '@/i18n/i18n'
 import type { RightSidebarExplorerView } from '../../../../shared/ui-chrome-types'
 
@@ -52,6 +53,7 @@ function FileExplorerFiles(): React.JSX.Element {
   const runtimeEnvironmentId = useAppStore((s) =>
     getRuntimeEnvironmentIdForWorktree(s, activeWorktreeId)
   )
+  const wslHostUnavailable = useWslHostUnavailableReason(activeWorktreeId)
   const activeWorktree = useActiveWorktree()
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
   // Why: a folder workspace has no repo row, so only the catalog owner names its SSH host.
@@ -354,6 +356,7 @@ function FileExplorerFiles(): React.JSX.Element {
             visibleRowCount={visibleRowCount}
             handleExplorerBackgroundContextMenuCapture={handleExplorerBackgroundContextMenuCapture}
             handleExplorerBackgroundDoubleClick={handleExplorerBackgroundDoubleClick}
+            wslHostUnavailable={wslHostUnavailable}
           />
           <div
             className={cn(

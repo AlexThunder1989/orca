@@ -9,7 +9,7 @@ import { createTestStore } from './store-test-helpers'
 
 const { syncFork } = vi.hoisted(() => ({ syncFork: vi.fn() }))
 
-vi.mock('../../runtime/runtime-git-client', async (importOriginal) => {
+vi.mock('../../runtime/runtime-git-sync-client', async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>()
   return {
     ...original,

@@ -609,6 +609,38 @@ describe('RateLimitService', () => {
       expect.arrayContaining([expect.objectContaining({ accountId: 'wsl-account-1' })])
     )
   })
+
+  // Regression: the Codex home resolver is async, and a reset never waits on isFetching.
+  it('does not apply a stale full-refresh cycle codex result over a newer reset', async () => {
+    const service = new RateLimitService()
+    const staleHome = deferred<{ kind: 'ready'; codexHomePath: string | null }>()
+    const resolver = vi
+      .fn()
+      .mockReturnValueOnce(staleHome.promise)
+      .mockResolvedValue({ kind: 'ready', codexHomePath: '/tmp/approved-selection' })
+    service.setCodexHomePathResolver(resolver)
+    vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 10, Date.now()))
+    vi.mocked(fetchCodexRateLimits)
+      .mockResolvedValueOnce(okProvider('codex', 0, Date.now()))
+      .mockResolvedValueOnce(okProvider('codex', 100, Date.now()))
+    vi.mocked(consumeCodexRateLimitResetCredit).mockResolvedValueOnce('reset')
+
+    const staleRefresh = service.refresh()
+    await vi.waitFor(() => expect(resolver).toHaveBeenCalledTimes(1))
+
+    await expect(
+      service.consumeCodexRateLimitResetCredit({
+        idempotencyKey: '55555555-5555-4555-8555-555555555555',
+        target: { runtime: 'host', wslDistro: null },
+        codexHomePath: '/tmp/approved-selection'
+      })
+    ).resolves.toMatchObject({ outcome: 'reset' })
+
+    staleHome.resolve({ kind: 'ready', codexHomePath: '/tmp/approved-selection' })
+    await staleRefresh
+
+    expect(service.getState().codex?.session?.usedPercent).not.toBe(100)
+  })
 })
 
 function inactiveCodexAccount(id: string, managedHomePath: string) {

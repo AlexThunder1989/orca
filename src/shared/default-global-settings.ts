@@ -4,7 +4,7 @@ import type { VoiceSettings } from './speech-types'
 import { DEFAULT_TERMINAL_FONT_WEIGHT, DEFAULT_TERMINAL_FONT_WEIGHT_BOLD } from './terminal-fonts'
 import { getDefaultTerminalQuickCommands } from './terminal-quick-commands'
 import { TASK_PROVIDERS } from './task-providers'
-import { getDefaultSourceControlAiSettings } from './source-control-ai'
+import { getDefaultSourceControlAiSettings } from './source-control-ai-settings'
 import { DEFAULT_APP_ICON_ID } from './app-icon'
 import { DEFAULT_OPEN_IN_APPLICATIONS } from './open-in-applications'
 import { DEFAULT_DISABLED_TUI_AGENTS } from './tui-agent-selection'
@@ -40,6 +40,7 @@ export function buildDefaultSettings(args: {
     autoRenameBranchFromWorkDefaultedOn: true,
     branchPrefix: 'git-username',
     branchPrefixCustom: '',
+    jiraIssueKeyCasing: 'lowercase',
     theme: 'system',
     leftSidebarAppearanceMode: 'default',
     leftSidebarTintColor: DEFAULT_LEFT_SIDEBAR_TINT_COLOR,
@@ -139,6 +140,8 @@ export function buildDefaultSettings(args: {
     nativeChatInheritShellEnvironment: true,
     nativeChatShellEnvironmentVariables: [],
     nativeChatSessionOptions: {},
+    // The shipped Claude and Codex arguments carry their bypass flags.
+    nativeChatPermissionMode: 'full-access',
     openInApplications: [...DEFAULT_OPEN_IN_APPLICATIONS],
     rightSidebarOpenByDefault: true,
     showGitIgnoredFiles: true,
@@ -253,6 +256,7 @@ export function buildDefaultSettings(args: {
     agentHibernationIdleMs: 30 * 60 * 1000,
     experimentalNewWorktreeCardStyle: false,
     experimentalEphemeralVms: false,
+    experimentalWslHosts: false,
     compactWorktreeCards: false,
     // Why: local desktop stays the default until the user picks a saved runtime environment.
     activeRuntimeEnvironmentId: null,

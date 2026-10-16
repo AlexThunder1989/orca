@@ -11,11 +11,18 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
 import { WorktreeAgentRow } from './WorktreeAgentRow'
-import { WorktreeListRow, type WorktreeListRowItem } from './WorktreeListRow'
+import type { Worktree } from '../worktree/workspace-list-types'
+import { WorktreeListRow } from './WorktreeListRow'
+import {
+  DEFAULT_WORKTREE_CARD_PROPERTIES,
+  getWorktreeCardDetails,
+  type WorktreeCardDetails
+} from '../../../src/shared/worktree/card-properties'
 
-const { agentSpinnerRender, agentStateDotRender } = vi.hoisted(() => ({
+const { agentSpinnerRender, agentStateDotRender, metaGlyphsRender } = vi.hoisted(() => ({
   agentSpinnerRender: vi.fn(),
-  agentStateDotRender: vi.fn()
+  agentStateDotRender: vi.fn(),
+  metaGlyphsRender: vi.fn()
 }))
 
 vi.mock('react-native', () => ({
@@ -53,18 +60,31 @@ vi.mock('./MobileRepoIcon', () => ({ MobileRepoIcon: () => null }))
 vi.mock('./WorktreeAgentList', () => ({ WorktreeAgentList: () => null }))
 vi.mock('./WorktreeMetaGlyphs', () => ({
   prStateColor: () => '#000000',
-  WorktreeMetaGlyphs: () => null
+  WorktreeMetaGlyphs: (props: unknown) => {
+    metaGlyphsRender(props)
+    return null
+  }
 }))
 
-type TestItem = WorktreeListRowItem & {
-  status: 'working' | 'active' | 'permission' | 'done' | 'inactive'
-  lastOutputAt: number
-}
+type TestItem = Worktree & { status: NonNullable<Worktree['status']> }
 
 const stableRepoIcon = { type: 'emoji', emoji: 'o' } as const
 let updateSibling: Dispatch<SetStateAction<number>> = () => undefined
 
-function ListRowHarness({ item, now }: { item: TestItem; now: number }) {
+const ALL_DETAILS = getWorktreeCardDetails(DEFAULT_WORKTREE_CARD_PROPERTIES, {
+  compactWorktreeCards: false,
+  newCardStyle: false
+})
+
+function ListRowHarness({
+  item,
+  now,
+  cardDetails = ALL_DETAILS
+}: {
+  item: TestItem
+  now: number
+  cardDetails?: WorktreeCardDetails
+}) {
   const [sibling, setSibling] = useState(0)
   updateSibling = setSibling
   const onPress = useCallback(() => undefined, [])
@@ -84,6 +104,8 @@ function ListRowHarness({ item, now }: { item: TestItem; now: number }) {
       repoColor: '#000000',
       repoIcon: stableRepoIcon,
       hideRepo: false,
+      cardDetails,
+      agentActivityDisplayMode: 'compact',
       status: item.status,
       onPress,
       onLongPress,
@@ -113,11 +135,14 @@ function agent(overrides: Partial<RuntimeWorktreeAgentRow> = {}): RuntimeWorktre
 
 const baseItem: TestItem = {
   worktreeId: 'worktree-1',
+  repoId: 'repo-1',
   repo: 'orca',
+  path: 'mobile-list',
+  hasAttachedPty: true,
+  isPinned: false,
   branch: 'feature/mobile-list',
   displayName: 'mobile-list',
   liveTerminalCount: 1,
-  preview: 'Waiting',
   unread: false,
   linkedPR: null,
   agents: [agent()],
@@ -131,11 +156,35 @@ describe('memoized worktree rows', () => {
   beforeEach(() => {
     agentSpinnerRender.mockClear()
     agentStateDotRender.mockClear()
+    metaGlyphsRender.mockClear()
   })
 
   afterEach(() => {
     act(() => renderer?.unmount())
     renderer = null
+  })
+
+  it.each([false, true])('names the owner once (Project mode: %s)', async (hideRepo) => {
+    await act(async () => {
+      renderer = create(
+        createElement(WorktreeListRow, {
+          item: { ...baseItem, showProjectName: true, lineageDepth: 1 },
+          isReadOnly: false,
+          now: 2_000,
+          repoColor: '#000000',
+          hideRepo,
+          cardDetails: ALL_DETAILS,
+          agentActivityDisplayMode: 'compact',
+          status: 'active',
+          onPress: () => undefined
+        })
+      )
+    })
+    const ownerNames = renderer!.root
+      .findAllByType(Text)
+      .map((node) => node.props.children)
+      .filter((text) => text === baseItem.repo)
+    expect(ownerNames).toEqual([baseItem.repo])
   })
 
   it('skips an unrelated parent render but updates for live item fields and time', async () => {
@@ -149,7 +198,6 @@ describe('memoized worktree rows', () => {
 
     let expectedRenders = 1
     const liveUpdates: TestItem[] = [
-      { ...baseItem, preview: 'Running tests' },
       { ...baseItem, unread: true },
       { ...baseItem, lastOutputAt: 2_000 },
       { ...baseItem, agents: [agent({ state: 'waiting', updatedAt: 2_000 })] },
@@ -170,6 +218,44 @@ describe('memoized worktree rows', () => {
       renderer!.update(createElement(ListRowHarness, { item: baseItem, now: 32_000 }))
     )
     expect(agentSpinnerRender).toHaveBeenCalledTimes(++expectedRenders)
+  })
+
+  it('skips a value-equal item and re-renders for time, callbacks and nested agent fields', async () => {
+    const onPress = () => undefined
+    const row = (item: TestItem, overrides: { now?: number; onPress?: () => void } = {}) =>
+      createElement(WorktreeListRow, {
+        item,
+        isReadOnly: false,
+        now: overrides.now ?? 2_000,
+        repoColor: '#000000',
+        repoIcon: { type: 'emoji', emoji: 'o' },
+        // A fresh but equal details object each render, as a parent re-render makes.
+        cardDetails: { ...ALL_DETAILS },
+        agentActivityDisplayMode: 'compact',
+        status: item.status,
+        onPress: overrides.onPress ?? onPress
+      })
+    await act(async () => {
+      renderer = create(row(baseItem))
+    })
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(1)
+
+    // A fresh parse of the same row, with a fresh repo icon object, is not a change.
+    await act(async () => renderer!.update(row(structuredClone(baseItem))))
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(1)
+
+    await act(async () => renderer!.update(row(baseItem, { now: 32_000 })))
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(2)
+
+    const nestedChange = structuredClone(baseItem)
+    nestedChange.agents![0]!.lastAssistantMessage = 'Tests pass'
+    await act(async () => renderer!.update(row(nestedChange, { now: 32_000 })))
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(3)
+
+    await act(async () =>
+      renderer!.update(row(nestedChange, { now: 32_000, onPress: () => undefined }))
+    )
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(4)
   })
 
   it('memoizes agent rows without hiding agent updates', async () => {
@@ -288,5 +374,64 @@ describe('memoized worktree rows', () => {
     )
     expect(textNodes()).not.toContain('Local Mac')
     expect(renderer!.root.findAllByType('Monitor' as never)).toHaveLength(0)
+  })
+
+  it("leaves out the PR, host and agents the desktop's card properties turn off", async () => {
+    const item: TestItem = {
+      ...baseItem,
+      hostId: 'ssh:ssh-1',
+      hostContextLabel: 'openclaw',
+      linkedPR: { number: 7, state: 'open' }
+    }
+    const shown = () => ({
+      pr: renderer!.root.findAll((node) => String(node.type) === 'GitPullRequest').length,
+      host: renderer!.root.findAll((node) => String(node.type) === 'Server').length
+    })
+    await act(async () => {
+      renderer = create(createElement(ListRowHarness, { item, now: 2_000 }))
+    })
+    expect(shown()).toEqual({ pr: 1, host: 1 })
+
+    await act(async () =>
+      renderer!.update(
+        createElement(ListRowHarness, {
+          item,
+          now: 2_000,
+          cardDetails: getWorktreeCardDetails(['status', 'unread'], {
+            compactWorktreeCards: false,
+            newCardStyle: false
+          })
+        })
+      )
+    )
+    expect(shown()).toEqual({ pr: 0, host: 0 })
+  })
+
+  it('passes the Jira, automation and CLI facts the card properties show', async () => {
+    const item: TestItem = {
+      ...baseItem,
+      automationCreated: true,
+      cliCreated: true,
+      linkedItems: [{ provider: 'jira', type: 'issue', number: 12, jiraIdentifier: 'ORCA-12' }]
+    }
+    const lastPresence = () => metaGlyphsRender.mock.lastCall?.[0].presence
+    await act(async () => {
+      renderer = create(createElement(ListRowHarness, { item, now: 2_000 }))
+    })
+    expect(lastPresence()).toMatchObject({ jira: true, automation: true, cli: true })
+
+    await act(async () =>
+      renderer!.update(
+        createElement(ListRowHarness, {
+          item,
+          now: 2_000,
+          cardDetails: getWorktreeCardDetails(['status', 'unread'], {
+            compactWorktreeCards: false,
+            newCardStyle: false
+          })
+        })
+      )
+    )
+    expect(lastPresence()).toMatchObject({ jira: false, automation: false, cli: false })
   })
 })

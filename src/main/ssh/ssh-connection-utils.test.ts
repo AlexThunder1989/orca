@@ -25,7 +25,6 @@ import {
   isGssapiSystemSshFallbackCandidate,
   isAuthError,
   isAgentFallbackError,
-  sleep,
   shellEscape,
   findDefaultKeyFile,
   buildConnectConfig,
@@ -226,16 +225,6 @@ describe('isAgentFallbackError', () => {
 
   it('keeps unrelated transport errors out of agent fallback handling', () => {
     expect(isAgentFallbackError(new Error('connect ECONNRESET'))).toBe(false)
-  })
-})
-
-// ── sleep ────────────────────────────────────────────────────────────
-
-describe('sleep', () => {
-  it('resolves after the given delay', async () => {
-    const start = Date.now()
-    await sleep(50)
-    expect(Date.now() - start).toBeGreaterThanOrEqual(40)
   })
 })
 

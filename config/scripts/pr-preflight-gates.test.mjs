@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { expect, it } from 'vitest'
+import { runProcess } from '@orca/process-host'
 import { parse } from 'yaml'
 import { classifyPrJobs } from './pr-code-change-scope.mjs'
 
@@ -29,7 +30,7 @@ it('shares one setup and overlaps the compiler only after type-aware checks fini
   expect(compiler.background).toBe(true)
   expect(compiler.run).toContain('pnpm run typecheck:ci')
   const bunSetup = steps.find((step) => step.name === 'Set up Bun for preflight checks')
-  expect(bunSetup.with['bun-version']).toBe('1.4.3')
+  expect(bunSetup.with['bun-version-file']).toBe('config/.bun-version')
   expect(bunSetup.if).toBeUndefined()
   expect(plan.background).toBe(true)
   expect(plan.run.trim().split('\n')).toEqual([
@@ -48,6 +49,22 @@ it('shares one setup and overlaps the compiler only after type-aware checks fini
   expect(compilerJoin).toBeGreaterThan(
     steps.findIndex((step) => step.wait?.includes('localization-extraction'))
   )
+})
+
+it('uses the shared Bun pin for every current-toolchain workflow', () => {
+  expect(readFileSync('config/.bun-version', 'utf8').trim()).toBe('1.4.3')
+  for (const file of readdirSync('.github/workflows').filter((name) => /\.ya?ml$/.test(name))) {
+    const current = parse(readFileSync(`.github/workflows/${file}`, 'utf8'))
+    for (const job of Object.values(current.jobs)) {
+      for (const step of job.steps ?? []) {
+        if (!String(step.uses).startsWith('oven-sh/setup-bun@')) {
+          continue
+        }
+        expect(step.with['bun-version-file'], file).toBe('config/.bun-version')
+        expect(step.with['bun-version'], file).toBeUndefined()
+      }
+    }
+  }
 })
 
 it('keeps the Bun anti-slop scan aligned with the local audit', () => {
@@ -224,6 +241,7 @@ it('pins every foreground and background step to its selected phase', () => {
     ['Enforce ts-nocheck ratchet', staticPhase],
     ['Enforce runtime Electron-import ratchet', staticPhase],
     ['Enforce focus-read ratchet', staticPhase],
+    ['Enforce layout-writer ratchets', staticPhase],
     ['Check Node runtime pin', staticPhase],
     ['Boot orcad and round-trip a terminal', staticPhase],
     ['Verify the generated RPC params catalog', staticPhase],
@@ -242,6 +260,7 @@ it('pins every foreground and background step to its selected phase', () => {
       .map((step) => [step.id, step.env.PREFLIGHT_PHASE_SELECTED])
   ).toEqual([
     ['process-host-imports', `\${{ ${staticPhase} }}`],
+    ['main-sync-spawn-ratchet', `\${{ ${staticPhase} }}`],
     ['root-lint', `\${{ ${staticPhase} }}`],
     ['native-code-quality', `\${{ ${staticPhase} }}`],
     ['changed-code-quality', `\${{ ${staticPhase} }}`],
@@ -310,3 +329,101 @@ it('registers successful no-op background work when a phase is unselected or alr
     )
   }
 })
+
+it('shares import analysis without dropping either boundary gate', () => {
+  const imports = steps.find((step) => step.id === 'process-host-imports')
+  expect(imports.run).toContain('bun config/scripts/check-import-boundaries.mjs')
+  expect(steps.some((step) => step.name === 'Check compatibility-folder imports')).toBe(false)
+  expect(steps.find((step) => step.name === 'Verify localization coverage').run).toBe(
+    'bun config/scripts/audit-localization-coverage.mjs --check'
+  )
+})
+
+it('prepares an isolated Node 18 executable before the existing Node 24 dependency installs', () => {
+  const setup = steps.find((step) => step.id === 'node18_runtime')
+  const capture = steps.find((step) => step.id === 'node18_executable')
+  const selected = "needs.code_paths.outputs.managed_hook_node18 == 'true'"
+  expect(setup.uses).toBe('actions/setup-node@v6')
+  expect(setup.if).toBe(selected)
+  expect(setup.with).toEqual({ 'node-version': '18', 'package-manager-cache': false })
+  expect(setup['continue-on-error']).toBe(true)
+  expect(capture['continue-on-error']).toBe(true)
+  expect(capture.run).toBe(`node -p '"executable=" + process.execPath' >> "$GITHUB_OUTPUT"`)
+  expect(steps.indexOf(capture)).toBeGreaterThan(steps.indexOf(setup))
+  for (const install of steps.filter(
+    (step) => step.uses === './.github/actions/install-node-dependencies'
+  )) {
+    expect(steps.indexOf(install)).toBeGreaterThan(steps.indexOf(capture))
+    expect(install.with['node-version']).toBe('24')
+    expect(install['continue-on-error']).toBeUndefined()
+  }
+  for (const outcome of ['success', 'failure', 'cancelled', 'skipped', '', undefined]) {
+    expect(
+      runInNewContext(capture.if, {
+        needs: { code_paths: { outputs: { managed_hook_node18: 'true' } } },
+        steps: { node18_runtime: { outcome } }
+      })
+    ).toBe(outcome === 'success')
+  }
+  const bun = steps.filter((step) => step.uses?.startsWith('oven-sh/setup-bun@'))
+  expect(bun).toHaveLength(1)
+  expect(bun[0].if).toBeUndefined()
+})
+
+it('runs the unchanged Node 18 smoke after every Node 24 step and preserves its required result', () => {
+  const smoke = steps.at(-1)
+  const receipt = workflow.jobs.managed_hook_node18
+  expect(smoke.id).toBe('managed_hook_node18')
+  expect(smoke.if).toBe("success() && needs.code_paths.outputs.managed_hook_node18 == 'true'")
+  expect(smoke.env.NODE18_EXECUTABLE).toBe('${{ steps.node18_executable.outputs.executable }}')
+  expect(smoke.env.ORCA_BACKGROUND_LAUNCH).toBe('1')
+  expect(smoke.run.trim().split('\n')).toEqual([
+    'test -n "$NODE18_EXECUTABLE"',
+    '"$NODE18_EXECUTABLE" config/scripts/smoke-process-host-node18.mjs'
+  ])
+  expect(smoke['continue-on-error']).toBe(true)
+  expect(preflight['continue-on-error']).toBeUndefined()
+  expect(preflight.outputs.managed_hook_node18).toBe('${{ steps.managed_hook_node18.outcome }}')
+  for (const background of steps.filter((step) => step.background)) {
+    const joined = steps.findIndex((step) =>
+      Array.isArray(step.wait) ? step.wait.includes(background.id) : step.wait === background.id
+    )
+    expect(joined, background.id).toBeGreaterThan(steps.indexOf(background))
+    expect(joined, background.id).toBeLessThan(steps.indexOf(smoke))
+  }
+  expect(receipt.name).toBe('managed hooks on Node 18')
+  expect(receipt['runs-on']).toBe('ubuntu-slim')
+  expect(receipt.steps).toHaveLength(1)
+  expect(receipt.steps[0].uses).toBeUndefined()
+  expect(receipt.steps[0].env.MANAGED_HOOK_NODE18).toBe(
+    '${{ needs.preflight.outputs.managed_hook_node18 }}'
+  )
+  expect(receipt['continue-on-error']).toBeUndefined()
+  expect(receipt.steps[0]['continue-on-error']).toBeUndefined()
+})
+
+it.skipIf(process.platform === 'win32')(
+  'fails the smoke for a missing captured executable and requires actual success in the receipt',
+  async () => {
+    const smoke = steps.at(-1)
+    const receipt = workflow.jobs.managed_hook_node18.steps[0]
+    const cases = [
+      [smoke.run, 'NODE18_EXECUTABLE', '', 1],
+      ...['success', 'failure', 'cancelled', 'skipped', '', 'unknown'].map((outcome) => [
+        receipt.run,
+        'MANAGED_HOOK_NODE18',
+        outcome,
+        outcome === 'success' ? 0 : 1
+      ])
+    ]
+    for (const [script, variable, value, expected] of cases) {
+      const result = await runProcess({
+        program: 'bash',
+        args: ['-e', '-c', script],
+        env: { ...process.env, ORCA_BACKGROUND_LAUNCH: '1', [variable]: value },
+        timeoutMs: 10_000
+      })
+      expect(result.code, `${variable}=${value}: ${result.stderr}`).toBe(expected)
+    }
+  }
+)

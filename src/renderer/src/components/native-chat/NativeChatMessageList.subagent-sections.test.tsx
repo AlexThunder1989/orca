@@ -6,6 +6,26 @@ import { cleanup, fireEvent, render, screen, within, act } from '@testing-librar
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// Why: these fixtures have neither inline visual owners nor sender navigation.
+const unusedChatLeaves = vi.hoisted(() => ({
+  inlineVisual: vi.fn(() => {
+    throw new Error('Unexpected inline visual in transcript fixture')
+  }),
+  openSender: vi.fn(() => {
+    throw new Error('Unexpected sender navigation in transcript fixture')
+  })
+}))
+vi.mock('./NativeChatInlineVisual', () => ({
+  NativeChatInlineVisual: unusedChatLeaves.inlineVisual
+}))
+vi.mock('@/lib/open-agent-message-sender', () => ({
+  openAgentMessageSender: unusedChatLeaves.openSender
+}))
+afterEach(() => {
+  expect(unusedChatLeaves.inlineVisual).not.toHaveBeenCalled()
+  expect(unusedChatLeaves.openSender).not.toHaveBeenCalled()
+})
+
 import type {
   AgentJournalItemBody,
   AgentJournalProducerLinkage,
@@ -370,6 +390,25 @@ import {
       expect(screen.getByText('The PR is CLEAN.')).toBeInTheDocument()
     })
 
+    it("does not replay a working subagent's streaming reply when its section reopens", () => {
+      const items = itemsWith('working', false).filter((next) => next.itemId !== 'child-edit')
+      render(
+        <NativeChatMessageList
+          session={session(projectStructuredItemsToNativeChat(items))}
+          journalItems={items}
+          isWorking
+          expandSignal={false}
+        />
+      )
+      expect(screen.getByText('The PR is CLEAN.')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /explore the lane/, expanded: true }))
+      expect(screen.queryByText('The PR is CLEAN.')).toBeNull()
+
+      // Back as the transcript's last, still-streaming row: already read, so it shows whole at once.
+      fireEvent.click(screen.getByRole('button', { name: /explore the lane/, expanded: false }))
+      expect(screen.getByText('The PR is CLEAN.')).toBeInTheDocument()
+    })
+
     it('names a section from the client roster when its roster row is not loaded', () => {
       const items = itemsWith('completed', true)
       const loaded = items.filter((next) => next.itemId !== 'spawn')
@@ -489,7 +528,7 @@ import {
       fireEvent.click(screen.getByRole('button', { name: 'Second prompt' }))
       expect(scrollTo.mock.calls).toEqual([
         [{ top: 6000, behavior: 'auto' }],
-        [{ top: selectedTop, behavior: 'smooth' }]
+        [{ top: selectedTop, behavior: 'auto' }]
       ])
       expect(screen.queryByRole('button', { name: /^Edited .*a\.ts(?:\s|$)/ })).toBeNull()
       scrollTo.mockClear()
@@ -504,9 +543,8 @@ import {
       const diffTop =
         screen.getByText('Edited').closest<HTMLElement>('[data-index]')?.offsetTop ?? 0
       expect(Number.isFinite(diffTop)).toBe(true)
-      expect(scrollTo.mock.calls.filter(([options]) => options?.behavior === 'smooth')).toEqual([
-        [{ top: diffTop, behavior: 'smooth' }]
-      ])
+      expect(scrollTo).toHaveBeenCalledWith({ top: diffTop, behavior: 'auto' })
+      expect(scrollTo.mock.calls.some(([options]) => options?.behavior === 'smooth')).toBe(false)
     })
   })
 

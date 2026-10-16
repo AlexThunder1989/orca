@@ -1,4 +1,5 @@
 import type React from 'react'
+import type { WorktreeOccurrence } from '../../../../../../shared/worktree-occurrence-plan'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
@@ -32,6 +33,7 @@ export type GroupHeaderRow = {
 }
 
 export type WorktreeRow = {
+  occurrence?: WorktreeOccurrence<Worktree>
   type: 'item'
   rowKey: string
   sectionKey: string
@@ -39,12 +41,12 @@ export type WorktreeRow = {
   repo: Repo | undefined
   depth: number
   groupDepth: number
-  lineageTrail: boolean[]
   isLastLineageChild: boolean
   lineageChildCount: number
   lineageGroupKey?: string
   lineageCollapsed?: boolean
   hostContextLabel?: string
+  showProjectName?: boolean
 }
 
 export type ImportedWorktreesCardCandidate = {

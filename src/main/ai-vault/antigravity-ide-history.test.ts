@@ -5,7 +5,6 @@ import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { scanAiVaultSessions } from './session-scanner'
 import { isolatedScanRoots, writeAntigravityTranscript } from './session-scanner-test-fixtures'
-import { jsonLines } from './remote-session-scanner-test-fixtures'
 import { antigravitySessionOrigin } from '../../shared/antigravity-session-origin'
 import { readLocalAntigravityHistory } from './session-scanner-antigravity-history'
 import { ANTIGRAVITY_INDEX_MAX_BYTES } from './session-scanner-antigravity-metadata'
@@ -186,5 +185,8 @@ describe('Antigravity IDE history discovery', () => {
     await writeFile(file, ' '.repeat(ANTIGRAVITY_INDEX_MAX_BYTES + 1))
     expect(await readLocalAntigravityHistory(file)).toBeNull()
   })
-
 })
+
+function jsonLines(records: unknown[]): string {
+  return records.map((record) => JSON.stringify(record)).join('\n')
+}

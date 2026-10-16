@@ -37,6 +37,7 @@ export const AGENT_SESSION_FAILURE_KINDS = [
   'claudeAccountFolderMissing',
   'claudeAccountSetupFailed',
   'agentCommandNotRunnable',
+  'runtimeNotInstalled',
   'providerExited',
   'restartFailed',
   'providerRejected',
@@ -56,6 +57,10 @@ export const AGENT_SESSION_FAILURE_KINDS = [
   'cancelUnconfirmed',
   /** A Stop naming no turn reached the agent, which ended nothing while the chat read working. */
   'stopRefused',
+  /** A Stop Orca could not save: only a refusal says it. */
+  'stopFailed',
+  /** A background-task Stop the agent answered with the task still running. */
+  'backgroundTaskNotStopped',
   'answerUnconfirmed',
   'hostFault',
   /** Orca stopped an agent whose start never finished. */
@@ -79,6 +84,8 @@ const STATUS_ROW_ONLY_FAILURE_KINDS = [
   'compactionUnconfirmed',
   'cancelUnconfirmed',
   'stopRefused',
+  'stopFailed',
+  'backgroundTaskNotStopped',
   'answerUnconfirmed',
   'providerRetrying',
   'previousExitUnverifiable',
@@ -158,7 +165,15 @@ export type AgentSessionFailureFact = {
   retry?: AgentSessionProviderRetry
   /** A safe option name from Orca's saved Arguments parser, never an error message. */
   argumentProblem?: AgentSessionArgumentProblem
+  /** Written only where Orca proves the agent never received the message: a Stop's withdrawal is
+   *  then owed as stopped history, and a refused carrier owes its history again. Absent means
+   *  unknown. Host-only; clients read the kind. */
+  neverReachedAgent?: true
+  /** On `backgroundTaskNotStopped`: one named task, or every task the Stop reached. */
+  backgroundStop?: AgentSessionBackgroundStop
 }
+
+export type AgentSessionBackgroundStop = 'task' | 'all'
 
 /** A fact as a row stores it: its kind may be one a newer host added, so only
  *  `readAgentSessionFailureFact` or the rejection classifier may place it. */
@@ -191,6 +206,8 @@ export function agentSessionFailureFact<TKind extends AgentSessionFailureKind>(
     attachment?: AgentSessionAttachmentProblem
     retry?: AgentSessionProviderRetry
     argumentProblem?: AgentSessionArgumentProblem
+    neverReachedAgent?: true
+    backgroundStop?: AgentSessionBackgroundStop
   } = {}
 ): AgentSessionFailureFact & { kind: TKind } {
   // Re-bounded here, so no writer can store more than the cap however it built the detail.
@@ -204,7 +221,9 @@ export function agentSessionFailureFact<TKind extends AgentSessionFailureKind>(
     ...(extra.refusal ? { refusal: extra.refusal } : {}),
     ...(extra.attachment ? { attachment: extra.attachment } : {}),
     ...(extra.retry ? { retry: extra.retry } : {}),
-    ...(extra.argumentProblem ? { argumentProblem: extra.argumentProblem } : {})
+    ...(extra.argumentProblem ? { argumentProblem: extra.argumentProblem } : {}),
+    ...(extra.neverReachedAgent ? { neverReachedAgent: true as const } : {}),
+    ...(extra.backgroundStop ? { backgroundStop: extra.backgroundStop } : {})
   }
 }
 
@@ -281,7 +300,11 @@ export function readAgentSessionFailureFact(value: unknown): AgentSessionFailure
     ...(refusal ? { refusal } : {}),
     ...(attachment ? { attachment } : {}),
     ...(retry ? { retry } : {}),
-    ...(argumentProblem ? { argumentProblem } : {})
+    ...(argumentProblem ? { argumentProblem } : {}),
+    ...(value.neverReachedAgent === true ? { neverReachedAgent: true as const } : {}),
+    ...(value.backgroundStop === 'task' || value.backgroundStop === 'all'
+      ? { backgroundStop: value.backgroundStop }
+      : {})
   })
 }
 

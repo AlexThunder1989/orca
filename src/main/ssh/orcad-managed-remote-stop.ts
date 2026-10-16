@@ -16,7 +16,7 @@ import { execOrcadRemote } from './orcad-remote-runtime-control'
 import { readBoundedOrcadRemoteRecord } from './orcad-remote-record-file'
 import { orcadSlotDir, type OrcadSlotOptions } from './orcad-recovery-slot'
 import { isWindowsRemoteHost, joinRemotePath } from './ssh-remote-platform'
-import { isUnconfirmedSshCommandTermination } from './ssh-relay-deploy-helpers'
+import { isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
 import {
   orcadWindowsNodeCommandLine,
   orcadWindowsSlotOpCommand,
@@ -84,7 +84,16 @@ export async function readRemoteOrcadManagedStopTarget(
     context: {
       version,
       runtimeId,
-      instance: { pid: lock.pid, startedAtMs: lock.startedAtMs, nonce: lock.nonce, lockPath }
+      instance: {
+        pid: lock.pid,
+        startedAtMs: lock.startedAtMs,
+        // Older slots drop these; newer ones prove identity without the drifting wall clock.
+        ...(lock.linuxStartTicks && lock.bootId
+          ? { linuxStartTicks: lock.linuxStartTicks, bootId: lock.bootId }
+          : {}),
+        nonce: lock.nonce,
+        lockPath
+      }
     }
   }
 }

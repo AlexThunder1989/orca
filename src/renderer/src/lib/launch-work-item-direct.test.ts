@@ -69,9 +69,7 @@ vi.mock('@/runtime/runtime-hooks-client', () => ({
   checkRuntimeHooks: hostMocks.checkRuntimeHooks
 }))
 
-vi.mock('@/runtime/runtime-rpc-client', () => ({
-  callRuntimeRpc: hostMocks.callRuntimeRpc
-}))
+vi.mock('@/runtime/runtime-rpc-client', () => ({ callRuntimeRpc: hostMocks.callRuntimeRpc }))
 
 vi.mock('@/lib/new-workspace', () => ({
   CLIENT_PLATFORM: 'win32',

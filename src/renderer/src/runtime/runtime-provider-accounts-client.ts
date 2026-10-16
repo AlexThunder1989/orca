@@ -4,7 +4,9 @@ import type {
 } from '../../../shared/managed-account-types'
 import type { RateLimitState } from '../../../shared/rate-limit-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
-import { callRuntimeRpc, RuntimeRpcCallError, type RuntimeClientTarget } from './runtime-rpc-client'
+import { callRuntimeRpc } from './runtime-rpc-client'
+import { RuntimeRpcCallError } from './runtime-rpc-result'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
 // Mirrors OrcaRuntime.getAccountsSnapshot() / the accounts.subscribe payload.
 export type ProviderAccountsSnapshot = {

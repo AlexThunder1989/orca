@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyOrcadActivationRecord, type OrcadActivationRecord } from './orcad-activation-record'
-import { OrcadHostUnsupportedError } from './orcad-host-unavailable'
+import { OrcadHostUnsupportedError } from '../orcad/orcad-host-unavailable'
 
 const mocks = vi.hoisted(() => {
   const state: { record: OrcadActivationRecord | null } = { record: null }
@@ -29,8 +29,10 @@ vi.mock('./orcad-managed-runtime-context', () => ({
 vi.mock('./orcad-managed-migration-status', () => ({
   findIncompleteManagedOrcadMigration: mocks.migrating
 }))
-vi.mock('./orcad-artifact-materializer', () => ({ materializeOrcadArtifact: mocks.materialize }))
-vi.mock('./ssh-relay-versioned-install', () => ({ readLocalFullVersion: () => '0.1.0+new' }))
+vi.mock('../orcad/orcad-artifact-materializer', () => ({
+  materializeOrcadArtifact: mocks.materialize
+}))
+vi.mock('./remote-versioned-install', () => ({ readLocalFullVersion: () => '0.1.0+new' }))
 
 import {
   autoUpdateManagedOrcadEnvironment,

@@ -2,6 +2,32 @@ import { describe, expect, it } from 'vitest'
 import { parseJiraConnectionStatus } from './runtime-jira-connection-status'
 
 describe('parseJiraConnectionStatus', () => {
+  it('accepts an upgraded host without changing the Cloud/Server values older readers know', () => {
+    const site = {
+      id: 'site-scoped',
+      siteUrl: 'https://example.atlassian.net',
+      email: '',
+      displayName: 'Ada',
+      accountId: 'account-alpha',
+      authType: 'cloud',
+      apiBaseUrl: 'https://api.atlassian.com/ex/jira/cloud-abc'
+    }
+    const status = parseJiraConnectionStatus({
+      connected: true,
+      viewer: null,
+      sites: [site],
+      supportsScopedTokens: true
+    })
+    expect(status.sites).toEqual([site])
+    expect(status.supportsScopedTokens).toBe(true)
+    expect(
+      parseJiraConnectionStatus({ connected: true, viewer: null }).supportsScopedTokens
+    ).toBeUndefined()
+    expect(
+      parseJiraConnectionStatus({ connected: true, supportsScopedTokens: 'yes' })
+        .supportsScopedTokens
+    ).toBeUndefined()
+  })
   it.each([
     ['undefined', undefined],
     ['null', null],

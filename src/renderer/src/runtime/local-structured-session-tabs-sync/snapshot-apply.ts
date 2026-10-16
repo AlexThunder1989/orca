@@ -3,13 +3,11 @@ import type {
   RuntimeMobileSessionTabsResult
 } from '../../../../shared/runtime-types'
 import { markStructuredAgentSessionLaunchesPublished } from '../../lib/structured-agent-session-launch-publication'
-import type { WorktreeRuntimeOwnerState } from '../../lib/worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from '../../lib/worktree-runtime-owner-state'
 import { getExecutionHostIdForWorktree } from '../../lib/worktree-runtime-owner'
-import {
-  applyWebSessionTabsSnapshot,
-  applyWebSessionTabsStorePatch
-} from '../web-session-tabs-sync'
-import type { WebSessionTabsSyncState } from '../web-session-tabs-sync'
+import { applyWebSessionTabsSnapshot } from '../web-session-tabs-sync/snapshot-api'
+import { applyWebSessionTabsStorePatch } from '../web-session-tabs-sync/store-patch'
+import type { WebSessionTabsSyncState } from '../web-session-tabs-sync/state'
 import {
   admitRetiredValueUnderAuthority,
   noteRetiredValue,
@@ -51,6 +49,8 @@ export type StructuredSessionSnapshotApplyOptions = {
    * whereas a subscription frame can be, and stays fenced.
    */
   authoritative?: boolean
+  /** Re-applies a publication at the version already applied: the window removed a chat early. */
+  reacceptCurrentVersion?: boolean
   /** Sequence allocated when the inventory request began, before a close can race its reply. */
   authoritativeInventory?: number
   /** Called for each snapshot the retired-epoch fence rejects; the repair lane listens here. */
@@ -140,7 +140,13 @@ export function applyLocalStructuredSessionTabSnapshots<
       options.onRetiredEpochDrop?.(snapshot.worktree, snapshot.publicationEpoch)
       continue
     }
-    if (prior && sharesLineage && snapshot.snapshotVersion <= prior.snapshotVersion) {
+    if (
+      prior &&
+      sharesLineage &&
+      (options.reacceptCurrentVersion
+        ? snapshot.snapshotVersion < prior.snapshotVersion
+        : snapshot.snapshotVersion <= prior.snapshotVersion)
+    ) {
       continue
     }
     const effectiveSnapshot = suppressCancelledStructuredSessionTabs(snapshot, { kind: 'local' })

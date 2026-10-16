@@ -48,7 +48,11 @@ vi.mock('@/lib/worktree-sleep-intent', () => ({
   withWorktreeSleepTeardown: (_worktreeId: string, teardown: () => Promise<unknown>) => teardown()
 }))
 
-import { runSleepWorktree, runSleepWorktrees } from './sleep-worktree-flow'
+import {
+  runSleepWorktree,
+  runSleepWorktrees,
+  sleepWorktreesReportingFailures
+} from './sleep-worktree-flow'
 
 describe('runSleepWorktree', () => {
   beforeEach(() => {
@@ -308,6 +312,18 @@ describe('runSleepWorktree', () => {
           'The workspace was kept open. Try again; if the problem continues, check the host connection.'
       })
     )
+  })
+
+  it('reports failed worktrees to a caller that answers for them, without a toast', async () => {
+    mocks.state.shutdownWorktreeBrowsers.mockImplementation((worktreeId: string) =>
+      worktreeId === 'wt-1' ? Promise.reject(new Error('first failed')) : Promise.resolve()
+    )
+
+    const outcome = await sleepWorktreesReportingFailures(['wt-1', 'wt-2'])
+
+    expect(outcome.failedWorktreeIds).toEqual(['wt-1'])
+    expect(outcome.errors).toHaveLength(1)
+    expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
   it('sleeps multiple worktrees and clears active only once when included', async () => {

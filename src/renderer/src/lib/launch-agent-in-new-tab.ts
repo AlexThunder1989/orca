@@ -6,13 +6,11 @@ import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import { seedNativeChatLaunchDraftForAgentTab } from '@/lib/agent-launch-prompt-delivery'
 import { pasteAgentLaunchPromptOnceReady } from '@/lib/launch-agent-tab-prompt-paste'
 import {
-  freshNewTabLaunchesThroughHost,
-  launchFreshNewTabThroughHost,
   launchNewTabPromptThroughHost,
   newTabPromptLaunchesThroughHost
 } from '@/lib/launch-agent-new-tab-host-route'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
-import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session'
+import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session-environment'
 import { launchAgentInWebHostTab } from '@/lib/launch-agent-web-host-tab'
 import {
   resolveTuiAgentLaunchArgs,
@@ -32,6 +30,7 @@ import {
   routeNewTabLaunch
 } from '@/lib/launch-agent-in-new-tab-host-agents'
 import type { AgentLaunchRequestId } from '@/lib/agent-launch-request-id'
+import type { NativeChatComposerFocusIntent } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
 
 /** The user action this launch serves: minted where that action is handled, or carried by the
  *  route the caller already planned for it. */
@@ -46,6 +45,8 @@ type LaunchAgentInNewTabRequest =
 export type LaunchAgentInNewTabArgs = LaunchAgentInNewTabRequest & {
   agent: TuiAgent
   worktreeId: string
+  /** Captured at a new-chat action before the host can delay route selection. */
+  focusIntent?: NativeChatComposerFocusIntent
   /** Tab group the user launched from; keeps split-group launches in that pane instead of the active group. */
   groupId?: string
   /** Optional initial prompt; delivery depends on `promptDelivery` and the agent's prompt mode. */
@@ -73,9 +74,6 @@ export type LaunchAgentInNewTabArgs = LaunchAgentInNewTabRequest & {
   onPromptDeliveryUnconfirmed?: () => void
   /** Keep terminal launches in a floating workspace from taking global selection. */
   activate?: boolean
-  /** A plain new-tab pick ("+", Quick Launch, floating panel, dashboard): with no prompt it starts
-   *  through the host where that matches main's own launch. */
-  freshNewTab?: true
   /** The launch seeds a workspace being opened, so its PTY spawn must not reshuffle Recent. */
   pendingActivationSpawn?: boolean
   /** Lets a workspace reveal itself before the selected surface opens. */
@@ -137,6 +135,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
   const store = useAppStore.getState()
   const executionContext = resolveAgentLaunchExecutionContext(store, { worktreeId, launchPlatform })
   if (!executionContext) {
+    args.focusIntent?.cancel()
     return null
   }
   const { resolvedLaunchPlatform, isRemote, queuedShell } = executionContext
@@ -171,6 +170,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
   let promptDeliveryResult: Promise<{ delivered: boolean; failureNotified: boolean }> | undefined
 
   if (!startupPlan) {
+    args.focusIntent?.cancel()
     return null
   }
 
@@ -193,6 +193,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
     const structured = launchStructuredAgentFromNewTab({
       plan,
       worktreeId,
+      ...(args.focusIntent ? { focusIntent: args.focusIntent } : {}),
       ...(groupId ? { groupId } : {}),
       ...(beforeSurfaceOpen ? { beforeSurfaceOpen } : {}),
       ...(args.onStructuredHostDeclined ? { onHostDeclined: args.onStructuredHostDeclined } : {}),
@@ -205,9 +206,14 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
           agentSessionLaunchPlan: terminalPlan
         })
     })
-    return structured && { ...structured, startupPlan }
+    if (!structured) {
+      args.focusIntent?.cancel()
+      return null
+    }
+    return { ...structured, startupPlan }
   }
 
+  args.focusIntent?.cancel()
   const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(store, worktreeId)
   if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
     if (beforeSurfaceOpen?.({ kind: 'host-published' }) === false) {
@@ -245,7 +251,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
   }
   if (
     pasteDraftAfterLaunch !== null &&
-    newTabPromptLaunchesThroughHost({ promptDelivery, pastesPrompt: true })
+    newTabPromptLaunchesThroughHost({ promptDelivery, pastesPrompt: true, isRemote })
   ) {
     const launched = launchNewTabPromptThroughHost({
       agent,
@@ -270,50 +276,34 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
       promptDeliveryResult: launched.promptDeliveryResult
     }
   }
-  if (args.freshNewTab && freshNewTabLaunchesThroughHost(args, resolvedLaunchPlatform)) {
-    const tabId = launchFreshNewTabThroughHost({
-      agent,
-      worktreeId,
-      ...(groupId ? { groupId } : {}),
-      prompt: '',
-      ...(agentArgs !== undefined ? { agentArgs } : {}),
-      ...(initialCwd?.trim() ? { cwd: initialCwd } : {}),
-      launchSource: launchSource ?? 'tab_bar_quick_launch',
-      quickCommandLabel,
-      ...(pendingActivationSpawn ? { pendingActivationSpawn: true } : {}),
-      ...(activate === false ? { activate: false } : {})
-    })
-    return { surface: { kind: 'local-terminal', tabId }, startupPlan, pasteDraftAfterLaunch: false }
-  }
-  // Why: queue startup BEFORE TerminalPane mounts — it snapshots pendingStartupByTabId in useState on first render.
   const tab = store.createTab(worktreeId, groupId, undefined, {
     launchAgent: agent,
     quickCommandLabel,
     ...(pendingActivationSpawn ? { pendingActivationSpawn: true } : {}),
-    ...(activate === false ? { activate: false } : {})
+    ...(activate === false ? { activate: false } : {}),
+    pendingStartup: {
+      command: startupPlan.launchCommand,
+      ...(startupPlan.env ? { env: startupPlan.env } : {}),
+      launchConfig: startupPlan.launchConfig,
+      launchAgent: agent,
+      ...(agentArgs !== undefined ? { agentArgsOverride: agentArgs } : {}),
+      ...(startupPlan.startupCommandDelivery
+        ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
+        : {}),
+      ...(agent === 'command-code' && hasPrompt && promptDelivery === 'auto-submit'
+        ? { initialAgentStatus: { agent, prompt: trimmedPrompt } }
+        : {}),
+      telemetry: {
+        agent_kind: tuiAgentToAgentKind(agent),
+        launch_source: launchSource ?? 'tab_bar_quick_launch',
+        request_kind: 'new'
+      }
+    }
   })
   if (initialCwd?.trim()) {
     // Why: queue before mount so local, WSL, and SSH continuations preserve their subdirectory.
     store.queueTabInitialCwd(tab.id, initialCwd)
   }
-  store.queueTabStartupCommand(tab.id, {
-    command: startupPlan.launchCommand,
-    ...(startupPlan.env ? { env: startupPlan.env } : {}),
-    launchConfig: startupPlan.launchConfig,
-    launchAgent: agent,
-    ...(agentArgs !== undefined ? { agentArgsOverride: agentArgs } : {}),
-    ...(startupPlan.startupCommandDelivery
-      ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
-      : {}),
-    ...(agent === 'command-code' && hasPrompt && promptDelivery === 'auto-submit'
-      ? { initialAgentStatus: { agent, prompt: trimmedPrompt } }
-      : {}),
-    telemetry: {
-      agent_kind: tuiAgentToAgentKind(agent),
-      launch_source: launchSource ?? 'tab_bar_quick_launch',
-      request_kind: 'new'
-    }
-  })
   // Why: fire-and-forget the paste-after-ready delivery so callers keep the synchronous { tabId, startupPlan } signature.
   // Why: safe to call unconditionally — the helper short-circuits (no paste) for native-prefill agents already holding the draft.
   if (hasPrompt && promptDelivery === 'draft' && pasteDraftAfterLaunch === null) {

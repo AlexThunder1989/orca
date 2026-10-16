@@ -3,6 +3,7 @@ import { MOBILE_WEB_SHELL_GRANTS } from '../page-route-policy'
 import {
   BRIDGE_FAULT_GRANT,
   BRIDGE_PROTOCOL_VERSION,
+  BRIDGE_RPC_ENVELOPE_GRANT,
   type BridgeConnectionSnapshot,
   type BridgeHostMessage,
   type BridgeInitHost,
@@ -27,6 +28,7 @@ import {
  */
 export const BRIDGE_NATIVE_GRANTS: readonly string[] = [
   BRIDGE_FAULT_GRANT,
+  BRIDGE_RPC_ENVELOPE_GRANT,
   ...MOBILE_WEB_SHELL_GRANTS
 ]
 

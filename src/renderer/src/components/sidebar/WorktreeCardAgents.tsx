@@ -267,7 +267,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
             agent.rowSource === 'retained' ? handleActivateRetainedAgent : handleActivateAgentTab
           }
           now={now}
-          // Why: bold the row until the user visits its tab (useAutoAckViewedAgent auto-acks on focus, muting it).
+          // Why: bold the row until the user visits its tab (useReadOnScreenAttention auto-acks on focus, muting it).
           isUnvisited={unvisitedByPaneKey[agent.paneKey] ?? false}
           // Why: inline rows are tight; 'md' reads as a second glyph users confuse with the adjacent identity icon, so use 'sm'.
           stateDotSize="sm"
@@ -316,8 +316,9 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
       : undefined
     const descendantAncestorPaneKeys = new Set(ancestorPaneKeys)
     descendantAncestorPaneKeys.add(agent.paneKey)
+    // Keep collapsed children from occupying a separate flex-gap slot.
     return (
-      <React.Fragment key={agent.paneKey}>
+      <div key={agent.paneKey} className="min-w-0">
         <CompactAgentRow
           agent={agent}
           now={now}
@@ -349,7 +350,7 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
             </div>
           </CompactAgentExpansion>
         ) : null}
-      </React.Fragment>
+      </div>
     )
   }
 

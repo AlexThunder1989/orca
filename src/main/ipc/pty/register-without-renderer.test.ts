@@ -2,12 +2,10 @@ import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import { setupPtyIpcSuite } from '../pty-ipc-test-harness'
-import {
-  getLocalPtyProvider,
-  getPtyRendererDeliveryDebugSnapshot,
-  registerPtyHandlers,
-  setPtyOwnership
-} from '../pty'
+import { getLocalPtyProvider } from './provider/registry'
+import { getPtyRendererDeliveryDebugSnapshot } from './delivery/debug'
+import { registerPtyHandlers } from './register-handlers'
+import { setPtyOwnership } from './provider/ownership-state'
 import { registerHeadlessPtyRuntime } from './register-headless-runtime'
 import { onMock } from '../pty-ipc-mock-registry'
 

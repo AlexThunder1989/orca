@@ -1,5 +1,7 @@
+import { AiVaultChatForkSourceSchema } from '../../shared/ai-vault-chat-fork-contract'
 import { z } from 'zod'
 import {
+  AI_VAULT_AGENTS,
   AI_VAULT_SCOPE_PATHS_MAX_COUNT,
   type AiVaultListArgs,
   type AiVaultListResult,
@@ -9,7 +11,7 @@ import { toRuntimeExecutionHostId } from '../../shared/execution-host'
 import { listEnvironments } from '../../shared/runtime-environment-store'
 import { callRuntimeEnvironment } from '../ipc/runtime-environment-transport-routing'
 import type {
-  AiVaultPrepareSessionResumeArgs,
+  AiVaultPrepareSessionResumeRequest,
   AiVaultPrepareSessionResumeResult
 } from '../../shared/ai-vault-resume-preparation'
 import type {
@@ -18,6 +20,7 @@ import type {
 } from '../../shared/ai-vault-session-title'
 import { parseAiVaultListResult } from './session-list-result-validation'
 import { parseAiVaultSessionTitlesResult } from './session-title-result-validation'
+import { isGatedOffWslHost } from '../wsl/wsl-host-gate'
 
 export type RuntimeAiVaultHostInfo = {
   environmentId: string
@@ -32,16 +35,26 @@ export type RuntimeAiVaultScanOptions = {
 // parent would silently drop it and resume under the wrong account's home.
 const aiVaultPrepareSessionResumeResultSchema = z.object({
   useRealCodexHome: z.boolean(),
-  substituteCodexHome: z.string().optional()
+  cliForkSource: AiVaultChatForkSourceSchema.optional(),
+  substituteCodexHome: z.string().optional(),
+  forkedSession: z
+    .object({
+      sessionId: z.string(),
+      agent: z.enum(AI_VAULT_AGENTS),
+      filePath: z.string().optional()
+    })
+    .optional()
 })
 
 export function getSavedRuntimeAiVaultHostInfos(
   userDataPath: string
 ): readonly RuntimeAiVaultHostInfo[] {
-  return listEnvironments(userDataPath).map((environment) => ({
-    environmentId: environment.id,
-    executionHostId: toRuntimeExecutionHostId(environment.id)
-  }))
+  return listEnvironments(userDataPath)
+    .filter((environment) => !isGatedOffWslHost(environment))
+    .map((environment) => ({
+      environmentId: environment.id,
+      executionHostId: toRuntimeExecutionHostId(environment.id)
+    }))
 }
 
 export async function scanRuntimeAiVaultSessions(
@@ -137,7 +150,7 @@ export async function resolveRuntimeAiVaultSessionTitles(
 export async function prepareRuntimeAiVaultSessionResume(
   userDataPath: string,
   environmentId: string,
-  args: AiVaultPrepareSessionResumeArgs
+  args: AiVaultPrepareSessionResumeRequest
 ): Promise<AiVaultPrepareSessionResumeResult> {
   const response = await callRuntimeEnvironment(
     userDataPath,
@@ -146,6 +159,13 @@ export async function prepareRuntimeAiVaultSessionResume(
     args
   )
   if (response.ok !== true) {
+    if (
+      response.error.code === 'method_not_found' &&
+      response.error.message === 'Unknown method: aiVault.prepareSessionResume'
+    ) {
+      // Why: Electron drops custom error fields; this exact message preserves the host's verdict.
+      throw new Error('aiVault.prepareSessionResume: method_not_found')
+    }
     throw new Error(response.error.message)
   }
   const parsed = aiVaultPrepareSessionResumeResultSchema.safeParse(response.result)

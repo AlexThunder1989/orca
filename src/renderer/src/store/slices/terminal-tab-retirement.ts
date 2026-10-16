@@ -1,10 +1,8 @@
 import { isRemoteRuntimePtyId } from '../../../../shared/remote-runtime-pty-id'
 import type { SleepingAgentSessionRecord } from '../../../../shared/agent-session-resume'
 import type { AppState } from '../types'
-import {
-  getRuntimeEnvironmentIdForWorktree,
-  type WorktreeRuntimeOwnerState
-} from '@/lib/worktree-runtime-owner'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from '@/lib/worktree-runtime-owner-state'
 import { parseRemoteRuntimePtyId } from '@/runtime/runtime-terminal-stream'
 import { resolveTerminalHostOwnership } from '@/lib/terminal-worktree-route'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'

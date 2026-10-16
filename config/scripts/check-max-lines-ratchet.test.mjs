@@ -9,9 +9,7 @@ import {
   collectCurrentSuppressions,
   collectMobileBumps,
   defaultLimitForPath,
-  diffBaseline,
-  hasMaxLinesDisable,
-  parseBaseline
+  hasMaxLinesDisable
 } from './check-max-lines-ratchet.mjs'
 
 describe('hasMaxLinesDisable', () => {
@@ -227,28 +225,4 @@ describe('max-lines repository coverage', () => {
       ).toEqual(expected.sort())
     }
   )
-})
-
-describe('parseBaseline', () => {
-  it('drops comments and blank lines', () => {
-    const b = parseBaseline('# header\n\ninline a.ts\nmobile-config x/*.tsx\n')
-    expect(b).toEqual(new Set(['inline a.ts', 'mobile-config x/*.tsx']))
-  })
-})
-
-describe('diffBaseline', () => {
-  it('reports added and stale entries', () => {
-    const { added, stale } = diffBaseline(
-      ['inline b.ts', 'inline c.ts'],
-      new Set(['inline a.ts', 'inline b.ts'])
-    )
-    expect(added).toEqual(['inline c.ts']) // new bypass
-    expect(stale).toEqual(['inline a.ts']) // suppression removed
-  })
-
-  it('is clean when current matches baseline', () => {
-    const { added, stale } = diffBaseline(['inline a.ts'], new Set(['inline a.ts']))
-    expect(added).toEqual([])
-    expect(stale).toEqual([])
-  })
 })

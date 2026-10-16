@@ -14,9 +14,10 @@ const UNSUPPORTED_TUI_AGENT_ARGS: Partial<Record<TuiAgent, readonly string[]>> =
   kilo: ['--dangerously-skip-permissions']
 }
 
-export const DEFAULT_TUI_AGENT_ARGS: Partial<Record<TuiAgent, string>> = YOLO_TUI_AGENT_ARGS
+export const DEFAULT_TUI_AGENT_ARGS: Partial<Record<TuiAgent, string>> &
+  Readonly<Record<string, string | undefined>> = YOLO_TUI_AGENT_ARGS
 
-export const DEFAULT_TUI_AGENT_ENV: Partial<Record<TuiAgent, Record<string, string>>> =
+export const DEFAULT_TUI_AGENT_ENV: Partial<Record<string, Record<string, string>>> =
   YOLO_TUI_AGENT_ENV
 
 function argPattern(arg: string): RegExp {
@@ -94,30 +95,30 @@ export function normalizeTuiAgentEnvRecord(
     if (!isTuiAgent(agent) || !env || typeof env !== 'object') {
       continue
     }
-    const nextEnv: Record<string, string> = {}
+    const entries: [string, string][] = []
     for (const [name, raw] of Object.entries(env)) {
       const key = name.trim()
       if (!key || typeof raw !== 'string') {
         continue
       }
-      nextEnv[key] = raw
+      entries.push([key, raw])
     }
-    normalized[agent] = nextEnv
+    normalized[agent] = Object.fromEntries(entries)
   }
   return normalized
 }
 
-export function getTuiAgentDefaultArgs(agent: TuiAgent): string {
+export function getTuiAgentDefaultArgs(agent: string): string {
   return DEFAULT_TUI_AGENT_ARGS[agent] ?? ''
 }
 
-export function getTuiAgentDefaultEnv(agent: TuiAgent): Record<string, string> {
+export function getTuiAgentDefaultEnv(agent: string): Record<string, string> {
   return { ...DEFAULT_TUI_AGENT_ENV[agent] }
 }
 
 export function resolveTuiAgentLaunchArgs(
-  agent: TuiAgent,
-  configuredArgs: Partial<Record<TuiAgent, string>> | null | undefined
+  agent: string,
+  configuredArgs: Readonly<Record<string, string | undefined>> | null | undefined
 ): string {
   if (
     configuredArgs &&
@@ -160,8 +161,8 @@ export function resolvedTuiAgentArgsBypassPermissions(
 }
 
 export function resolveTuiAgentLaunchEnv(
-  agent: TuiAgent,
-  configuredEnv: Partial<Record<TuiAgent, Record<string, string>>> | null | undefined
+  agent: string,
+  configuredEnv: Partial<Record<string, Record<string, string>>> | null | undefined
 ): Record<string, string> {
   if (configuredEnv && Object.hasOwn(configuredEnv, agent)) {
     return { ...configuredEnv[agent] }

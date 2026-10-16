@@ -1,6 +1,8 @@
 // A scripted ACP agent behind the real adapter: a fake connection over in-memory stdio, the real
 // protocol runtime, translator and assembler, and a real on-disk journal to read back.
 
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { vi } from 'vitest'
 import type { AgentJournalMessageItem } from '../../shared/agent-session-journal-types'
 import type { ProviderProcessExit } from '../provider-process/managed-provider-process'
@@ -170,9 +172,9 @@ export async function openAcpAdapterRig(
   const lifecycle: StructuredAgentSessionLifecycleEvent[] = []
   const settled: AcpAdapterRig['settled'] = []
   const spec = options.spec ?? GROK
-  const adapter = new AcpStructuredSessionAdapter({
-    spec,
-    resolveLaunch: async () => ({
+  const resolveLaunch: AcpStructuredSessionAdapterDeps['resolveLaunch'] =
+    options.deps?.resolveLaunch ??
+    (async () => ({
       spec,
       command: `/opt/bin/${spec.command}`,
       args: spec.args({ fullAccess: false, pluginDir: null }),
@@ -182,7 +184,12 @@ export async function openAcpAdapterRig(
       fullAccess: false,
       resume: null,
       ...options.launch
-    }),
+    }))
+  const adapter = new AcpStructuredSessionAdapter({
+    spec,
+    resolveLaunch,
+    // A double starts nothing, so a recovery read sees the launch a start would.
+    readLaunch: (identity) => resolveLaunch({ identity, spawnToken: 'recovery-read' }),
     connect: (launch, connectionOptions) => {
       spawned.push('spawn')
       const child = new FakeAcpChild(launch, connectionOptions)
@@ -211,6 +218,7 @@ export async function openAcpAdapterRig(
       return child
     },
     readProcessStartTime: async () => 1_700_000_000_000,
+    dataDirectory: join(tmpdir(), 'orca-acp-adapter-rig'),
     onEvent: (event) => lifecycle.push(event),
     onDispatchSettledLate: (settlement) => settled.push(settlement),
     mintGeneration: () => 'gen-acp',

@@ -15,7 +15,6 @@ const remoteRepo: Repo = {
 
 const reposList = vi.fn()
 const reposClone = vi.fn()
-const reposCloneRemote = vi.fn()
 const runtimeEnvironmentCall = vi.fn()
 const runtimeEnvironmentTransportCall = vi.fn()
 let runtimeCapabilities: string[] = []
@@ -43,7 +42,6 @@ beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
   reposList.mockReset()
   reposClone.mockReset()
-  reposCloneRemote.mockReset()
   runtimeEnvironmentCall.mockReset()
   runtimeEnvironmentTransportCall.mockReset()
   runtimeCapabilities = []
@@ -57,8 +55,7 @@ beforeEach(() => {
     api: {
       repos: {
         list: reposList,
-        clone: reposClone,
-        cloneRemote: reposCloneRemote
+        clone: reposClone
       },
       runtimeEnvironments: { call: runtimeEnvironmentTransportCall }
     }

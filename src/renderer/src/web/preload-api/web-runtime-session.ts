@@ -10,10 +10,12 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import { WebRuntimeClient } from '../web-runtime-client'
 import {
   clearStoredWebRuntimeEnvironment,
-  getPreferredWebPairingOffer,
+  getPreferredWebRuntimeConnection,
   readStoredWebRuntimeEnvironment,
+  replaceStoredTokenWithDeviceKey,
   updateStoredEnvironmentRuntimeId
 } from '../web-runtime-environment'
+import { webRuntimeCredentialFor } from './web-runtime-credentials'
 import type { StoredWebRuntimeEnvironment } from '../web-runtime-environment'
 import { translate } from '@/i18n/i18n'
 
@@ -64,8 +66,9 @@ export async function observeWebRuntimeStatus(
   if (existing) {
     return existing.refresh({ timeoutMs, observeOnly: true })
   }
-  const transient = new WebRuntimeClient(getPreferredWebPairingOffer(environment), {
-    reconnect: false
+  const transient = new WebRuntimeClient(getPreferredWebRuntimeConnection(environment), {
+    reconnect: false,
+    credential: credentialFor(environment)
   })
   try {
     return (await transient.call('status.get', undefined, {
@@ -100,21 +103,46 @@ export function getClientForEnvironment(
     webRuntimeState.activeClientEnvironmentId !== environment.id
   ) {
     webRuntimeState.activeClient?.close()
-    webRuntimeState.activeClient = new WebRuntimeClient(getPreferredWebPairingOffer(environment), {
-      status: {
-        environmentId: environment.id,
-        pairingRevision: environment.pairingRevision ?? environment.createdAt,
-        publish: (snapshot) => {
-          for (const listener of statusListeners) {
-            listener(snapshot)
-          }
-        },
-        verified: (response) => updateEnvironmentFromResponse(environment, response)
+    webRuntimeState.activeClient = new WebRuntimeClient(
+      getPreferredWebRuntimeConnection(environment),
+      {
+        credential: credentialFor(environment),
+        allowKeyMigration: true,
+        status: {
+          environmentId: environment.id,
+          pairingRevision: environment.pairingRevision ?? environment.createdAt,
+          publish: (snapshot) => {
+            for (const listener of statusListeners) {
+              listener(snapshot)
+            }
+          },
+          verified: (response) => updateEnvironmentFromResponse(environment, response)
+        }
       }
-    })
+    )
     webRuntimeState.activeClientEnvironmentId = environment.id
   }
   return webRuntimeState.activeClient
+}
+
+function credentialFor(environment: StoredWebRuntimeEnvironment) {
+  return webRuntimeCredentialFor(environment, {
+    forgetStoredToken: (deviceId) => {
+      if (isActivePairing(environment) && webRuntimeState.activeEnvironment) {
+        webRuntimeState.activeEnvironment = replaceStoredTokenWithDeviceKey(
+          webRuntimeState.activeEnvironment,
+          deviceId
+        )
+      }
+    },
+    // Why not close clients here: the transport is mid-verdict and moves itself to auth-failed.
+    forgetPairing: () => {
+      if (isActivePairing(environment)) {
+        clearStoredWebRuntimeEnvironment()
+        webRuntimeState.activeEnvironment = null
+      }
+    }
+  })
 }
 
 export function closeActiveRuntimeClients(): void {

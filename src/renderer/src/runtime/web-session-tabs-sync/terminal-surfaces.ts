@@ -12,7 +12,7 @@ import {
   HOST_TERMINAL_SURFACE_SEPARATOR,
   WEB_TERMINAL_SURFACE_TAB_PREFIX,
   toWebTerminalSurfaceTabId
-} from '../web-runtime-session'
+} from '../../../../shared/terminal-surface-id'
 import type {
   ReadyBrowserSurface,
   ReadyEditorSurface,

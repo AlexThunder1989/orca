@@ -72,7 +72,9 @@ async function feedWithChildren(provider: AgentSessionHandleProvider = 'codex') 
   const sink: StructuredAgentSessionStatusSink = {
     publish: () => {},
     forget: () => {},
-    publishChildWork: (_subject, evidence) => admitted.push(evidence),
+    publishChildWork: (_subject, evidence) => {
+      admitted.push(evidence)
+    },
     readChildWork: () => views.current()
   }
   let now = 1_000

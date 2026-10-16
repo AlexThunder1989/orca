@@ -32,7 +32,8 @@ const describePostgres = databaseUrl ? describe : describe.skip
 // asia-east2 cell to the us-central1 database, measured in production.
 const ASIA_ROUND_TRIP_MS = 171
 const LOCAL_ROUND_TRIP_MS = 1
-const WINDOW_MS = 10_000
+// Keep the measured contention rates; repeating them for longer only repeats the same locks.
+const WINDOW_MS = 5_000
 // Reconnecting hosts dialling the directors during the window. Above the
 // ~6-15/s the production tail sustained, so the director side is never idle.
 const DIAL_RATE_PER_SECOND = 20

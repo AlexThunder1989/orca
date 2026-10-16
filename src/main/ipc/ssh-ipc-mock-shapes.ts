@@ -24,6 +24,7 @@ export type SshConnectionManagerMock = {
   disconnectConnection: Mock
   reconnect: Mock
   getConnection: Mock
+  hasCachedCredential: Mock
   getState: Mock
   disconnectAll: Mock
   setCallbacks: Mock
@@ -49,6 +50,7 @@ export type SshPortForwardManagerMock = {
   removeForwardAndWait: Mock
   listForwards: Mock
   removeAllForwards: Mock
+  closeAll: Mock
   dispose: Mock
   setCallbacks: Mock
   callbacksRef: MockCallbacksRef
@@ -60,12 +62,7 @@ export type SshIpcMockState = {
   powerMonitorOnMock: Mock
   mockSshStore: SshStoreMock
   mockConnectionManager: SshConnectionManagerMock
-  mockAcceptSshPtyOutputData: Mock
-  mockAcceptSshPtyOutputExit: Mock
   mockMux: SshChannelMultiplexerMock
-  mockFsProvider: Record<string, unknown>
-  mockGitProvider: Record<string, unknown>
-  mockRegisterSshGitProvider: Mock
   mockPortForwardManager: SshPortForwardManagerMock
   mockPortScannerCallbacks: Map<string, unknown>
   mockListConfigHosts: Mock
@@ -80,16 +77,10 @@ export type SshIpcMockModule = Record<string, unknown>
 export type SshIpcMockModules = {
   sshConfigHostPicker: SshIpcMockModule
   electron: SshIpcMockModule
-  sshPtyOutputIntakeRegistry: SshIpcMockModule
   hostServerConnect: SshIpcMockModule
   sshConnectionStore: SshIpcMockModule
   sshConnectionManager: SshIpcMockModule
   sshChannelMultiplexer: SshIpcMockModule
-  sshFilesystemProvider: SshIpcMockModule
-  pty: SshIpcMockModule
-  sshFilesystemDispatch: SshIpcMockModule
-  sshGitProvider: SshIpcMockModule
-  sshGitDispatch: SshIpcMockModule
   sshPortForward: SshIpcMockModule
   sshPortScanner: SshIpcMockModule
 }

@@ -1,3 +1,4 @@
+import '../runtime/rpc/unused-default-rpc-methods.test-fixture'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type * as NodeOs from 'node:os'
 
@@ -846,8 +847,7 @@ describe('runtime pairing bind host', () => {
   beforeEach(() => {
     handlers.clear()
     handleMock.mockReset()
-    networkInterfacesMock.mockReset()
-    networkInterfacesMock.mockReturnValue({})
+    networkInterfacesMock.mockReset().mockReturnValue({})
     handleMock.mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
       handlers.set(channel, handler)
     })
@@ -855,6 +855,7 @@ describe('runtime pairing bind host', () => {
 
   const startServer = async (userDataPath: string): Promise<OrcaRuntimeRpcServer> => {
     const server = new OrcaRuntimeRpcServer({
+      methods: [],
       runtime: new OrcaRuntimeService(),
       userDataPath,
       enableWebSocket: true,

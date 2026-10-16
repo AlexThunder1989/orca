@@ -1,5 +1,5 @@
+import type { SourceControlAiSettingsInput } from '../../shared/source-control-ai'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../shared/execution-host'
-import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { Repo } from '../../shared/repo-types'
 import type { GitPushTarget, GitWorktreeInfo, Worktree } from '../../shared/worktree/types'
 import type { GitRuntimeOptions } from '../git/git-runtime-options'
@@ -38,7 +38,7 @@ export type RuntimeGitTarget = {
 
 export type RuntimeGitCommandHost = {
   resolveRuntimeGitTarget(selector: string): Promise<RuntimeGitTarget>
-  getRuntimeSettings(): GlobalSettings
+  getRuntimeSettings(): SourceControlAiSettingsInput
   getCommitMessageAgentEnvironment?(): CommitMessageAgentEnvironmentResolvers | undefined
   /** `undefined` keeps cached metadata; `null` is the authoritative unlinked answer. */
   getWorktreeLinkedIssue?(worktreeId: string): number | null | undefined

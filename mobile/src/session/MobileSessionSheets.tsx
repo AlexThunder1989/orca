@@ -9,6 +9,7 @@ import { TextInputModal } from '../components/TextInputModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { CustomKeyModal } from '../components/CustomKeyModal'
 import { MobileDictationSetupSheet } from '../components/MobileDictationSetupSheet'
+import { useWorkspaceOnPairedHost } from '../navigation/workspace-execution-host'
 import { MobileBrowserTabActionSheet } from './MobileBrowserTabActionSheet'
 import { getMobileTerminalActionSheetActions } from './mobile-terminal-action-sheet-actions'
 import {
@@ -61,6 +62,7 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
     setShowDictationSetup,
     browserScreencastSupported,
     quickCommandsSupported,
+    quickCommandAgentPromptMaxLength,
     showToast,
     nativeChatTranscriptIsLocalReadable,
     nativeChatController,
@@ -91,6 +93,7 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
     showChecksAction
   } = controller
   const clipboard = useClipboardWriter()
+  const onPairedHost = useWorkspaceOnPairedHost()
   return (
     <>
       <MobileSessionHeaderMoreActionsSheet
@@ -111,6 +114,7 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
             : getRepoIdFromMobileWorktreeId(worktreeId) || null
         }
         repoName={worktreeName || null}
+        agentPromptMaxLength={quickCommandAgentPromptMaxLength}
         onLaunch={launchQuickCommand}
       />
       <ActionSheetModal
@@ -144,14 +148,18 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
                     setShowCreateBrowserModal(true)
                   }
                 },
-                {
-                  label: 'Markdown Note',
-                  icon: FileText,
-                  onPress: () => {
-                    setShowCreateTabDrawer(false)
-                    void handleCreateMarkdownNote()
-                  }
-                }
+                ...(onPairedHost
+                  ? [
+                      {
+                        label: 'Markdown Note',
+                        icon: FileText,
+                        onPress: () => {
+                          setShowCreateTabDrawer(false)
+                          void handleCreateMarkdownNote()
+                        }
+                      }
+                    ]
+                  : [])
               ])
         ]}
         onClose={() => setShowCreateTabDrawer(false)}

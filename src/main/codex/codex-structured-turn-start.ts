@@ -34,15 +34,9 @@ import {
 // the turn to open and steers it.
 
 /** Keys Codex accepts as per-turn overrides. An unlisted key would otherwise
- *  become an arbitrary client-controlled `turn/start` parameter. Permission posture is owned by
- *  Agent Permissions and applied when the thread opens. */
-const CODEX_TURN_OPTION_KEYS = new Set([
-  'model',
-  'effort',
-  'approvalsReviewer',
-  'personality',
-  'serviceTier'
-])
+ *  become an arbitrary client-controlled `turn/start` parameter. Permission posture is the chat's
+ *  permission mode, stated when the thread opens: a saved reviewer here would override it. */
+const CODEX_TURN_OPTION_KEYS = new Set(['model', 'effort', 'personality', 'serviceTier'])
 
 export function isCodexTurnOptionKey(key: string): boolean {
   return CODEX_TURN_OPTION_KEYS.has(key)
@@ -176,11 +170,15 @@ export async function dispatchCodexTurn(
     if (isCodexAppServerRequestError(error) || isCodexAppServerUnsupportedError(error)) {
       // Codex answered and declined, so no echo for this write can arrive.
       session.dispatchEchoes.disarm(input.clientMessageId)
-      // Codex's own words, when it gave any, are the one part of the error a person can use.
+      // Codex's own words, when it gave any, are the one part of the error a person can use. A
+      // declined request recorded nothing, so stopped messages it carried are owed again.
       return {
         state: 'rejected',
         ...codexDispatchRejection(
-          agentSessionFailureFact('providerRejected', { detail: providerDiagnosticOf(error) })
+          agentSessionFailureFact('providerRejected', {
+            detail: providerDiagnosticOf(error),
+            neverReachedAgent: true
+          })
         )
       }
     }

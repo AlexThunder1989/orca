@@ -16,6 +16,7 @@ import {
 import type { CodexPendingJournalPrompt } from './codex-structured-journal-settlement'
 import type { CodexJournalTranslationAdmission } from './codex-structured-journal-contracts'
 import { CODEX_JOURNAL_ADMITTED } from './codex-structured-journal-contracts'
+import { reviseCodexTurnRow } from './codex-structured-journal-translation-turns'
 
 const ADMITTED: StructuredAgentSessionSinkAdmission = { accepted: true }
 
@@ -28,7 +29,31 @@ export function appendCodexLifecycleMutations(
     return ADMITTED
   }
   let admission: StructuredAgentSessionSinkAdmission = ADMITTED
-  if (sink.tryAppendLifecycleBatch) {
+  if (sink.tryAppendTransition) {
+    // Resolved when it runs, so a turn row is revised as the journal holds it then.
+    admission = sink.tryAppendTransition({
+      steps: [
+        {
+          kind: 'settlement',
+          settlementId,
+          reservedBytes:
+            Buffer.byteLength(JSON.stringify({ settlementId, mutations }), 'utf8') + 512,
+          resolve: (journal) =>
+            mutations.map((mutation) =>
+              mutation.kind === 'item' && mutation.body.kind === 'turn'
+                ? {
+                    ...mutation,
+                    body: reviseCodexTurnRow(journal, mutation.identity, mutation.body)
+                  }
+                : mutation
+            )
+        }
+      ],
+      lifecycle: true,
+      // Published below, where it coalesces with a publication still queued.
+      publish: false
+    })
+  } else if (sink.tryAppendLifecycleBatch) {
     admission = sink.tryAppendLifecycleBatch(settlementId, mutations, { lifecycle: true })
   } else if (sink.appendLifecycleBatch) {
     admission = sink.appendLifecycleBatch(settlementId, mutations, { lifecycle: true }) ?? ADMITTED

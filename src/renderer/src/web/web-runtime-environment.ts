@@ -1,3 +1,7 @@
+import {
+  pairedRuntimeConnectionFromOffer,
+  type PairedRuntimeConnection
+} from '../../../shared/paired-runtime-connection'
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/runtime-environments'
 import {
   RuntimeHostDescriptorSchema,
@@ -5,6 +9,8 @@ import {
 } from '../../../shared/runtime-host-descriptor'
 import { classifyRuntimeHostRePair } from '../../../shared/runtime-host-pairing-identity'
 import type { WebPairingOffer } from './web-pairing'
+import { readWebDeviceKeySupport } from './web-device-key-support'
+import { MIGRATED_DEVICE_TOKEN_PREFIX } from './web-runtime-credential-source'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { translate } from '@/i18n/i18n'
 
@@ -13,6 +19,8 @@ export type StoredWebRuntimeEnvironment = Omit<PublicKnownRuntimeEnvironment, 'e
   compatibleEnvironmentIds?: string[]
   /** The server's descriptor pinned at pairing; see classifyRuntimeHostRePair. */
   hostDescriptor?: RuntimeHostDescriptor
+  /** Paired where no key can be persisted: kept in memory only, never in localStorage. */
+  sessionOnly?: true
   endpoints: {
     id: string
     kind: 'websocket'
@@ -25,7 +33,13 @@ export type StoredWebRuntimeEnvironment = Omit<PublicKnownRuntimeEnvironment, 'e
 
 const ENVIRONMENT_STORAGE_KEY = 'orca.web.runtimeEnvironment.v1'
 
+// Why memory: a session-only pairing's code must not outlive the page (#17399).
+let sessionEnvironment: StoredWebRuntimeEnvironment | null = null
+
 export function readStoredWebRuntimeEnvironment(): StoredWebRuntimeEnvironment | null {
+  if (sessionEnvironment) {
+    return sessionEnvironment
+  }
   const raw = window.localStorage.getItem(ENVIRONMENT_STORAGE_KEY)
   if (!raw) {
     return null
@@ -68,10 +82,50 @@ export function readStoredWebRuntimeEnvironment(): StoredWebRuntimeEnvironment |
 }
 
 export function saveStoredWebRuntimeEnvironment(environment: StoredWebRuntimeEnvironment): void {
-  window.localStorage.setItem(ENVIRONMENT_STORAGE_KEY, JSON.stringify(environment))
+  if (environment.sessionOnly) {
+    sessionEnvironment = environment
+    // Why: a new session pairing replaces whatever older pairing (and its code) was stored.
+    window.localStorage.removeItem(ENVIRONMENT_STORAGE_KEY)
+    return
+  }
+  sessionEnvironment = null
+  const stored = readStoredWebRuntimeEnvironment()
+  // Why: a stale tab must not roll back another tab's re-pair of the same environment.
+  if (stored?.id === environment.id && pairingRevision(stored) > pairingRevision(environment)) {
+    return
+  }
+  window.localStorage.setItem(
+    ENVIRONMENT_STORAGE_KEY,
+    JSON.stringify(keepMigratedPlaceholders(environment, stored))
+  )
+}
+
+// Why: a tab holding a stale copy of this pairing must not put its code back after another tab
+// replaced it with a device key. A re-pair (new revision) stores its fresh code as usual.
+function keepMigratedPlaceholders(
+  next: StoredWebRuntimeEnvironment,
+  stored: StoredWebRuntimeEnvironment | null
+): StoredWebRuntimeEnvironment {
+  if (!stored || stored.id !== next.id || pairingRevision(stored) !== pairingRevision(next)) {
+    return next
+  }
+  return {
+    ...next,
+    endpoints: next.endpoints.map((endpoint) => {
+      const storedToken = stored.endpoints.find((entry) => entry.id === endpoint.id)?.deviceToken
+      return storedToken?.startsWith(MIGRATED_DEVICE_TOKEN_PREFIX)
+        ? { ...endpoint, deviceToken: storedToken }
+        : endpoint
+    })
+  }
+}
+
+function pairingRevision(environment: StoredWebRuntimeEnvironment): number {
+  return environment.pairingRevision ?? environment.createdAt
 }
 
 export function clearStoredWebRuntimeEnvironment(): void {
+  sessionEnvironment = null
   window.localStorage.removeItem(ENVIRONMENT_STORAGE_KEY)
 }
 
@@ -112,6 +166,7 @@ export function createStoredWebRuntimeEnvironment(args: {
     ...(args.connectionDependency ? { connectionDependency: args.connectionDependency } : {}),
     ...(compatibleEnvironmentIds.length > 0 ? { compatibleEnvironmentIds } : {}),
     ...(pin ? { hostDescriptor: pin } : {}),
+    ...(isSessionOnlyBrowser() ? { sessionOnly: true as const } : {}),
     preferredEndpointId: `ws-${id}`,
     endpoints: [
       {
@@ -132,6 +187,7 @@ export function redactStoredWebRuntimeEnvironment(
   const {
     compatibleEnvironmentIds: _compatibleEnvironmentIds,
     hostDescriptor: _hostDescriptor,
+    sessionOnly: _sessionOnly,
     ...publicEnvironment
   } = environment
   return {
@@ -144,22 +200,21 @@ export function redactStoredWebRuntimeEnvironment(
   }
 }
 
-export function getPreferredWebPairingOffer(
+export function getPreferredWebRuntimeConnection(
   environment: StoredWebRuntimeEnvironment
-): WebPairingOffer {
+): PairedRuntimeConnection {
   const endpoint =
     environment.endpoints.find((entry) => entry.id === environment.preferredEndpointId) ??
     environment.endpoints[0]
   if (!endpoint) {
     throw new Error('No runtime endpoint is stored for this web client.')
   }
-  return {
-    v: 2,
+  return pairedRuntimeConnectionFromOffer({
     endpoint: endpoint.endpoint,
     deviceToken: endpoint.deviceToken,
     publicKeyB64: endpoint.publicKeyB64,
-    ...(environment.pairedDeviceId ? { pairedDeviceId: environment.pairedDeviceId } : {})
-  }
+    pairedDeviceId: environment.pairedDeviceId
+  })
 }
 
 export function updateStoredEnvironmentRuntimeId(
@@ -180,4 +235,25 @@ export function updateStoredEnvironmentRuntimeId(
 
 export function isMixedContentWebSocket(endpoint: string): boolean {
   return window.location.protocol === 'https:' && endpoint.startsWith('ws://')
+}
+
+/** Forget the pairing code once a device key replaced it; the pairing itself is unchanged. */
+export function replaceStoredTokenWithDeviceKey(
+  environment: StoredWebRuntimeEnvironment,
+  deviceId: string
+): StoredWebRuntimeEnvironment {
+  const next = {
+    ...environment,
+    endpoints: environment.endpoints.map((endpoint) => ({
+      ...endpoint,
+      deviceToken: `${MIGRATED_DEVICE_TOKEN_PREFIX}${deviceId}`
+    }))
+  }
+  saveStoredWebRuntimeEnvironment(next)
+  return next
+}
+
+function isSessionOnlyBrowser(): boolean {
+  const support = readWebDeviceKeySupport()
+  return support !== null && support !== 'persistent'
 }

@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import type { NestedRepoScanResult } from '../../../../shared/project-group-types'
-import type { Repo } from '../../../../shared/repo-types'
 import { addRuntimeSshRepo } from '@/runtime/runtime-ssh-target-management'
 import { connectRuntimeEnvironmentSshTarget } from '@/runtime/runtime-environment-ssh-state'
 import {
@@ -11,70 +9,35 @@ import {
   withServerSshStates,
   type RemoteRepoTarget
 } from './add-repo-server-ssh-targets'
-import { createNestedRepoTelemetryAttemptId } from '../../../../shared/nested-repo-telemetry'
 import { translate } from '@/i18n/i18n'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { upsertAddedRepoWithProjectHostSetup } from './add-repo-store-upsert'
 import { worktreeRefreshOptions } from './add-repo-runtime-owner'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 
-// ── SSH host project hook ───────────────────────────────────────────
-
-async function loadLocalSshTargets(): Promise<RemoteRepoTarget[]> {
-  const targets = await window.api.ssh.listTargets()
-  return Promise.all(
-    targets.map(async (t) => {
-      const state = await window.api.ssh.getState({ targetId: t.id })
-      return { ...t, state: state ?? undefined }
-    })
-  )
-}
-
-function unwrapAddedRepo(result: { repo: Repo } | { error: string }): Repo {
-  if ('error' in result) {
-    throw new Error(result.error)
-  }
-  return result.repo
-}
+// ── A paired server's SSH host project hook ─────────────────────────
 
 export function useRemoteRepo(
   fetchWorktrees: (
     repoId: string,
-    options?: { requireAuthoritative?: boolean; executionHostId?: ExecutionHostId }
+    options?: {
+      requireAuthoritative?: boolean
+      executionHostId?: ExecutionHostId
+    }
   ) => Promise<unknown>,
   setStep: (step: 'add' | 'clone' | 'remote' | 'create' | 'nested') => void,
   closeModal: () => void,
-  onGitRepoReady?: (repoId: string, executionHostId?: ExecutionHostId) => void | Promise<void>,
-  scanNestedRepos?: (
-    path: string,
-    connectionId: string | undefined,
-    controls: {
-      scanId?: string
-      onProgress?: (scan: NestedRepoScanResult) => void
-      runtimeEnvironmentId: string | null
-    }
-  ) => Promise<NestedRepoScanResult | null>,
-  showNestedRepoReview?: (
-    scan: NestedRepoScanResult,
-    selectedPath: string,
-    connectionId: string,
-    attemptId: string,
-    inProgress: boolean,
-    scanId: string | null
-  ) => void,
-  onNestedScanResult?: (scan: NestedRepoScanResult | null, attemptId: string) => void,
+  onGitRepoReady: (repoId: string, executionHostId?: ExecutionHostId) => void | Promise<void>,
   /** A paired server: its own SSH hosts are listed, browsed and added by that server only. */
-  serverEnvironmentId: string | null = null
+  serverEnvironmentId: string | null
 ) {
   const [sshTargets, setSshTargets] = useState<RemoteRepoTarget[]>([])
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null)
   const [remotePath, setRemotePath] = useState('~/')
   const [remoteError, setRemoteError] = useState<string | null>(null)
   const [isAddingRemote, setIsAddingRemote] = useState(false)
-  const [remoteNestedScanId, setRemoteNestedScanId] = useState<string | null>(null)
   const remoteGenRef = useRef(0)
   const mountedRef = useMountedRef()
-  const cancelNestedRepoScan = useAppStore((s) => s.cancelNestedRepoScan)
 
   const resetRemoteState = useCallback(() => {
     remoteGenRef.current++
@@ -83,27 +46,17 @@ export function useRemoteRepo(
     setRemotePath('~/')
     setRemoteError(null)
     setIsAddingRemote(false)
-    if (remoteNestedScanId) {
-      void cancelNestedRepoScan(remoteNestedScanId, { runtimeEnvironmentId: null })
-    }
-    setRemoteNestedScanId(null)
-  }, [cancelNestedRepoScan, remoteNestedScanId])
-
-  const stopRemoteNestedScan = useCallback(() => {
-    if (!remoteNestedScanId) {
-      return
-    }
-    void cancelNestedRepoScan(remoteNestedScanId, { runtimeEnvironmentId: null })
-  }, [cancelNestedRepoScan, remoteNestedScanId])
+  }, [])
 
   const handleOpenRemoteStep = useCallback(
     async (preferredTargetId?: string | null) => {
+      if (!serverEnvironmentId) {
+        return
+      }
       const gen = ++remoteGenRef.current
       setStep('remote')
       try {
-        const withState = serverEnvironmentId
-          ? await loadServerSshTargets(serverEnvironmentId)
-          : await loadLocalSshTargets()
+        const withState = await loadServerSshTargets(serverEnvironmentId)
         if (gen !== remoteGenRef.current) {
           return
         }
@@ -124,17 +77,12 @@ export function useRemoteRepo(
           return
         }
         setSshTargets([])
-        if (serverEnvironmentId) {
-          setRemoteError(extractIpcErrorMessage(error, String(error)))
-        }
+        setRemoteError(extractIpcErrorMessage(error, String(error)))
       }
     },
     [serverEnvironmentId, setStep]
   )
 
-  // Why: keep the target list's connection state in sync while the dialog is
-  // open, so clicking the inline Connect button below updates the dot/label
-  // live without the user reopening the step.
   const serverSshStates = useAppStore((s) =>
     serverEnvironmentId
       ? s.sshStateByEnvironment.get(serverEnvironmentId)?.connectionStates
@@ -146,33 +94,17 @@ export function useRemoteRepo(
     [serverSshStates, sshTargets]
   )
 
-  useEffect(() => {
-    if (serverEnvironmentId) {
-      return
-    }
-    const unsubscribe = window.api.ssh.onStateChanged(({ targetId, state }) => {
-      setSshTargets((prev) => prev.map((t) => (t.id === targetId ? { ...t, state } : t)))
-      if (state.status === 'connected') {
-        setSelectedTargetId((curr) => curr ?? targetId)
-      }
-    })
-    return unsubscribe
-  }, [serverEnvironmentId])
-
   const handleConnectTarget = useCallback(
     async (targetId: string) => {
+      if (!serverEnvironmentId) {
+        return
+      }
       try {
-        if (serverEnvironmentId) {
-          const state = await connectRuntimeEnvironmentSshTarget(serverEnvironmentId, targetId)
-          if (state) {
-            setSshTargets((prev) => prev.map((t) => (t.id === targetId ? { ...t, state } : t)))
-            setSelectedTargetId((curr) =>
-              state.status === 'connected' ? (curr ?? targetId) : curr
-            )
-          }
-          return
+        const state = await connectRuntimeEnvironmentSshTarget(serverEnvironmentId, targetId)
+        if (state) {
+          setSshTargets((prev) => prev.map((t) => (t.id === targetId ? { ...t, state } : t)))
+          setSelectedTargetId((curr) => (state.status === 'connected' ? (curr ?? targetId) : curr))
         }
-        await window.api.ssh.connect({ targetId })
       } catch (err) {
         toast.error(
           err instanceof Error
@@ -185,7 +117,7 @@ export function useRemoteRepo(
   )
 
   const handleAddRemoteRepo = useCallback(async () => {
-    if (!selectedTargetId || !remotePath.trim()) {
+    if (!serverEnvironmentId || !selectedTargetId || !remotePath.trim()) {
       return
     }
 
@@ -194,54 +126,13 @@ export function useRemoteRepo(
     setIsAddingRemote(true)
     setRemoteError(null)
     try {
-      const attemptId = createNestedRepoTelemetryAttemptId()
-      const scanId = `nested-repo-scan-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      setRemoteNestedScanId(scanId)
-      // Why no nested scan on a server's host: that server's scan cannot reach its SSH targets.
-      const scan = serverEnvironmentId
-        ? null
-        : await scanNestedRepos?.(trimmedRemotePath, selectedTargetId, {
-            scanId,
-            runtimeEnvironmentId: null,
-            onProgress: (progressScan) => {
-              if (
-                gen !== remoteGenRef.current ||
-                !mountedRef.current ||
-                progressScan.selectedPathKind !== 'non_git_folder' ||
-                progressScan.repos.length === 0
-              ) {
-                return
-              }
-              showNestedRepoReview?.(
-                progressScan,
-                trimmedRemotePath,
-                selectedTargetId,
-                attemptId,
-                true,
-                scanId
-              )
-            }
-          })
-      if (!mountedRef.current || gen !== remoteGenRef.current) {
-        return
-      }
-      onNestedScanResult?.(scan ?? null, attemptId)
-      if (scan?.selectedPathKind === 'non_git_folder' && scan.repos.length > 0) {
-        showNestedRepoReview?.(scan, trimmedRemotePath, selectedTargetId, attemptId, false, scanId)
-        setRemoteNestedScanId(null)
-        return
-      }
-      setRemoteNestedScanId(null)
-      const request = { connectionId: selectedTargetId, remotePath: trimmedRemotePath }
-      const addedRepo = serverEnvironmentId
-        ? await addRuntimeSshRepo(serverEnvironmentId, request)
-        : unwrapAddedRepo(await window.api.repos.addRemote(request))
-      const { alreadyPresent, repo } = upsertAddedRepoWithProjectHostSetup(
-        addedRepo,
-        serverEnvironmentId
-          ? { runtimeEnvironmentId: serverEnvironmentId }
-          : { sshConnectionId: selectedTargetId }
-      )
+      const addedRepo = await addRuntimeSshRepo(serverEnvironmentId, {
+        connectionId: selectedTargetId,
+        remotePath: trimmedRemotePath
+      })
+      const { alreadyPresent, repo } = upsertAddedRepoWithProjectHostSetup(addedRepo, {
+        runtimeEnvironmentId: serverEnvironmentId
+      })
 
       if (alreadyPresent) {
         useAppStore.getState().clearOrcaHookTrustForRepo(repo.id)
@@ -256,14 +147,12 @@ export function useRemoteRepo(
       )
       // Why: the repo is already persisted here; if SSH refresh is temporarily
       // non-authoritative, finish onto the project row instead of stranding the dialog.
-      const ownerOptions = serverEnvironmentId
-        ? worktreeRefreshOptions(serverEnvironmentId)
-        : worktreeRefreshOptions(undefined, selectedTargetId)
+      const ownerOptions = worktreeRefreshOptions(serverEnvironmentId)
       await fetchWorktrees(repo.id, ownerOptions)
       if (!mountedRef.current || gen !== remoteGenRef.current) {
         return
       }
-      await onGitRepoReady?.(repo.id, ownerOptions.executionHostId)
+      await onGitRepoReady(repo.id, ownerOptions.executionHostId)
     } catch (err) {
       const message = extractIpcErrorMessage(err, String(err))
       if (message.includes('Not a valid git repository')) {
@@ -274,7 +163,7 @@ export function useRemoteRepo(
         useAppStore.getState().openModal('confirm-non-git-folder', {
           folderPath: trimmedRemotePath,
           connectionId: selectedTargetId,
-          ...(serverEnvironmentId ? { runtimeEnvironmentId: serverEnvironmentId } : {})
+          runtimeEnvironmentId: serverEnvironmentId
         })
         return
       }
@@ -284,16 +173,12 @@ export function useRemoteRepo(
     } finally {
       if (mountedRef.current && gen === remoteGenRef.current) {
         setIsAddingRemote(false)
-        setRemoteNestedScanId(null)
       }
     }
   }, [
     serverEnvironmentId,
     selectedTargetId,
     remotePath,
-    scanNestedRepos,
-    showNestedRepoReview,
-    onNestedScanResult,
     fetchWorktrees,
     mountedRef,
     closeModal,
@@ -306,14 +191,12 @@ export function useRemoteRepo(
     remotePath,
     remoteError,
     isAddingRemote,
-    isScanningNested: Boolean(remoteNestedScanId),
     setSelectedTargetId,
     setRemotePath,
     setRemoteError,
     resetRemoteState,
     handleOpenRemoteStep,
     handleAddRemoteRepo,
-    handleConnectTarget,
-    stopRemoteNestedScan
+    handleConnectTarget
   }
 }

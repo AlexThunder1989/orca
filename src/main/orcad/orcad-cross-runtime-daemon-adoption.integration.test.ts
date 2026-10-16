@@ -4,6 +4,7 @@
  * are installed side by side as `~/.orca-remote/orcad-<version>/`, launched and stopped with
  * the client's own deploy commands, and share one data root.
  */
+import type * as ExecCommandModule from '../ssh/ssh-relay-exec-command'
 import { build } from 'esbuild'
 import {
   copyFileSync,
@@ -59,7 +60,10 @@ import {
 
 // GC runs its real commands, against this machine instead of an SSH host.
 const { execMock } = vi.hoisted(() => ({ execMock: vi.fn() }))
-vi.mock('../ssh/ssh-relay-deploy-helpers', () => ({ execCommand: execMock }))
+vi.mock('../ssh/ssh-relay-exec-command', async (importOriginal) => ({
+  ...(await importOriginal<typeof ExecCommandModule>()),
+  execCommand: execMock
+}))
 
 type Runtime = 'Bun' | 'Node'
 type Slot = { runtime: Runtime; dir: string; version: string }

@@ -57,6 +57,11 @@ export function disposeOrcadManagedTunnels(): void {
   managedTunnels.dispose()
 }
 
+/** Why on quit: a system-ssh tunnel is its own `ssh -L` process and would outlive Orca. */
+export function shutdownOrcadManagedTunnels(): Promise<void> {
+  return managedTunnels.shutdown()
+}
+
 export function recoverOrcadManagedTunnelsAfterHostResume(
   userDataPath: string,
   options: { attempts: number; timeoutMs: number }

@@ -7,6 +7,7 @@ import { agentHookServer } from '../../agent-hooks/server'
 import { ActiveViewPreference } from '../../active-view-preference'
 import { registerPersistedPaneKeyAlias } from '../restoring-sessions/pane-alias-normalization'
 import { normalizePersistedPaneIdentityState } from '../restoring-sessions/workspace-pane-normalization'
+import { nameEmptyPersistedTerminalLayoutRoots } from '../restoring-sessions/empty-terminal-layout-root-repair'
 import { StoreRuntimeState, type StoreRuntimeOptions } from './store-runtime-state'
 import {
   createStoreDomains,
@@ -105,10 +106,13 @@ export class Store {
     } else {
       throw new Error('Store requires an authority or a frozen serialized import')
     }
-    const normalized = normalizePersistedPaneIdentityState(loaded, {
-      registerAliases: !imported,
-      collectUnboundPaneAlias: options.collectUnboundPaneAlias
-    })
+    const normalized = normalizePersistedPaneIdentityState(
+      nameEmptyPersistedTerminalLayoutRoots(loaded),
+      {
+        registerAliases: !imported,
+        collectUnboundPaneAlias: options.collectUnboundPaneAlias
+      }
+    )
     this.state = normalized.state
     this.runtime.state = this.state
     this.runtime.activeViewPreference = new ActiveViewPreference(
@@ -122,6 +126,9 @@ export class Store {
     const sweptRepoIds = this.domains.repos.sweepDeregisteredRepoResidue()
     // Imported snapshots cannot own the live hook server or write their source file.
     if (!imported) {
+      // A committed migration whose blob install failed or was cut short is finished here; shell
+      // history waits for the runtime's post-attach pass, which can see live shells.
+      this.domains.orcadMigrationBlobInstalls.installPendingOrcadMigrationReceivedBlobs()
       for (const entry of initial?.unboundPaneAliases ?? []) {
         agentHookServer.registerPaneKeyAlias(
           entry.legacyPaneKey,

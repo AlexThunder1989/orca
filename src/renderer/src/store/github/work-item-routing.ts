@@ -12,13 +12,14 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import { classifyGitHubUnavailable } from '../../../../shared/github/api-availability'
-import { callRuntimeRpc, RuntimeRpcCallError } from '../../runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
+import { RuntimeRpcCallError } from '../../runtime/runtime-rpc-result'
 import { getHostlessSourceRepoOwnerEnvironmentId } from '@/lib/repo-runtime-owner'
 import {
   runtimeTargetForOwnerEnvironment,
-  runtimeTargetForOwnerHostId,
-  type RuntimeClientTarget
+  ipcOrRuntimeTargetForHostId
 } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { workItemsCacheKey } from './cache-identity'
 import {
   findRepoForGitHubOwner,
@@ -154,7 +155,7 @@ export function getGitHubSourceTarget(
     )
   }
   return (
-    (repo ? runtimeTargetForOwnerHostId(getRepoExecutionHostId(repo)) : null) ?? { kind: 'local' }
+    (repo ? ipcOrRuntimeTargetForHostId(getRepoExecutionHostId(repo)) : null) ?? { kind: 'local' }
   )
 }
 

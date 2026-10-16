@@ -2,6 +2,7 @@ import { globSync, readFileSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { diffEntries, parseEntryBaseline } from './ratchet-baseline.mjs'
 import { collectModuleSpecifiers } from './static-module-specifiers.mjs'
 import { isTestOnlySourcePath } from './test-only-source-path.mjs'
 
@@ -39,7 +40,12 @@ function packageRelativeImport(file, specifier) {
   return path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier))
 }
 
-export function assessProcessHostImports(sources, manifest, baseline) {
+export function assessProcessHostImports(
+  sources,
+  manifest,
+  baseline,
+  specifiersFor = collectModuleSpecifiers
+) {
   const direct = new Set()
   const violations = []
   const dependencies = new Set([
@@ -49,7 +55,7 @@ export function assessProcessHostImports(sources, manifest, baseline) {
   ])
   for (const [file, contents] of sources) {
     const ownSource = file.startsWith(PACKAGE_SOURCE)
-    for (const sourceSpecifier of collectModuleSpecifiers(file, contents)) {
+    for (const sourceSpecifier of specifiersFor(file, contents)) {
       const specifier = normalized(sourceSpecifier)
       const local = packageRelativeImport(file, specifier)
       const selfImport = specifier === PACKAGE_NAME || specifier.startsWith(`${PACKAGE_NAME}/`)
@@ -97,21 +103,11 @@ export function assessProcessHostImports(sources, manifest, baseline) {
       }
     }
   }
-  const current = [...direct].sort()
-  const baselineSet = new Set(baseline)
   return {
-    direct: current,
-    added: current.filter((file) => !baselineSet.has(file)),
-    stale: baseline.filter((file) => !direct.has(file)).sort(),
+    direct: [...direct].sort(),
+    ...diffEntries(direct, baseline),
     violations: violations.sort()
   }
-}
-
-export function readProcessHostBaseline(contents) {
-  return contents
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('#'))
 }
 
 export function collectProcessHostSources(root = ROOT) {
@@ -126,12 +122,12 @@ export function collectProcessHostSources(root = ROOT) {
   )
 }
 
-export function main(root = ROOT) {
+export function main(root = ROOT, sharedSources, specifiersFor = collectModuleSpecifiers) {
   const manifest = JSON.parse(
     readFileSync(path.join(root, PACKAGE_DIRECTORY, 'package.json'), 'utf8')
   )
-  const baseline = readProcessHostBaseline(readFileSync(path.join(root, BASELINE_PATH), 'utf8'))
-  const sources = collectProcessHostSources(root)
+  const baseline = parseEntryBaseline(readFileSync(path.join(root, BASELINE_PATH), 'utf8'))
+  const sources = sharedSources ?? collectProcessHostSources(root)
   if (
     ![...sources.keys()].some(
       (file) => file.startsWith(PACKAGE_SOURCE) && !isTestOnlySourcePath(file)
@@ -139,7 +135,7 @@ export function main(root = ROOT) {
   ) {
     throw new Error(`Missing process-host implementation under ${PACKAGE_SOURCE}`)
   }
-  const result = assessProcessHostImports(sources, manifest, baseline)
+  const result = assessProcessHostImports(sources, manifest, baseline, specifiersFor)
   const failures = [
     ...result.violations,
     ...result.added.map((file) => `${file}: new direct child_process import; use ${PACKAGE_NAME}`),

@@ -1,5 +1,6 @@
 import { execFile as execFileCb } from 'node:child_process'
 import { readlink } from 'node:fs/promises'
+import { LSOF_NONBLOCKING_ARGS } from '../../shared/lsof-nonblocking-args'
 
 /**
  * Resolve the current working directory of a local process by pid.
@@ -128,7 +129,7 @@ function readCwdWithLsof(pid: number): Promise<string> {
     try {
       child = execFileCb(
         'lsof',
-        ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'],
+        [...LSOF_NONBLOCKING_ARGS, '-a', '-p', String(pid), '-d', 'cwd', '-Fn'],
         {
           encoding: 'utf-8',
           timeout: LSOF_TIMEOUT_MS

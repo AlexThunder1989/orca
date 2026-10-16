@@ -12,8 +12,8 @@ import type { Project, ProjectHostSetup } from '../../../../shared/project-types
 import type { Repo } from '../../../../shared/repo-types'
 import { translate } from '@/i18n/i18n'
 import { getProjectGroupHeaderKey } from '../sidebar/worktree-list/grouping/group-keys'
-import { getProjectHeaderRevealTarget } from '../sidebar/worktree-list/grouping/project-grouping'
-import type { ProjectGroupingModel } from '../sidebar/worktree-list/grouping/project-grouping'
+import { getProjectHeaderRevealTarget } from '../../../../shared/project-section-grouping'
+import type { ProjectGroupingModel } from '../../../../shared/project-section-grouping'
 
 export type CmdJProjectGroupResult = {
   id: string

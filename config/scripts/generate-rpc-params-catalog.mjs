@@ -96,7 +96,9 @@ function loadRegistryAndSchemas(modules) {
       format: 'cjs',
       outfile,
       logLevel: 'error',
-      packages: 'external'
+      packages: 'external',
+      // Why: the catalog types every method a build can register, layout-owner-only ones included.
+      define: { ORCA_LAYOUT_OWNER: '"main"' }
     })
     const loaded = createRequire(import.meta.url)(outfile)
     return { methods: loaded.ALL_RPC_METHODS, schemaModules: loaded.SCHEMA_MODULES }

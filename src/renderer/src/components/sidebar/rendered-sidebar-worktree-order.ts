@@ -12,7 +12,7 @@ import { getPinnedWorktreeDisplayPolicy } from './worktree-list/grouping/row-typ
 import { addHostSectionRows, type HostSectionRow } from './host-section-rows'
 import { orderHostSectionOptions } from './host-section-order'
 import { buildSidebarHostOptions } from './sidebar-host-options'
-import { getLogicalRepoOrderRankById } from './project-header-drop'
+import { getLogicalRepoOrderRankById } from '../../../../shared/project-section-order'
 import { getRenderedWorktreesInSidebarOrder } from './worktree-sidebar-row-preference'
 import { selectWorktreeListReviewCacheInputs } from './worktree-list/listing/review-cache-inputs'
 import {
@@ -93,7 +93,8 @@ export function computeRenderedSidebarRows(
     // Why no hostLabelById: it only feeds display-only host context labels, never row order.
     undefined,
     defaultHostId,
-    pinnedDisplayPolicy
+    pinnedDisplayPolicy,
+    state.filterRepoIds
   )
 
   // Why lazy: with no host filter, addHostSectionRows is a pass-through, so skip building the whole host registry on a keystroke.

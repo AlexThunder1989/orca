@@ -156,7 +156,10 @@ export class AcpStructuredTurns {
   private withdrawSteers(): boolean {
     const withdrawn = this.steers.splice(0)
     for (const send of withdrawn) {
-      this.reject(send.clientMessageId, agentSessionFailureFact('cancelled'))
+      this.reject(
+        send.clientMessageId,
+        agentSessionFailureFact('cancelled', { neverReachedAgent: true })
+      )
     }
     return withdrawn.length > 0
   }

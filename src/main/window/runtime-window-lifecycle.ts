@@ -53,14 +53,16 @@ export function registerRuntimeWindowLifecycle(
       worktreeId,
       setup?: CreateWorktreeResult['setup'],
       startup?: WorktreeStartupLaunch,
-      defaultTabs?: CreateWorktreeResult['defaultTabs']
+      defaultTabs?: CreateWorktreeResult['defaultTabs'],
+      providesInitialSurface?: boolean
     ) => {
       send('ui:activateWorktree', {
         repoId,
         worktreeId,
         ...(setup ? { setup } : {}),
         ...(startup ? { startup } : {}),
-        ...(defaultTabs ? { defaultTabs } : {})
+        ...(defaultTabs ? { defaultTabs } : {}),
+        ...(providesInitialSurface ? { providesInitialSurface } : {})
       })
     },
     createTerminal: (worktreeId, opts) =>
@@ -130,6 +132,7 @@ export function registerRuntimeWindowLifecycle(
           activate: opts.activate !== false,
           ...(opts.presentation ? { presentation: opts.presentation } : {}),
           ...(opts.surfaceOwner === false ? { surfaceOwner: false } : {}),
+          ...(opts.agentLaunchViewer ? { agentLaunchViewer: opts.agentLaunchViewer } : {}),
           // Why: pre-minted tabId aligns the renderer tab id with the paneKey baked into the PTY env, so hook events route right.
           ...(opts.tabId !== undefined ? { tabId: opts.tabId } : {}),
           ...(opts.leafId !== undefined ? { leafId: opts.leafId } : {}),
@@ -176,13 +179,14 @@ export function registerRuntimeWindowLifecycle(
       requestSessionTabCloseFromRenderer(mainWindow, tabId, worktreeId),
     moveSessionTab: (worktreeId: string, move: RuntimeMobileSessionTabMove) =>
       send('ui:moveSessionTab', { worktreeId, ...move }),
-    openFile: (worktreeId, filePath, relativePath, runtimeEnvironmentId?, navigation?) =>
+    openFile: (worktreeId, filePath, relativePath, runtimeEnvironmentId?, navigation?, position?) =>
       send('ui:openFileFromMobile', {
         worktreeId,
         filePath,
         relativePath,
         runtimeEnvironmentId,
-        ...(navigation ? { navigation } : {})
+        ...(navigation ? { navigation } : {}),
+        ...(position ? { position } : {})
       }),
     openDiff: (worktreeId, filePath, relativePath, staged, runtimeEnvironmentId?, navigation?) =>
       send('ui:openDiffFromMobile', {

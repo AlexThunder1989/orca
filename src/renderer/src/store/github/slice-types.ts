@@ -26,7 +26,7 @@ import type {
 } from '../../../../shared/github/project-result-types'
 import type { GetProjectViewTableArgs } from '../../../../shared/github/project-request-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type {
   CacheEntry,
   FetchOptions,

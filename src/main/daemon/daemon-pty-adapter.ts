@@ -2,7 +2,8 @@ import { emitPtyListeners, createPtyExitPayload } from './daemon-pty-listener-em
 import { DaemonPtyDaemonRecovery } from './daemon-pty-daemon-recovery'
 import { supportsMode2031UnsubscribeFact, type DaemonEvent } from './types'
 import type { DaemonEndpointIdentity } from './daemon-hello-protocol'
-import type { IPtyProvider } from '../providers/types'
+import type { IPtyProvider } from '../providers/pty-provider-contract'
+import type { DeveloperPermissionStatus } from '../../shared/developer-permissions-types'
 import {
   AUTOMATIC_WORK_RESUME_UNSUPPORTED,
   type AutomaticWorkResumeOutcome,
@@ -11,8 +12,53 @@ import {
 } from '../../shared/host-spawn-admission'
 import { isUnknownRequestTypeError } from './daemon-endpoint-errors'
 import type { AutomaticWorkRequestType } from './daemon-automatic-work-protocol'
+import type { DaemonAsyncIoStatus } from '../../shared/daemon-async-io-health'
 
 export class DaemonPtyAdapter extends DaemonPtyDaemonRecovery implements IPtyProvider {
+  async getAsyncIoHealth(): Promise<DaemonAsyncIoStatus> {
+    if (!this.client.isConnected()) {
+      return { state: 'unverifiable' }
+    }
+    try {
+      const health = await this.client.request<unknown>('asyncIoHealth', undefined, 7_000)
+      if (
+        health &&
+        typeof health === 'object' &&
+        'state' in health &&
+        (health.state === 'healthy' || health.state === 'stalled') &&
+        'pendingMs' in health &&
+        typeof health.pendingMs === 'number' &&
+        Number.isFinite(health.pendingMs) &&
+        health.pendingMs >= 0
+      ) {
+        return { state: health.state, pendingMs: health.pendingMs }
+      }
+    } catch (error) {
+      if (isUnknownRequestTypeError(error)) {
+        return { state: 'unsupported' }
+      }
+    }
+    return { state: 'unverifiable' }
+  }
+
+  async getFullDiskAccessStatus(): Promise<DeveloperPermissionStatus> {
+    if (!this.client.isConnected()) {
+      return 'unknown'
+    }
+    try {
+      const result = await this.client.request<unknown>('fullDiskAccessStatus', undefined, 3000)
+      if (result && typeof result === 'object' && 'status' in result) {
+        const { status } = result
+        if (status === 'granted' || status === 'denied' || status === 'unsupported') {
+          return status
+        }
+      }
+    } catch {
+      // Older daemons and lost host contact cannot establish a permission verdict.
+    }
+    return 'unknown'
+  }
+
   /** Identity of the daemon behind this adapter; null until hello completes or after a disconnect. */
   getDaemonIdentity(): DaemonEndpointIdentity | null {
     return this.client.getDaemonIdentity()

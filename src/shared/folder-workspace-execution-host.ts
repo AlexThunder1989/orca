@@ -17,7 +17,7 @@ import type { ProjectGroup } from './project-group-types'
 import type { Repo } from './repo-types'
 import { isPathInsideOrEqual } from './cross-platform-path'
 import { getProjectGroupSubtreeIds } from './project-groups'
-import { getRepoExecutionHostId, parseExecutionHostId } from './execution-host'
+import { getRepoExecutionHostId, normalizeHostPart, parseExecutionHostId } from './execution-host'
 
 export type FolderWorkspaceHostState = {
   folderWorkspaces: readonly FolderWorkspace[]
@@ -33,11 +33,6 @@ export type FolderWorkspaceHost =
   | { kind: 'runtime'; environmentId: string; sshTargetId: string | null }
   | { kind: 'ambiguous' }
 
-/** Reads a stored connection id: blank is local, since no write path normalizes it. */
-export function normalizeConnectionId(value: string | null | undefined): string | null {
-  return value?.trim() || null
-}
-
 /**
  * The SSH target whose filesystem holds this repo's files, or `null` for anything else.
  *
@@ -52,7 +47,7 @@ export function normalizeConnectionId(value: string | null | undefined): string 
  */
 function getRepoScopeConnectionId(repo: Repo): string | null {
   const host = parseExecutionHostId(getRepoExecutionHostId(repo))
-  return host?.kind === 'ssh' ? host.targetId : normalizeConnectionId(repo.connectionId)
+  return host?.kind === 'ssh' ? host.targetId : normalizeHostPart(repo.connectionId)
 }
 
 function getFolderScopeCandidateRepos(args: {
@@ -105,7 +100,7 @@ export function findFolderWorkspaceCandidateRepos(
   return getFolderScopeCandidateRepos({
     folderPath: workspace.folderPath,
     projectGroupId: workspace.projectGroupId,
-    connectionId: normalizeConnectionId(workspace.connectionId ?? group?.connectionId),
+    connectionId: normalizeHostPart(workspace.connectionId ?? group?.connectionId),
     projectGroups: state.projectGroups,
     repos: state.repos
   })
@@ -120,7 +115,7 @@ export function resolveFolderWorkspaceHost(
     return { kind: 'missing' }
   }
   const readScopeConnectionId = (): string | null =>
-    normalizeConnectionId(
+    normalizeHostPart(
       workspace.connectionId ??
         state.projectGroups.find((entry) => entry.id === workspace.projectGroupId)?.connectionId
     )

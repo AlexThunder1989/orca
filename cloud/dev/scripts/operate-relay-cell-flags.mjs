@@ -119,6 +119,23 @@ export function assertSupportedObject(flags, runtime) {
   }
 }
 
+// A reserve cell's dead-man is fed only by director polls through the load balancer. With SQL
+// readiness the balancer drops the cell in a database outage, the polls fail, and the cell trips
+// (staging drill 2026-10-11), so reserve requires readinessLocal=true in the object it writes.
+export function assertReserveKeepsLocalReadiness(flags, changes) {
+  if ((flags.admitMode ?? 'db') !== 'reserve' || flags.readinessLocal === true) return
+  if ('readinessLocal' in changes && !('admitMode' in changes)) {
+    throw new Error(
+      'readinessLocal must stay true while the cell is reserve; flip it back with admitMode=db first, or in the same write'
+    )
+  }
+  throw new Error(
+    'admitMode=reserve requires readinessLocal=true on the cell, already written or in the same write ' +
+      '(e.g. --set readinessLocal=true,admitMode=reserve): with SQL readiness the load balancer drops the cell ' +
+      "in a database outage and the directors' polls can no longer feed its dead-man"
+  )
+}
+
 // `key=value,key=value`; `key=default` removes the key so the cell uses its default.
 export function parseFlagChanges(text) {
   const changes = {}
@@ -227,7 +244,7 @@ function objectUrl(request, suffix = '') {
 }
 
 // One transient 5xx or network failure is retried once, as every relay admin step does.
-async function readRuntime(fetchImpl, request, idToken, wait) {
+export async function readRuntime(fetchImpl, request, idToken, wait) {
   const response = await fetchAdminOnceMore(
     fetchImpl,
     `${request.cellOrigin}/v1/admin/runtime-status`,
@@ -245,7 +262,7 @@ async function readRuntime(fetchImpl, request, idToken, wait) {
   return await response.json()
 }
 
-async function readCurrentObject(fetchImpl, request, accessToken) {
+export async function readCurrentObject(fetchImpl, request, accessToken) {
   const headers = { authorization: `Bearer ${accessToken}` }
   const metadata = await fetchImpl(objectUrl(request), { headers })
   if (metadata.status === 404) {
@@ -259,6 +276,12 @@ async function readCurrentObject(fetchImpl, request, accessToken) {
   })
   if (!media.ok) throw new Error(`object read returned ${media.status}`)
   return { generation: String(generation), object: await media.json().catch(() => null) }
+}
+
+function generationConflict(current, expected) {
+  return Object.assign(new Error(`current generation is ${current}, not expected ${expected}`), {
+    generationConflict: true
+  })
 }
 
 async function writeObject(fetchImpl, request, object, accessToken, audit) {
@@ -298,7 +321,8 @@ async function writeObject(fetchImpl, request, object, accessToken, audit) {
   if (response.status === 412) {
     await response.body?.cancel().catch(() => undefined)
     throw Object.assign(new Error('the object changed since expected-generation; re-read and retry'), {
-      notWritten: true
+      notWritten: true,
+      generationConflict: true
     })
   }
   if (!response.ok) {
@@ -392,7 +416,7 @@ async function breakGlassToDatabase(request, dependencies, { fetchImpl, log, sle
   }
   const current = await readCurrentObject(fetchImpl, request, accessToken)
   if (current.generation !== request.expectedGeneration) {
-    throw new Error(`current generation is ${current.generation}, not expected ${request.expectedGeneration}`)
+    throw generationConflict(current.generation, request.expectedGeneration)
   }
   const object = desiredObject(request, current.object)
   const generation = await writeObject(fetchImpl, request, object, accessToken, audit)
@@ -428,6 +452,7 @@ export async function operateCellFlags(request, dependencies) {
         'Name admitMode=db in the same write, e.g. --set admitMode=db,reregisterInFlight=N'
     )
   }
+  assertReserveKeepsLocalReadiness(object.flags, request.changes)
   const plan = {
     event: 'orca_relay_cell_flags_plan',
     mode: request.mode,
@@ -441,9 +466,7 @@ export async function operateCellFlags(request, dependencies) {
   // Before the generation check, so a dry run always shows the generation to pass next.
   log(JSON.stringify(plan))
   if (current.generation !== request.expectedGeneration) {
-    throw new Error(
-      `current generation is ${current.generation}, not expected ${request.expectedGeneration}`
-    )
+    throw generationConflict(current.generation, request.expectedGeneration)
   }
   // The cell applies every readable write; a generation it did not apply was voided there. A
   // write of an object this image accepts whole (checked above) repairs it.

@@ -1,6 +1,7 @@
 import {
   CLAUDE_MODEL_LIST_ARGS,
-  CLAUDE_MODEL_LIST_STDIN
+  CLAUDE_MODEL_LIST_STDIN,
+  parseClaudeModelList
 } from '../../shared/claude-model-list-probe'
 import { requireLegacyAgentSessionAccountHome } from '../../shared/agent-session-account-home'
 import { parseClaudeModels } from '../../shared/commit-message-model-parsers'
@@ -8,8 +9,9 @@ import { AgentModelCatalogUnavailableError } from '../native-chat/agent-model-ca
 import { claudeConfigDirEnvPatch } from './claude-config-dir-pin'
 import {
   resolveClaudeStructuredInvocation,
-  type ClaudeStructuredLaunchResolverDeps
+  type ClaudeStructuredLaunchPartDeps
 } from './claude-structured-launch-resolution'
+import type { ClaudeEnvDeps } from './claude-structured-child-env'
 import type {
   AgentModelCatalogProbe,
   AgentModelCatalogSuccess
@@ -19,13 +21,11 @@ import {
   runAgentModelCatalogListing
 } from '../native-chat/agent-model-catalog/agent-model-catalog-probe-runner'
 
-export type ClaudeModelCatalogProbeDeps = Pick<
-  ClaudeStructuredLaunchResolverDeps,
-  'resolveCommand' | 'resolveEnv' | 'resolveInheritedEnv' | 'resolveAuthPolicy'
-> & {
-  /** Test seam; production runs the shared supervised listing. */
-  runListing?: typeof runAgentModelCatalogListing
-}
+export type ClaudeModelCatalogProbeDeps = ClaudeEnvDeps &
+  Pick<ClaudeStructuredLaunchPartDeps, 'resolveAuthPolicy'> & {
+    /** Test seam; production runs the shared supervised listing. */
+    runListing?: typeof runAgentModelCatalogListing
+  }
 
 /**
  * Lists models without a live session: one `list_models` control request, under the SAME binary
@@ -58,12 +58,16 @@ export function createClaudeModelCatalogProbe(
     if (listed.length === 0) {
       throw new Error('claude listed no models')
     }
+    // Only the catalog marks the CLI default; the commit-message parse keeps its own default.
+    const runsDefault = new Set(
+      parseClaudeModelList(stdout).flatMap((model) => (model.isDefault ? [model.id] : []))
+    )
     return {
       models: listed.map((model) => ({
         id: model.id,
         label: model.label,
         ...(model.description ? { description: model.description } : {}),
-        isDefault: model.isDefault === true,
+        isDefault: runsDefault.has(model.id),
         // No defaultEffort: the parser's thinking default is the commit-message generator's
         // choice, not the effort Claude runs; the store keeps the one a live child reported.
         efforts: (model.thinkingLevels ?? []).map((level) => ({
@@ -72,6 +76,9 @@ export function createClaudeModelCatalogProbe(
         })),
         ...(model.supportsFastMode !== undefined
           ? { supportsFastMode: model.supportsFastMode }
+          : {}),
+        ...(model.supportsAutoMode !== undefined
+          ? { supportsAutoMode: model.supportsAutoMode }
           : {})
       })),
       origin: 'probe'

@@ -1,3 +1,8 @@
+import { withWorkspaceRoute } from '../../../../../src/navigation/workspace-route'
+import {
+  useWorkspaceExecutionHost,
+  workspaceRouteParams
+} from '../../../../../src/navigation/workspace-execution-host'
 import { useLocalSearchParams } from 'expo-router'
 import { MobileFilePreviewScreen } from '../../../../../src/files/MobileFilePreviewScreen'
 import {
@@ -22,7 +27,7 @@ import { shellSwitchDecision } from '../../../../../src/mobile-web-shell/shell-s
  * them — is a param, which is what keeps a `/`, a space or a `..` out of the segment vocabulary the
  * bridge holds a route to.
  */
-export default function MobileFilePreviewRoute() {
+export default withWorkspaceRoute(function MobileFilePreviewRoute() {
   const params = useLocalSearchParams<{
     hostId?: string | string[]
     worktreeId?: string | string[]
@@ -42,13 +47,17 @@ export default function MobileFilePreviewRoute() {
   }>()
   const route = normalizeMobileFilePreviewRouteParams(params)
   const native = <MobileFilePreviewScreen route={route} />
+  const executionHost = useWorkspaceExecutionHost()
 
   const shellRoute = route.ok
     ? shellScreenRoute({
         pathname: `/h/${encodeURIComponent(route.params.hostId)}/files/preview/${encodeURIComponent(
           route.params.worktreeId
         )}`,
-        params: mobileFilePreviewShellParams(route.params)
+        params: {
+          ...mobileFilePreviewShellParams(route.params),
+          ...workspaceRouteParams(executionHost)
+        }
       })
     : null
 
@@ -72,4 +81,4 @@ export default function MobileFilePreviewRoute() {
       fallback={native}
     />
   )
-}
+})

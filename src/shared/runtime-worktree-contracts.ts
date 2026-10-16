@@ -9,6 +9,13 @@ import type {
 } from './worktree/lineage-types'
 import type { RuntimeListingHostScope } from './runtime-listing-host-scope'
 import type { GitWorktreeInfo, Worktree } from './worktree/types'
+import type { WorkspaceStatusWarning } from './workspace-status-warning'
+
+export type RuntimeWorktreeSetResult = {
+  worktree: RuntimeWorktreeRecord
+  /** Older hosts omit warnings; metadata writes still succeed. */
+  warnings?: WorkspaceStatusWarning[]
+}
 
 export type RuntimeWorktreeAgentRow = {
   paneKey: string
@@ -86,6 +93,16 @@ export type RuntimeWorktreePsSummary = {
   removing?: true
   /** See `GitWorktreeInfo.removalError`. */
   removalError?: string
+  /** Workspace options row facts, from the host's own predicates (workspace-kinds). Older hosts
+   *  send none. `defaultBranch` is always sent by newer hosts; absent, a reader keeps its own
+   *  guess. The others are sent only when true; absent reads "not that kind", so the row shows. */
+  defaultBranch?: boolean
+  automationCreated?: true
+  cliCreated?: true
+  detachedHead?: true
+  /** This host calls the row another client's ("Hide other-client workspaces"); sent only to its
+   *  own phone, which applies the filter value it shares with this host. */
+  desktopOtherClient?: true
 }
 
 export type RuntimeGitLocalBranches = {

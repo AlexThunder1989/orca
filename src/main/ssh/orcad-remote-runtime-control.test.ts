@@ -1,12 +1,14 @@
+import type * as ExecCommandModule from './ssh-relay-exec-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('./ssh-relay-deploy-helpers', () => ({
+vi.mock('./ssh-relay-exec-command', async (importOriginal) => ({
+  ...(await importOriginal<typeof ExecCommandModule>()),
   execCommand: vi.fn(),
   isUnconfirmedSshCommandTermination: (error: unknown) =>
     error instanceof Error && error.message === 'unconfirmed'
 }))
 
-import { execCommand } from './ssh-relay-deploy-helpers'
+import { execCommand } from './ssh-relay-exec-command'
 import { launchOrcadAndAwaitReadiness } from './orcad-remote-runtime-control'
 import { getRemoteHostPlatform } from './ssh-remote-platform'
 import type { OrcadLaunchSpec } from './orcad-remote-launch'

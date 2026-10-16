@@ -2,7 +2,7 @@ import { parseExecutionHostId } from '../../../shared/execution-host'
 import type { Worktree } from '../../../shared/worktree/types'
 import { getResolvedExecutionHostIdForWorktree } from './resolved-worktree-execution-host'
 import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
-import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner-state'
 import {
   resolveStrictWorktreeOperationRouteResultForHost,
   type WorktreeOperationRouteState

@@ -1,8 +1,6 @@
 import type { RuntimeTerminalListResult } from '../../../shared/runtime-types'
-import {
-  runtimeTargetForOwnerEnvironment,
-  type RuntimeClientTarget
-} from '@/runtime/runtime-client-target'
+import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { toHostSessionTabId } from '../../../shared/terminal-surface-id'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
@@ -10,10 +8,8 @@ import {
 } from '../../../shared/agent-status-types'
 import type { AppState } from '@/store/types'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
-import {
-  getRuntimeEnvironmentIdForWorktree,
-  type WorktreeRuntimeOwnerState
-} from '@/lib/worktree-runtime-owner'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from '@/lib/worktree-runtime-owner-state'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import { isTerminalLeafId, makePaneKey } from '../../../shared/stable-pane-id'
 import type { TerminalLayoutSnapshot } from '../../../shared/terminal-tab-types'

@@ -14,7 +14,10 @@ import {
   getExecutionHostIdFromWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
 import { getProjectGroupHeaderKey } from '../grouping/group-keys'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
 import { getFolderWorkspaceLaneKey } from '../grouping/folder-workspace-lanes'
 import type { WorktreeGroupBy } from '../grouping/row-types'
 import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
@@ -88,14 +91,26 @@ export function getFolderWorkspaceRevealGroupKeys(
     workspaceStatuses?: readonly WorkspaceStatusDefinition[]
     defaultHostId?: ExecutionHostId
     hostScopedGroups?: boolean
+    executionHostId?: ExecutionHostId
   }
 ): string[] {
-  const folderWorkspace = findFolderWorkspaceByKey(worktreeId, folderWorkspaces)
+  const folderWorkspace = findFolderWorkspaceByKey(
+    worktreeId,
+    folderWorkspaces,
+    options?.executionHostId
+  )
   if (!folderWorkspace) {
     return []
   }
 
-  const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
+  const groupsById = new Map(
+    projectGroups
+      .filter(
+        (group) =>
+          !options?.executionHostId || getRepoExecutionHostId(group) === options.executionHostId
+      )
+      .map((group) => [group.id, group])
+  )
   const keys: string[] = []
   const seen = new Set<string>()
   let groupId: string | null = folderWorkspace.projectGroupId

@@ -10,7 +10,7 @@ import {
 import { useAppStore } from '@/store'
 import {
   getLocalPathOpenOwnerForRoute,
-  isLocalPathOpenBlocked,
+  isRevealOrEditorOpenBlocked,
   showLocalPathOpenBlockedToast
 } from '@/lib/local-path-open-guard'
 import { getLocalFileManagerLabel } from '@/lib/local-file-manager-label'
@@ -61,7 +61,7 @@ export function getOpenInEntryAvailability(
   ownerUnresolved?: boolean
 ): { disabled: boolean; metadata?: string } {
   if (entry.target === 'file-manager') {
-    const disabled = isLocalPathOpenBlocked(
+    const disabled = isRevealOrEditorOpenBlocked(
       getLocalPathOpenOwnerForRoute({ connectionId, runtimeEnvironmentId, ownerUnresolved })
     )
     return disabled
@@ -81,6 +81,12 @@ export function getOpenInEntryAvailability(
     return {
       disabled: true,
       metadata: translate('auto.components.sidebar.WorktreeOpenInMenu.localOnly', 'Local only')
+    }
+  }
+  if (capability.wsl) {
+    return {
+      disabled: false,
+      metadata: translate('auto.components.sidebar.WorktreeOpenInMenu.wsl', 'WSL')
     }
   }
   return capability.remote
@@ -119,7 +125,7 @@ export async function openWorktreePath(args: {
     ownerUnresolved: args.ownerUnresolved
   })
   if (args.target === 'file-manager') {
-    if (isLocalPathOpenBlocked(owner)) {
+    if (isRevealOrEditorOpenBlocked(owner)) {
       showLocalPathOpenBlockedToast()
       return
     }

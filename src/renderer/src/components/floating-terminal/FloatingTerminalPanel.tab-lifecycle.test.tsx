@@ -41,6 +41,25 @@ vi.mock('@/store', async () => {
   return (await import('./floating-terminal-panel-test-module-mocks')).createAppStoreModule()
 })
 
+// The probe checks element names and props without mounting these workspace children.
+vi.mock('@/components/tab-group/WorkspaceTabDragLayer', async () => {
+  return (
+    await import('./floating-terminal-panel-component-stubs')
+  ).createWorkspaceTabDragLayerModule()
+})
+
+vi.mock('@/components/tab-group/TabGroupSplitNodeTree', async () => {
+  return (
+    await import('./floating-terminal-panel-component-stubs')
+  ).createTabGroupSplitNodeTreeModule()
+})
+
+vi.mock('@/components/WorkspacePaneOverlayLayers', async () => {
+  return (
+    await import('./floating-terminal-panel-component-stubs')
+  ).createWorkspacePaneOverlayLayersModule()
+})
+
 vi.mock('@/components/tab-bar/TabBar', async () => {
   return (await import('./floating-terminal-panel-component-stubs')).createTabBarModule()
 })
@@ -107,10 +126,28 @@ vi.mock('@/components/terminal/useTerminalSaveDialog', async () => {
   ).createTerminalSaveDialogModule()
 })
 
-vi.mock('@/runtime/web-runtime-session', async () => {
+vi.mock('@/runtime/web-runtime-session-tab-lifecycle', async () => {
   return (
     await import('./floating-terminal-panel-test-module-mocks')
-  ).createWebRuntimeSessionModule()
+  ).createWebRuntimeTabLifecycleModule()
+})
+
+vi.mock('@/runtime/web-runtime-browser-creation', async () => {
+  return (
+    await import('./floating-terminal-panel-test-module-mocks')
+  ).createWebRuntimeBrowserCreationModule()
+})
+
+vi.mock('@/runtime/web-runtime-terminal-creation', async () => {
+  return (
+    await import('./floating-terminal-panel-test-module-mocks')
+  ).createWebRuntimeTerminalCreationModule()
+})
+
+vi.mock('@/runtime/web-runtime-session-environment', async () => {
+  return (
+    await import('./floating-terminal-panel-test-module-mocks')
+  ).createWebRuntimeSessionEnvironmentModule()
 })
 
 vi.mock('@/lib/connection-context', async () => {
@@ -184,10 +221,11 @@ describe('FloatingTerminalPanel close behavior', () => {
     expect(mocks.createTab).toHaveBeenCalledWith(
       FLOATING_TERMINAL_WORKTREE_ID,
       'floating-group',
-      undefined
+      undefined,
+      { id: expect.any(String) }
     )
     expect(mocks.activateTab).not.toHaveBeenCalled()
-    expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('created-tab')
+    expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith(mocks.createTab.mock.calls[0][3]?.id)
   })
 
   it('keeps floating browser create and duplicate local during active web runtime sessions', async () => {
@@ -470,10 +508,11 @@ describe('FloatingTerminalPanel close behavior', () => {
     expect(mocks.createTab).toHaveBeenCalledWith(
       FLOATING_TERMINAL_WORKTREE_ID,
       'floating-group',
-      undefined
+      undefined,
+      { id: expect.any(String) }
     )
     expect(mocks.activateTab).not.toHaveBeenCalled()
-    expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith('created-tab')
+    expect(mocks.focusTerminalTabSurface).toHaveBeenCalledWith(mocks.createTab.mock.calls[0][3]?.id)
 
     ;(tabBar.props.onClose as (tabId: string) => void)('tab-1')
     expect(mocks.closeWebRuntimeSessionTab).not.toHaveBeenCalled()

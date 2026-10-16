@@ -68,6 +68,11 @@ export class ReservePlacer {
     return cell.seats + cell.bookings + this.ownBookingsSince(cell)
   }
 
+  // Estimated free seats under the ceiling; 0 when the cell reports none.
+  free(cell: PlacementCell): number {
+    return cell.ceiling === undefined ? 0 : Math.max(0, cell.ceiling - this.load(cell))
+  }
+
   hasSeat(cell: PlacementCell): boolean {
     return cell.ceiling !== undefined && this.load(cell) < cell.ceiling
   }
@@ -158,7 +163,7 @@ export class ReservePlacer {
       if (cell.region !== region || !cell.general || cell.draining) continue
       if (cell.reserve) {
         if (this.isCandidate(cell, region, now)) {
-          reserveFree += Math.max(0, cell.ceiling! - this.load(cell))
+          reserveFree += this.free(cell)
         }
         continue
       }

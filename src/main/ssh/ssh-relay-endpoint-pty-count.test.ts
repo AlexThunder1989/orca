@@ -7,7 +7,7 @@ const { waitForSentinel, request, dispose } = vi.hoisted(() => ({
   dispose: vi.fn()
 }))
 
-vi.mock('./ssh-relay-deploy-helpers', () => ({ waitForSentinel }))
+vi.mock('./ssh-relay-sentinel', () => ({ waitForSentinel }))
 vi.mock('./ssh-channel-multiplexer', () => ({
   SshChannelMultiplexer: class {
     request = request

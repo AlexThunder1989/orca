@@ -31,16 +31,11 @@ import { resolveDispatchAssigneeParty } from '../../../../orchestration/orchestr
 import { CHAT_WORKER_AUTHORITY, chatAssigneeOf, chatWorkerMode } from '../chat-assignee-admission'
 import { recordCreatedWorkerTerminalCustody } from './created-worker-terminal-custody'
 import { tearDownFailedWorkerStart } from './failed-worker-start-teardown'
+import { releaseRetriedWorkerTerminal } from './retried-worker-terminal-release'
 import { requireWorkerAuthority, type WorkerEffect } from './worker-topology'
 import { prepareLocalWorkerStart } from './worker-start-validation'
 import { deliverAndSettleWorkerStartReadiness } from './worker-start-readiness-settlement'
-
-type WorkerStartMutation = {
-  callerFingerprint: string
-  requestId: string
-  method: string
-  payloadHash: string
-}
+import type { WorkerStartMutation } from './worker-start-mutation'
 
 export async function startLocalWorker(args: {
   params: WorkerStartInput
@@ -54,8 +49,7 @@ export async function startLocalWorker(args: {
   /** Settings-driven; the executing host still gets to refuse below. */
   mode: WorkerStartModeReceipt
 }): Promise<unknown> {
-  const { runtime, db, run, coordinator, callerSession, existingTask } = args
-  const { orchestrationMutation } = args
+  const { runtime, db, run, coordinator, callerSession, existingTask, orchestrationMutation } = args
   // `--terminal` names a party: a chat by its `/clear` root address, as its Dispatch does.
   const terminal = args.params.terminal && resolveDispatchAssigneeParty(args.params.terminal, db)
   const params = terminal ? { ...args.params, terminal: terminal.address } : args.params
@@ -114,11 +108,12 @@ export async function startLocalWorker(args: {
       existingPlacement: 'current or an exact existing folder workspace'
     })
   }
-  let resolvedWorktree = creationWorktree
-    ? undefined
-    : requestedWorktree === 'current'
-      ? await runtime.showManagedTerminalWorkspace(`id:${coordinatorWorktreeId}`)
-      : await runtime.showManagedTerminalWorkspace(requestedWorktree)
+  let resolvedWorktree: Awaited<ReturnType<typeof placeWorkerAgent>>['worktree'] | undefined =
+    creationWorktree
+      ? undefined
+      : requestedWorktree === 'current'
+        ? await runtime.showManagedTerminalWorkspace(`id:${coordinatorWorktreeId}`)
+        : await runtime.showManagedTerminalWorkspace(requestedWorktree)
   if (terminal) {
     await assertExplicitWorkerUsable({
       runtime,
@@ -171,6 +166,7 @@ export async function startLocalWorker(args: {
     runtimeEpoch: runtime.getRuntimeId(),
     mutationReceipt: orchestrationMutation
   })
+  releaseRetriedWorkerTerminal(runtime, db, params)
   const effects: WorkerEffect[] = []
   const task = started.task
   if (resolvedWorktree) {

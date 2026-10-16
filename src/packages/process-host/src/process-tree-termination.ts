@@ -4,6 +4,8 @@ import { windowsSystem32Binary } from './windows-system-binary'
 
 const PROBE_INTERVAL_MS = 25
 const SUBPROCESS_TIMEOUT_MS = 2_000
+// Allow the same taskkill startup budget as the other Windows tree-cleanup paths.
+const WINDOWS_TASKKILL_TIMEOUT_MS = 5_000
 const MAX_PS_OUTPUT_BYTES = 8 * 1024 * 1024
 
 /**
@@ -131,7 +133,7 @@ function taskkillTree(
     const timer = setTimeout(() => {
       killer.kill()
       finish(true)
-    }, SUBPROCESS_TIMEOUT_MS)
+    }, WINDOWS_TASKKILL_TIMEOUT_MS)
     timer.unref?.()
   })
 }

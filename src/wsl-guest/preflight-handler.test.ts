@@ -40,28 +40,20 @@ import {
   PreflightHandler
 } from './preflight-handler'
 
-function lookupArgs(command: string, mode: '-lc' | '-ilc' = '-lc'): string[] {
+function shLookupScript(command: string): string {
   return [
-    mode,
-    [
-      buildPosixCommandPathLookupScript({ kind: 'literal', value: command }),
-      'if [ -n "$resolved" ]; then',
-      'printf \'__ORCA_AGENT_PATH__%s\\n\' "$resolved"',
-      'fi'
-    ].join('\n')
-  ]
+    buildPosixCommandPathLookupScript(
+      { kind: 'literal', value: command },
+      { skipWindowsMountDirs: true }
+    ),
+    'if [ -n "$resolved" ]; then',
+    'printf \'__ORCA_AGENT_PATH__%s\\n\' "$resolved"',
+    'fi'
+  ].join('\n')
 }
 
-function fishLookupArgs(command: string): string[] {
-  return [
-    '-ilc',
-    [
-      `set -l resolved (command -v ${command} 2>/dev/null)`,
-      'if test -n "$resolved"',
-      'printf \'__ORCA_AGENT_PATH__%s\\n\' "$resolved"',
-      'end'
-    ].join('\n')
-  ]
+function lookupArgs(command: string, mode: '-lc' | '-ilc' = '-lc'): string[] {
+  return [mode, shLookupScript(command)]
 }
 
 beforeEach(() => {
@@ -102,10 +94,18 @@ describe('buildCommandLookupSpecs', () => {
     })
   })
 
-  it('uses fish syntax for trusted fish shells', () => {
+  it('skips Windows-mounted PATH dirs so a Windows-only shim is not a guest install', () => {
+    const [shellSpec] = buildCommandLookupSpecs('codex', 'linux', { SHELL: '/bin/bash' }, null)
+    expect(shellSpec.args[1]).toContain('/proc/mounts')
+    expect(shellSpec.args[1]).toBe(shLookupScript('codex'))
+  })
+
+  it('runs the POSIX lookup under the fish login PATH for trusted fish shells', () => {
+    const script = shLookupScript('codex')
+    const fishQuoted = `'${script.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
     expect(buildCommandLookupSpecs('codex', 'linux', { SHELL: '/usr/bin/fish' }, null)[0]).toEqual({
       file: '/usr/bin/fish',
-      args: fishLookupArgs("'codex'")
+      args: ['-ilc', `exec /bin/sh -c ${fishQuoted}`]
     })
   })
 

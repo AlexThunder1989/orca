@@ -62,6 +62,7 @@ const WORKER_THREAD_ENTRY_NAMES = [
   'foreign-sqlite-reader-entry',
   'main-thread-hang-watchdog-entry',
   'port-scan-command-worker-entry',
+  'worker-thread-child-process-entry',
   'usage-scan-worker-entry',
   'claude-profile-setup-worker-entry',
   'profile-state-backup-worker-entry',

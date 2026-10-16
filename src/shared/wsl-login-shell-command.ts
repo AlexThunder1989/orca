@@ -17,9 +17,15 @@ export function quotePosixShell(value: string): string {
  */
 export function buildWslExecArgs(
   distro: string | undefined,
-  shellArgs: readonly string[]
+  shellArgs: readonly string[],
+  options: { user?: string } = {}
 ): string[] {
-  return [...(distro ? ['-d', distro] : []), '--exec', ...shellArgs]
+  return [
+    ...(distro ? ['-d', distro] : []),
+    ...(options.user ? ['-u', options.user] : []),
+    '--exec',
+    ...shellArgs
+  ]
 }
 
 export function buildWslLoginShellCommand(command: string): string {

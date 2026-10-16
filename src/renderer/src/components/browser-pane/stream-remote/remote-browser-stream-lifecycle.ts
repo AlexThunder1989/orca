@@ -1,4 +1,4 @@
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
 import type { RuntimeStatus } from '../../../../../shared/runtime-types'
 import { RemoteBrowserPageSession } from './remote-browser-page-session'
 import { openRemoteBrowserScreencastStream } from './remote-browser-screencast-subscription'

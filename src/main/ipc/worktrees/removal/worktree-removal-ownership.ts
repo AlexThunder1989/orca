@@ -1,5 +1,6 @@
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
-import { getLocalPtyProvider, clearProviderPtyState } from '../../pty'
+import { getLocalPtyProvider } from '../../pty/provider/registry'
+import { clearProviderPtyState } from '../../pty/provider/state-cleanup'
 import { killAllProcessesForWorktree } from '../../../runtime/worktree-teardown'
 import type { Store } from '../../../persistence/loading-store/store'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'

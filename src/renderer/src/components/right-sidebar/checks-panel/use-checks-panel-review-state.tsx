@@ -28,7 +28,7 @@ import {
   resolveSourceControlAiForOperation,
   resolveSourceControlAiPrCreationDefaults
 } from '../../../../../shared/source-control-ai'
-import { getRuntimeGitScope } from '@/runtime/runtime-git-client'
+import { getRuntimeGitScope } from '@/runtime/runtime-git-client-context'
 import type { ChecksPanelReviewStateInput } from './review-state-dependencies'
 
 export function useChecksPanelReviewState(model: ChecksPanelReviewStateInput) {

@@ -31,8 +31,7 @@ type Status = SshConnectionState['managedServer']
 const offer: Status = {
   kind: 'relay',
   reason: 'relay_terminals_live',
-  terminals: 3,
-  offerMove: true
+  terminals: 3
 }
 const moveToManagedServer = vi.fn()
 

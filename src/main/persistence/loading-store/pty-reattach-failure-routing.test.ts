@@ -8,7 +8,6 @@ import { createRuntimePtySpawnState } from '../../ipc/pty/runtime/spawn-state'
 import { createPtySpawnCommitDependencies } from './pty-spawn-commit-dependencies-fixture'
 import { clearProviderPtyState } from '../../ipc/pty/provider/state-cleanup'
 import { ptyIncarnationById, ptyOwnership } from '../../ipc/pty/provider/ownership-state'
-import { toSshExecutionHostId } from '../../../shared/execution-host'
 
 vi.mock('../../telemetry/client', () => ({ track: vi.fn() }))
 vi.mock('../../telemetry/cohort-classifier', () => ({
@@ -19,12 +18,12 @@ vi.mock('../../ssh/ssh-config-parser', () => ({
   sshConfigHostsToTargets: () => []
 }))
 
-const connectionId = 'reattach-host'
+const connectionId = null
 const binding = {
   worktreeId: 'repo-local::/fixture/local',
   tabId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   leafId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-  ptyId: 'ssh:reattach-host@@surviving-pty'
+  ptyId: 'surviving-pty'
 }
 const incarnation = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 const successorIncarnation = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
@@ -86,20 +85,14 @@ describe.each(['ipc', 'runtime'])('%s failed reattach routing', (controller) => 
         await runtime.onPtyExit(binding.ptyId, 0, incarnationId, { providerExitObserved: true })
         if (outcome === 'replaced') {
           runtime.onPtySpawned(binding.ptyId, successorIncarnation)
-          ptyOwnership.set(binding.ptyId, 'ssh:successor-host')
+          ptyOwnership.set(binding.ptyId, 'local')
           ptyIncarnationById.set(binding.ptyId, successorIncarnation)
         }
       }
       gate.finish.reject(new Error('disk full'))
       await pending
-      expect(ownerWhileSaving).toBe(`ssh:${connectionId}`)
-      expect(ptyOwnership.get(binding.ptyId)).toBe(
-        outcome === 'live'
-          ? `ssh:${connectionId}`
-          : outcome === 'replaced'
-            ? 'ssh:successor-host'
-            : undefined
-      )
+      expect(ownerWhileSaving).toBe('local')
+      expect(ptyOwnership.get(binding.ptyId)).toBe(outcome === 'exited' ? undefined : 'local')
       expect(ptyIncarnationById.get(binding.ptyId)).toBe(
         outcome === 'live'
           ? incarnationId
@@ -109,8 +102,7 @@ describe.each(['ipc', 'runtime'])('%s failed reattach routing', (controller) => 
       )
       expect(shutdown).not.toHaveBeenCalled()
       expect(publish).not.toHaveBeenCalled()
-      expect(store.getSshRemotePtyLeases(connectionId)).toEqual([])
-      const session = readState().workspaceSessionsByHostId[toSshExecutionHostId(connectionId)]
+      const session = readState().workspaceSession
       expect(
         session?.terminalLayoutsByTabId[binding.tabId]?.ptyIdsByLeafId?.[binding.leafId]
       ).toBeUndefined()

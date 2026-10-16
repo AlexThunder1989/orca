@@ -40,7 +40,12 @@ export type ResolveDispatchInput = {
   (
     | { state: 'accepted'; providerIdentity: AgentJournalItemIdentity | null }
     /** The turn the message is handed into — the live root turn, or `thread` when none runs. */
-    | { state: 'pending'; turnScope: AgentJournalTurnScope }
+    | {
+        state: 'pending'
+        turnScope: AgentJournalTurnScope
+        /** The stopped messages this send carries as history (`JournalDispatchRow.carries`). */
+        carries?: readonly string[]
+      }
     /** `reason` is what released clients print, `rejection` what newer ones read: both from
      *  `agentSessionFailureWords`, never written by hand. */
     | ({
@@ -59,6 +64,9 @@ export type JournalAppendResult = {
 
 export type JournalItemAppendOptions = AgentJournalRowAttribution & {
   fence: number
+  /** The generation whose execution produced the item: set by a provider's observation, and by
+   *  nothing else. Host bookkeeping leaves it out and keeps the item's (`journalItemOwnerFence`). */
+  ownerFence?: number
   observedAt?: number
   recovered?: true
 }
@@ -76,6 +84,9 @@ export type JournalLifecycleBatchInput = {
   settlementId: string
   mutations: readonly JournalLifecycleMutationInput[]
   fence: number
+  /** A provider's own batch: the generation that produced every item it writes
+   *  (`JournalItemAppendOptions.ownerFence`). */
+  ownerFence?: number
   recovered?: true
   /** Submission verdicts belonging to this settlement, committed before its item rows. */
   dispatches?: readonly ResolveDispatchInput[]
@@ -106,6 +117,8 @@ export type JournalSubmissionInput = {
   origin?: 'client' | 'host'
   /** Who it is from (`JournalSubmissionRow.source`); the row keeps the kind only. */
   source?: Pick<AgentSessionMessageSource, 'kind'>
+  /** The model and effort it runs on (`JournalSubmissionRow.options`). */
+  options?: Readonly<Record<string, string>>
 }
 
 /** A submission append that converts a queued draft, in one transaction. */

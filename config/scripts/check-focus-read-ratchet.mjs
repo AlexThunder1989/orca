@@ -1,8 +1,14 @@
-import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import {
+  diffCounts,
+  parseCountBaseline,
+  pruneCountBaseline,
+  readTrackedSources,
+  totalCount
+} from './ratchet-baseline.mjs'
 
 // Ratchet for renderer code that routes host-owned work by the "Active Server" setting instead of
 // by the resource's own host. Per file it counts every read of the setting plus every call of an
@@ -349,79 +355,7 @@ const ADVICE =
   "Route by the resource's owner. Only a creation flow with no source row may use defaultCreationHost."
 
 export function isScannedPath(rel) {
-  return /\.(ts|tsx)$/.test(rel) && !/\.(test|spec)\.tsx?$/.test(rel)
-}
-
-/** `<count> <path> [# note]` lines; `#` comment lines and blanks ignored. */
-export function parseBaseline(text) {
-  const counts = new Map()
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (!line || line.startsWith('#')) {
-      continue
-    }
-    const [count, file] = line.split(/\s+/, 2)
-    counts.set(file, Number(count))
-  }
-  return counts
-}
-
-/** Trailing `# note` per row, so a pruned baseline keeps why an entry is still allowed. */
-export function parseBaselineNotes(text) {
-  const notes = new Map()
-  for (const raw of text.split('\n')) {
-    const match = /^\s*\d+\s+(\S+)\s+#\s*(.+?)\s*$/.exec(raw)
-    if (match) {
-      notes.set(match[1], match[2])
-    }
-  }
-  return notes
-}
-
-export function formatBaseline(counts, header = BASELINE_HEADER, notes = new Map()) {
-  const rows = [...counts]
-    .filter(([, count]) => count > 0)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([file, count]) =>
-      notes.has(file) ? `${count} ${file} # ${notes.get(file)}` : `${count} ${file}`
-    )
-  return `${[...header, ''].join('\n')}${rows.join('\n')}${rows.length > 0 ? '\n' : ''}`
-}
-
-/** `grown`: above baseline (fails). `shrunk`: below baseline, must be pruned so it cannot regrow. */
-export function diffCounts(current, baseline) {
-  const grown = []
-  const shrunk = []
-  for (const file of new Set([...current.keys(), ...baseline.keys()])) {
-    const now = current.get(file) ?? 0
-    const allowed = baseline.get(file) ?? 0
-    if (now > allowed) {
-      grown.push({ file, now, allowed })
-    } else if (now < allowed) {
-      shrunk.push({ file, now, allowed })
-    }
-  }
-  const byFile = (a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0)
-  return { grown: grown.sort(byFile), shrunk: shrunk.sort(byFile) }
-}
-
-function readTrackedSources(root, scanRoot) {
-  const tracked = execFileSync('git', ['ls-files', scanRoot], {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024
-  })
-    .split('\n')
-    .filter((rel) => rel && isScannedPath(rel))
-  const sources = new Map()
-  for (const rel of tracked) {
-    try {
-      sources.set(rel, fs.readFileSync(path.join(root, rel), 'utf8'))
-    } catch {
-      // Deleted in the working tree but still tracked.
-    }
-  }
-  return sources
+  return /\.(ts|tsx)$/.test(rel) && !/\.(test|spec)(?:-fixture)?\.tsx?$/.test(rel)
 }
 
 // One read and one discovery per root per run; `--prune` then `main` reuse them.
@@ -429,9 +363,7 @@ const scanCache = new Map()
 
 function scanSources(root) {
   if (!scanCache.has(root)) {
-    const sources = new Map(
-      FOCUS_SCAN_ROOTS.flatMap((scanRoot) => [...readTrackedSources(root, scanRoot)])
-    )
+    const sources = readTrackedSources(root, FOCUS_SCAN_ROOTS, isScannedPath)
     scanCache.set(root, { sources, readers: discoverFocusReaders(sources) })
   }
   return scanCache.get(root)
@@ -460,10 +392,6 @@ export function collectCurrentCounts(root = process.cwd()) {
   return { counts, forbidden, aliased }
 }
 
-function total(counts) {
-  return [...counts.values()].reduce((sum, count) => sum + count, 0)
-}
-
 export function main(root = process.cwd()) {
   const baselineFile = path.join(root, BASELINE_PATH)
   if (!fs.existsSync(baselineFile)) {
@@ -483,7 +411,7 @@ export function main(root = process.cwd()) {
   }
   const { grown, shrunk } = diffCounts(
     current,
-    parseBaseline(fs.readFileSync(baselineFile, 'utf8'))
+    parseCountBaseline(fs.readFileSync(baselineFile, 'utf8'))
   )
   for (const { file, now, allowed } of grown) {
     console.error(
@@ -498,23 +426,14 @@ export function main(root = process.cwd()) {
   if (forbidden.length + aliased.length + grown.length + shrunk.length > 0) {
     return 1
   }
-  console.log(`Focus-read ratchet OK — ${total(current)} read(s).`)
+  console.log(`Focus-read ratchet OK — ${totalCount(current)} read(s).`)
   return 0
 }
 
 export function prune(root = process.cwd()) {
-  const baselineFile = path.join(root, BASELINE_PATH)
-  const text = fs.existsSync(baselineFile) ? fs.readFileSync(baselineFile, 'utf8') : ''
   const { counts: current } = collectCurrentCounts(root)
-  // Lowers entries only; growth still has to be fixed in the code.
-  const pruned = new Map(
-    [...parseBaseline(text)].map(([file, allowed]) => [
-      file,
-      Math.min(allowed, current.get(file) ?? 0)
-    ])
-  )
-  fs.writeFileSync(baselineFile, formatBaseline(pruned, BASELINE_HEADER, parseBaselineNotes(text)))
-  console.log(`Pruned ${BASELINE_PATH} to ${total(pruned)} read(s).`)
+  const kept = pruneCountBaseline(root, BASELINE_PATH, BASELINE_HEADER, current)
+  console.log(`Pruned ${BASELINE_PATH} to ${kept} read(s).`)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

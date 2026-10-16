@@ -31,6 +31,7 @@ import { usePRBotAuthorOverrides } from '@/lib/pr-bot-author-overrides'
 import { translate } from '@/i18n/i18n'
 import { PRCommentGroupView } from './comment-group'
 import { useNow } from '@/hooks/use-now'
+import { motionSafeScrollBehavior } from '@/hooks/usePrefersReducedMotion'
 
 export type PRCommentsListDisplayMode = 'triage' | 'timeline'
 export const PR_COMMENT_LIST_DISPLAY_MODES: PRCommentsListDisplayMode[] = ['triage', 'timeline']
@@ -95,7 +96,7 @@ export function useCommentsListState({
   function scrollElementBottomIntoView(element: HTMLElement): void {
     const scrollParent = findVerticalScrollParent(element)
     if (!scrollParent) {
-      element.scrollIntoView({ block: 'end', behavior: 'smooth' })
+      element.scrollIntoView({ block: 'end', behavior: motionSafeScrollBehavior() })
       return
     }
 
@@ -106,7 +107,7 @@ export function useCommentsListState({
     if (bottomOverflow > 0) {
       scrollParent.scrollTo({
         top: scrollParent.scrollTop + bottomOverflow,
-        behavior: 'smooth'
+        behavior: motionSafeScrollBehavior()
       })
       return
     }
@@ -115,7 +116,7 @@ export function useCommentsListState({
     if (topOverflow < 0) {
       scrollParent.scrollTo({
         top: Math.max(0, scrollParent.scrollTop + topOverflow),
-        behavior: 'smooth'
+        behavior: motionSafeScrollBehavior()
       })
     }
   }

@@ -80,6 +80,7 @@ describe('ACP agent that closes its stdout but keeps running', () => {
     const pidFile = join(mkdtempSync(join(tmpdir(), 'orca-acp-broken-stream-')), 'pid')
     const rig = await openAcpAdapterRig({
       deps: {
+        stopGraceMs: 20,
         connect: (_launch, options) =>
           createAcpAgentConnection(
             {

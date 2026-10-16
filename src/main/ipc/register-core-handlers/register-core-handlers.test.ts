@@ -51,6 +51,7 @@ const {
   registerAppHandlersMock,
   registerLinearHandlersMock,
   registerJiraHandlersMock,
+  registerJiraIssueSummaryGenerationHandlersMock,
   registerBitbucketHandlersMock,
   registerGitLabHandlersMock,
   registerHostedReviewHandlersMock,
@@ -120,6 +121,7 @@ const {
   registerAppHandlersMock: vi.fn(),
   registerLinearHandlersMock: vi.fn(),
   registerJiraHandlersMock: vi.fn(),
+  registerJiraIssueSummaryGenerationHandlersMock: vi.fn(),
   registerBitbucketHandlersMock: vi.fn(),
   registerGitLabHandlersMock: vi.fn(),
   registerHostedReviewHandlersMock: vi.fn(),
@@ -305,7 +307,12 @@ vi.mock('../runtime', () => ({
 }))
 
 vi.mock('../runtime-environments', () => ({
+  invalidateRuntimeEnvironmentTransport: vi.fn(),
   registerRuntimeEnvironmentHandlers: registerRuntimeEnvironmentHandlersMock
+}))
+
+vi.mock('../wsl-host-handlers', () => ({
+  registerWslHostHandlers: vi.fn()
 }))
 
 vi.mock('../ephemeral-vm', () => ({
@@ -390,6 +397,10 @@ vi.mock('../jira', () => ({
   registerJiraHandlers: registerJiraHandlersMock
 }))
 
+vi.mock('../jira-issue-summary-generation', () => ({
+  registerJiraIssueSummaryGenerationHandlers: registerJiraIssueSummaryGenerationHandlersMock
+}))
+
 vi.mock('../bitbucket', () => ({
   registerBitbucketHandlers: registerBitbucketHandlersMock
 }))
@@ -413,7 +424,13 @@ import { registerCoreHandlers } from './register-core-handlers'
 let registeredAiVaultOptions: {
   ensureStructuredSessionOwnership: () => Promise<void>
 }
-let registeredRuntime: { ensureStructuredAgentSessionHost: ReturnType<typeof vi.fn> } | undefined
+let registeredRuntime:
+  | {
+      ensureStructuredAgentSessionHost: ReturnType<typeof vi.fn>
+      closeNotificationDismissals: ReturnType<typeof vi.fn>
+    }
+  | undefined
+let registeredRelaunchExit: (() => Promise<void>) | undefined
 
 describe('registerCoreHandlers', () => {
   beforeEach(() => {
@@ -466,6 +483,7 @@ describe('registerCoreHandlers', () => {
     registerAppHandlersMock.mockReset()
     registerLinearHandlersMock.mockReset()
     registerJiraHandlersMock.mockReset()
+    registerJiraIssueSummaryGenerationHandlersMock.mockReset()
     registerBitbucketHandlersMock.mockReset()
     registerGitLabHandlersMock.mockReset()
     registerHostedReviewHandlersMock.mockReset()
@@ -488,7 +506,8 @@ describe('registerCoreHandlers', () => {
     const runtime = {
       marker: 'runtime',
       getAgentBrowserBridge: () => null,
-      ensureStructuredAgentSessionHost: vi.fn()
+      ensureStructuredAgentSessionHost: vi.fn(),
+      closeNotificationDismissals: vi.fn(async () => {})
     }
     const stats = { marker: 'stats' }
     const claudeUsage = { marker: 'claudeUsage' }
@@ -540,7 +559,13 @@ describe('registerCoreHandlers', () => {
       openCodeUsage,
       museUsage
     })
-    expect(registerAppHandlersMock).toHaveBeenCalledWith(store, { onBeforeRelaunch })
+    expect(registerAppHandlersMock).toHaveBeenCalledWith(store, {
+      onBeforeRelaunch,
+      onBeforeRelaunchExit: expect.any(Function)
+    })
+    registeredRelaunchExit = registerAppHandlersMock.mock.calls[0]?.[1]?.onBeforeRelaunchExit
+    await registeredRelaunchExit?.()
+    expect(runtime.closeNotificationDismissals).toHaveBeenCalledOnce()
     expect(registerCodexAccountHandlersMock).toHaveBeenCalledWith(
       codexAccounts,
       expect.any(Function)
@@ -562,6 +587,7 @@ describe('registerCoreHandlers', () => {
     expect(registerGitHubHandlersMock).toHaveBeenCalledWith(store, stats)
     expect(registerLinearHandlersMock).toHaveBeenCalled()
     expect(registerJiraHandlersMock).toHaveBeenCalled()
+    expect(registerJiraIssueSummaryGenerationHandlersMock).toHaveBeenCalledWith(store, undefined)
     expect(registerBitbucketHandlersMock).toHaveBeenCalled()
     expect(registerGitLabHandlersMock).toHaveBeenCalledWith(store)
     expect(registerHostedReviewHandlersMock).toHaveBeenCalledWith(store, stats)
@@ -691,6 +717,26 @@ describe('registerCoreHandlers', () => {
       )
     } finally {
       recordStructuredAgentSessionHostInstallRefusal(null)
+    }
+  })
+
+  it('lets relaunch exit after 2 s when the dismissal close never settles', async () => {
+    vi.useFakeTimers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      registeredRuntime?.closeNotificationDismissals.mockReturnValueOnce(new Promise(() => {}))
+      let exited = false
+      void registeredRelaunchExit?.().then(() => {
+        exited = true
+      })
+      await vi.advanceTimersByTimeAsync(1_999)
+      expect(exited).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(exited).toBe(true)
+      expect(warn).toHaveBeenCalledOnce()
+    } finally {
+      warn.mockRestore()
+      vi.useRealTimers()
     }
   })
 

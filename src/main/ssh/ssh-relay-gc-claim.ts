@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { SshConnection } from './ssh-connection'
+import type { RemoteInstallTransport } from './remote-install-transport'
 import { shellEscape } from './ssh-connection-utils'
 import { execHostCommand } from './ssh-relay-host-exec'
 import { isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
@@ -29,7 +29,7 @@ export function relayGcClaimPath(remoteRelayDir: string): string {
 }
 
 export async function isRelayGcClaimed(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST,
   signal?: AbortSignal
@@ -51,7 +51,7 @@ export async function isRelayGcClaimed(
 }
 
 export async function tryAcquireRelayGcClaim(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST,
   signal?: AbortSignal
@@ -87,7 +87,7 @@ export async function tryAcquireRelayGcClaim(
 }
 
 async function writeRelayGcClaimOwner(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   host: RemoteHostPlatform,
   signal?: AbortSignal
@@ -115,7 +115,7 @@ async function writeRelayGcClaimOwner(
 }
 
 export async function isRelayGcClaimOwned(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   token: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST
@@ -138,7 +138,7 @@ export async function isRelayGcClaimOwned(
 export type RelayGcClaimReleaseResult = 'released' | 'lost' | 'unknown'
 
 export async function releaseRelayGcClaim(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   token: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST
@@ -176,7 +176,7 @@ export async function releaseRelayGcClaim(
 }
 
 export async function releaseRelayGcClaimWithRetry(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   token: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST
@@ -189,7 +189,7 @@ export async function releaseRelayGcClaimWithRetry(
 }
 
 export async function waitForRelayGcClaimRelease(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST,
   signal?: AbortSignal

@@ -55,7 +55,12 @@ export function MobileNativeChatOverlay({
   keyboardInset
 }: Props): React.JSX.Element | null {
   const session = controller.nativeChatSession
-  const folded = useMemo(() => foldMobileNativeChatMessages(session.messages), [session.messages])
+  // The chat is drawn only with a resolved agent; the fallback never reaches the screen.
+  const agent = controller.nativeChatAgent ?? ''
+  const folded = useMemo(
+    () => foldMobileNativeChatMessages(session.messages, agent),
+    [session.messages, agent]
+  )
   const streaming = useMobileNativeChatStreamingBubble(
     folded,
     controller.nativeChatStreamingText,
@@ -68,6 +73,7 @@ export function MobileNativeChatOverlay({
       cards: queued.cards,
       onSend: queued.send,
       onDelete: queued.delete,
+      onClearAll: queued.clear,
       onEdit: queued.edit,
       pause: queued.pause,
       onResume: queued.resume,
@@ -99,6 +105,8 @@ export function MobileNativeChatOverlay({
           workingStartedAt={controller.nativeChatWorkingStartedAt}
           settledTurns={controller.nativeChatSettledTurns}
           turnJournal={controller.nativeChatTurnJournal}
+          receipts={controller.nativeChatReceipts}
+          actionablePromptIds={controller.nativeChatActionablePromptIds}
           streaming={streaming}
           onStop={controller.handleNativeChatStop}
           ask={controller.nativeChatAsk}
@@ -128,7 +136,11 @@ export function MobileNativeChatOverlay({
           imagePreviewsByMessageId={controller.chatImagePreviewsByMessageId}
           composerText={controller.chatComposerText}
           onComposerTextChange={controller.setChatComposerText}
-          onAttachImage={() => void images.attachImage('library')}
+          onAttachImage={
+            controller.nativeChatAcceptsImages
+              ? () => void images.attachImage('library')
+              : undefined
+          }
           attachments={images.attachments}
           onRemoveAttachment={images.removeAttachment}
           isAttaching={images.isAttaching}

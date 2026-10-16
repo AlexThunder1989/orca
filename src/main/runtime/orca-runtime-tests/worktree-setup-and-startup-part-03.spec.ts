@@ -6,7 +6,6 @@ import {
   computeWorktreePathMock,
   createSetupRunnerScript,
   detectInstalledAgentsWithShellPathHydrationMock,
-  detectRemoteAgentsMock,
   electronMocks,
   ensurePathWithinWorkspaceMock,
   getDefaultTabsLaunch,
@@ -570,7 +569,6 @@ describe('OrcaRuntimeService', () => {
     })
 
     expect(detectInstalledAgentsWithShellPathHydrationMock).not.toHaveBeenCalled()
-    expect(detectRemoteAgentsMock).not.toHaveBeenCalled()
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/tmp/workspaces/runtime-startup-draft',

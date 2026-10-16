@@ -56,19 +56,6 @@ export function createTabsFocusActions(
           return state
         }
         const { tab, worktreeId } = found
-        // Why: activating a terminal tab dismisses its tab-level bell — the user has moved their eyes here.
-        // Why (activeWorktree guard below): only when the tab is in the active worktree, else the unseen signal is lost (mirrors focusGroup).
-        const terminalEntityId = tab.contentType === 'terminal' ? tab.entityId : null
-        const nextUnreadTerminalTabs =
-          state.activeWorktreeId === worktreeId &&
-          terminalEntityId &&
-          state.unreadTerminalTabs[terminalEntityId]
-            ? (() => {
-                const copy = { ...state.unreadTerminalTabs }
-                delete copy[terminalEntityId]
-                return copy
-              })()
-            : state.unreadTerminalTabs
         return {
           unifiedTabsByWorktree: {
             ...state.unifiedTabsByWorktree,
@@ -101,11 +88,7 @@ export function createTabsFocusActions(
           activeGroupIdByWorktree: {
             ...state.activeGroupIdByWorktree,
             [worktreeId]: tab.groupId
-          },
-          // Why: skip writing unreadTerminalTabs when the reference is unchanged, avoiding a no-op alloc that re-runs full-state selectors.
-          ...(nextUnreadTerminalTabs !== state.unreadTerminalTabs
-            ? { unreadTerminalTabs: nextUnreadTerminalTabs }
-            : {})
+          }
         }
       })
     }

@@ -23,6 +23,7 @@ import {
   isDevBundleInUse,
   selectStaleDevBundleDirs
 } from './dev-electron-bundle-cache.mjs'
+import { startDevStorageReclaim } from './dev-storage-reclaim.mjs'
 import { copyPrivateTree } from './space-sharing-copy.mjs'
 import {
   DEV_BUNDLE_ID,
@@ -654,6 +655,12 @@ const child = spawn(process.execPath, [electronViteCli, ...forwardedArgs], {
   // dev runner its own process group lets Ctrl+C kill the whole tree on macOS
   // instead of leaving the Electron app alive after the terminal exits.
   detached: process.platform !== 'win32'
+})
+
+child.once('spawn', () => {
+  if (!isHelpOrVersion) {
+    startDevStorageReclaim({ repoRoot })
+  }
 })
 
 let isShuttingDown = false

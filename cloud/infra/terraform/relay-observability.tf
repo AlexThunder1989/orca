@@ -1748,6 +1748,74 @@ resource "google_monitoring_alert_policy" "relay_cell_reserve_dead_man_tripped" 
   depends_on = [google_logging_metric.relay_cell_reserve_dead_man_tripped]
 }
 
+# The reserve watch workflow logs this from its runner (resource global) when a watch is refused or
+# a flip back did not land in write mode: either can leave a cell in reserve unwatched.
+resource "google_logging_metric" "relay_reserve_watch_alarm" {
+  project     = var.project_id
+  name        = "orca_relay_reserve_watch_alarm"
+  description = "Reserve watch runs that were refused or whose flip back to db did not land, so the cell may be in reserve mode with nothing watching it."
+  filter      = "resource.type=\"global\" AND logName=\"projects/${var.project_id}/logs/orca-relay-reserve-watch\" AND jsonPayload.event=\"orca_relay_reserve_watch_alarm\""
+  label_extractors = {
+    cell_id = "EXTRACT(jsonPayload.cellId)"
+    kind    = "EXTRACT(jsonPayload.kind)"
+  }
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    unit        = "1"
+
+    labels {
+      key         = "cell_id"
+      value_type  = "STRING"
+      description = "Durable relay cell identifier."
+    }
+
+    labels {
+      key         = "kind"
+      value_type  = "STRING"
+      description = "refused or flip-back-failed."
+    }
+  }
+}
+
+resource "google_monitoring_alert_policy" "relay_reserve_watch_alarm" {
+  project               = var.project_id
+  display_name          = "Orca Relay: reserve cell may be unwatched"
+  combiner              = "OR"
+  enabled               = true
+  notification_channels = var.relay_alert_notification_channels
+
+  conditions {
+    display_name = "A reserve watch was refused or its flip back did not land"
+
+    condition_threshold {
+      filter          = "resource.type=\"global\" AND metric.type=\"logging.googleapis.com/user/orca_relay_reserve_watch_alarm\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields      = ["metric.label.\"cell_id\""]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  documentation {
+    content   = "A write-mode `Operate Relay Production Reserve Watch` run was refused (a rollout held the Cloud SQL rollout lease, the lease was unreadable, bad inputs, or the cell never reported reserve within 10 minutes) or its flip back to db did not land (no ID token, a failed login, or a cell that does not answer). The cell may be in reserve mode with nothing watching it. Read the cell's `runtime-status`; if its switch file says reserve, either rerun the watch or run `cloud-operate-relay-production-cell-flags.yml` with `admitMode=db` for that cell, using the break-glass inputs the failed run printed if the cell does not answer."
+    mime_type = "text/markdown"
+  }
+
+  depends_on = [google_logging_metric.relay_reserve_watch_alarm]
+}
+
 # host-session-registry.ts: a flip back closed a control it could not re-register (4409), after 20 refusals.
 resource "google_logging_metric" "relay_cell_reregistration_gave_up" {
   project     = var.project_id
@@ -1938,4 +2006,77 @@ resource "google_monitoring_alert_policy" "relay_reserve_placement_off_with_rese
   }
 
   depends_on = [google_logging_metric.relay_reserve_placement_off_with_reserve_cells]
+}
+
+# cell-poll-reachability.ts: a reserve cell stopped answering polls, but the director would not call it
+# dead (too few feed cells, or too many failing with it), so its hosts wait for an operator fence.
+# Logged at most once a minute per cell per director. Gated until staging has proved it (variables.tf);
+# apply the metric first, then the policy a few minutes later: Monitoring refuses a policy on a new
+# log metric until the metric is visible, which the dependency ordering alone does not wait for.
+resource "google_logging_metric" "relay_dead_cell_verdict_withheld" {
+  count = var.relay_dead_cell_verdict_alert ? 1 : 0
+
+  project     = var.project_id
+  name        = "orca_relay_dead_cell_verdict_withheld"
+  description = "Directors that saw a reserve cell stop answering their seat-feed polls but withheld the dead-cell verdict: too few feed cells to judge, a third of the fleet failing, or half its region."
+  filter      = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.relay_cloud_run_service_name}\" AND jsonPayload.event=\"orca_relay_dead_cell_verdict_withheld\""
+  label_extractors = {
+    cell_id  = "EXTRACT(jsonPayload.cellId)"
+    withheld = "EXTRACT(jsonPayload.withheld)"
+  }
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    unit        = "1"
+
+    labels {
+      key         = "cell_id"
+      value_type  = "STRING"
+      description = "Durable relay cell identifier."
+    }
+    labels {
+      key         = "withheld"
+      value_type  = "STRING"
+      description = "Which guard withheld the verdict: sample (fewer than 6 feed cells, or the cell is not among them), fleet (a third of all feed cells) or region (half the cell's region)."
+    }
+  }
+}
+
+resource "google_monitoring_alert_policy" "relay_dead_cell_verdict_withheld" {
+  count = var.relay_dead_cell_verdict_alert ? 1 : 0
+
+  project               = var.project_id
+  display_name          = "Orca Relay: a dead-looking reserve cell was not called dead"
+  combiner              = "OR"
+  enabled               = true
+  notification_channels = var.relay_alert_notification_channels
+
+  conditions {
+    display_name = "A dead-cell verdict was withheld"
+
+    condition_threshold {
+      filter          = "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/${google_logging_metric.relay_dead_cell_verdict_withheld[0].name}\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields      = ["metric.label.\"withheld\""]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  documentation {
+    content   = "A reserve cell's heartbeat went stale and a director's seat-feed polls to it kept failing, but the director withheld the dead-cell verdict because the poll failures were not that cell's alone: at least half of its region's feed cells were failing polls too (`withheld=region`, typically a us-central1 to asia-east2 partition), more than a third of all feed cells were (`withheld=fleet`, typically the director's own network or credential), or there were too few feed cells to judge or the cell was not among them (`withheld=sample`). Hosts that lost their control on that cell are not moved off automatically; they get `relay_home_cell_unavailable` until the cell answers again or an operator fences it. Cells only cut off from the directors keep serving the hosts still connected. Check director egress and which cells fail polls before fencing anything: fencing a cell that is still serving disconnects its hosts."
+    mime_type = "text/markdown"
+  }
+
 }

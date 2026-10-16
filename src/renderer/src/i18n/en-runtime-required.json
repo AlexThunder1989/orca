@@ -53,6 +53,7 @@
       },
       "JiraIssueWorkspace": {
         "2a829a2f00": "priority",
+        "54649eaeab": "+ Assignee",
         "693be070d0": "transition",
         "9ebee71962": "labels",
         "b8e2079d96": "assignee",
@@ -251,7 +252,6 @@
         "AutomationsPage": {
           "2695883141": "delete",
           "0329f9bef1": "Close · Esc",
-          "0ae52dd760": "hermes",
           "3e42a5cc1b": "SSH connection failed.",
           "53f06f0ad5": "Retry source",
           "587a4b205c": "Next",
@@ -263,7 +263,6 @@
           "82eb6cb933": "source",
           "8705757e27": "job",
           "8d1afa8269": "Add automation",
-          "97ff587ee3": "Connect this source to check for Hermes automations in the remote profile.",
           "9f2855677c": "SSH connected.",
           "a21f6c33ad": "Automation source refreshed.",
           "aaa007846f": "source unavailable",
@@ -287,11 +286,7 @@
           "tableProject": "Project"
         },
         "ExternalAutomationManagers": {
-          "330b3c32e8": "available",
-          "bf5f67b590": "hermes"
-        },
-        "HermesCronOutputView": {
-          "88d48157fc": "default"
+          "330b3c32e8": "available"
         },
         "createDestination": {
           "stale": "{host} changed while this form was open. Choose it again before saving.",
@@ -712,6 +707,12 @@
             "scope": "Scope",
             "thisScope": "This",
             "worktreeScope": "Worktree"
+          },
+          "AiVaultScanProgressStrip": {
+            "databaseCount_one": "{{value0}} database",
+            "databaseCount_other": "{{value0}} databases",
+            "fileCount_one": "{{value0}} file",
+            "fileCount_other": "{{value0}} files"
           },
           "AiVaultSessionDetails": {
             "assistant": "Assistant",
@@ -1396,8 +1397,11 @@
         "ProjectWindowsRuntimeSetting": {
           "activeTaskPlural": "{{count}} active tasks",
           "activeTaskSingular": "{{count}} active task",
+          "distroMissing": "{{value0}} is not installed in WSL. Choose an installed distro or switch this project to Windows.",
+          "distroRequired": "Choose a WSL distro or switch this project to Windows.",
           "liveTerminalPlural": "{{count}} live terminals",
-          "liveTerminalSingular": "{{count}} live terminal"
+          "liveTerminalSingular": "{{count}} live terminal",
+          "wslUnavailable": "WSL is not available. Switch this project to Windows or repair WSL."
         },
         "QuickCommandsPane": {
           "44923dd982": "destructive",
@@ -1511,7 +1515,9 @@
         },
         "SshPane": {
           "94c5284560": "Targets",
-          "a7d28dff81": "Add a remote host to connect to it in Orca."
+          "a7d28dff81": "Add a remote host to connect to it in Orca.",
+          "syncedServerPlural": "Synced {{count}} servers",
+          "syncedServerSingular": "Synced {{count}} server"
         },
         "SshTargetCard": {
           "47e94bd6ba": "connected",
@@ -1706,7 +1712,8 @@
             "fa72e71f05": "agents",
             "fe5688b761": "sidebar",
             "nativeChat": {
-              "description": "Open supported new agents in Chat UI."
+              "description": "Open supported new agents in Chat UI.",
+              "queue": "queue"
             }
           }
         },
@@ -1804,8 +1811,22 @@
           }
         },
         "sshHostServer": {
+          "linkedProjects_one": "This host’s Orca server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automation there were not moved, and worktrees it created there show as external worktrees.",
+          "linkedProjects_other": "This host’s Orca server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automations there were not moved, and worktrees it created there show as external worktrees.",
           "olderTerminals_one": "{{count}} terminal started by an older version of Orca is still running on this host, and it doesn’t stop on its own. Close it in that version of Orca or end it on the host, then reconnect.",
           "olderTerminals_other": "{{count}} terminals started by an older version of Orca are still running on this host, and they don’t stop on their own. Close them in that version of Orca or end them on the host, then reconnect."
+        },
+        "task": {
+          "tracker": {
+            "integration": {
+              "cards": {
+                "connectedSitePlural": "{{count}} sites connected",
+                "connectedSiteSingular": "{{count}} site connected",
+                "connectedWorkspacePlural": "{{count}} workspaces connected",
+                "connectedWorkspaceSingular": "{{count}} workspace connected"
+              }
+            }
+          }
         },
         "terminal": {
           "windows": {
@@ -2558,9 +2579,9 @@
             "3eed73394f": "Your keyboard is paused"
           },
           "TerminalErrorToast": {
+            "hostTerminalCap": "The host is already running as many terminals as Orca allows. Close a terminal you no longer need, then try again.",
             "ptyAllocationLimit": "Your system cannot allocate any more pty devices. Close some terminals you are not using, in Orca or another program, then try again.",
-            "terminalProcessLimit": "Your system cannot start another terminal process. Close unused terminals or quit unused processes, then try again.",
-            "hostTerminalCap": "The host is already running as many terminals as Orca allows. Close a terminal you no longer need, then try again."
+            "terminalProcessLimit": "Your system cannot start another terminal process. Close unused terminals or quit unused processes, then try again."
           },
           "TerminalSessionStateSaveFailureDialog": {
             "678c780a2c": "Disk space is unavailable",
@@ -2853,6 +2874,8 @@
         "attachmentTotalTooLarge": "The images on this message are too large together, so the message was not sent.",
         "attachmentUnreadable": "An attachment on this message couldn't be read, so the message was not sent.",
         "attachmentUnsupportedType": "{{agent}} accepts only PNG, JPEG, GIF, and WebP images, so this message was not sent.",
+        "backgroundTaskNotStopped": "The background task wasn't stopped.",
+        "backgroundTasksNotStopped": "The background tasks weren't stopped.",
         "cancelUnconfirmed": "Cancellation was not confirmed.",
         "cancelled": "This message was withdrawn before the agent started it.",
         "chatClosed": "The chat closed before this message was sent.",
@@ -2864,6 +2887,7 @@
         "claudeManagedNotSignedIn": "This Claude account isn't signed in. Sign in again in Claude Accounts settings.",
         "claudeSystemNotSignedIn": "Claude isn't signed in. Run `{{loginCommand}}`, or choose an account in Claude Accounts settings.",
         "cliMissing": "{{agent}} wasn't found on the computer running this chat. Install it, or check its Command in Settings → Agents.",
+        "codexCliTooOld": "Codex {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer.",
         "codexManagedNotSignedIn": "This Codex account isn't signed in. Sign in again in Codex Accounts settings.",
         "codexSystemNotSignedIn": "Codex isn't signed in. Run `{{loginCommand}}`.",
         "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}.",
@@ -2874,6 +2898,8 @@
         "compactionUnconfirmed": "Compaction completion is unconfirmed.",
         "couldNotRestart": "{{agent}} couldn't restart.",
         "couldNotStart": "{{agent}} couldn't start.",
+        "couldNotStop": "Couldn't stop {{agent}}.",
+        "couldNotStopTheAgent": "Couldn't stop the agent.",
         "editSavedArguments": "Edit them in Settings > Agents > Arguments.",
         "emptyMessage": "This message is empty, so it was not sent.",
         "historyInOtherAccount": "This chat's history is in another Claude account. Switch back to that account to continue it.",
@@ -2891,11 +2917,12 @@
         "notDeliveredSendAgain": "This message was not delivered. Send it again to continue.",
         "notSignedIn": "{{agent}} is not signed in.",
         "previousExitUnverifiable": "Couldn't stop {{agent}} from before.",
+        "providerExitedAnswer": "{{agent}} has stopped, so your answer was not sent. Send a message to continue.",
         "providerExitedRejection": "{{agent}} stopped before this message was sent.",
         "providerExitedRow": "{{agent}} stopped while this response was in progress. You can continue in this conversation.",
         "providerRateLimited": "{{agent}} is rate-limited and retrying.",
-        "providerRejected": "The provider did not accept this message.",
-        "providerRejectedQuoted": "The provider did not accept this message: {{detail}}.",
+        "providerRejected": "{{agent}} didn't accept this message.",
+        "providerRejectedQuoted": "{{agent}} didn't accept this message: {{detail}}.",
         "providerRetryLastError": "Last error: {{detail}}.",
         "providerRetryNumber": "Retry {{attempt}}.",
         "providerRetryNumberOf": "Retry {{attempt}} of {{maxRetries}}.",
@@ -2905,6 +2932,7 @@
         "queueFull": "Too many messages were waiting for the agent, so this one was not sent.",
         "runCommandAgain": "Run /{{command}} again.",
         "runCommandWhenDone": "Run /{{command}} when it's done.",
+        "runtimeNotInstalled": "{{agent}} isn't installed on the computer running this chat. Install it from the chat in a current version of Orca.",
         "sendAgainToTryOnceMore": "Send your message again to try once more.",
         "sendToTryAgain": "Send your message to try again.",
         "sessionNotRestored": "{{agent}} couldn't reopen its earlier session, so this chat continues in a new one. {{agent}} doesn't remember the earlier messages.",
@@ -2918,15 +2946,22 @@
         "writeFailed": "Orca couldn't hand this message to the agent, so it was not sent."
       },
       "notices": {
+        "compaction": "Context compacted",
+        "contextCleared": "Context cleared",
         "historyItemTooLarge": "This part of the chat was too large to show.",
-        "historyRepaired": "Part of this chat's history couldn't be loaded."
+        "historyRepaired": "Part of this chat's history couldn't be loaded.",
+        "plan": "Plan"
       },
       "question": {
         "other": "Other…"
       },
-      "queuedMessages": {
-        "sendConfirmBody_one": "You are about to send a message. Do you want to clear the {{count}} message previously queued?",
-        "sendConfirmBody_other": "You are about to send a message. Do you want to clear the {{count}} messages previously queued?"
+      "receipt": {
+        "cancelled": "Cancelled",
+        "cancelledBy": "Cancelled on {{device}}",
+        "emptyAnswer": "Empty answer",
+        "resolved": "Resolved",
+        "resolver": "Answered on {{device}}",
+        "unavailable": "Selected answer unavailable"
       },
       "state": {
         "empty": {
@@ -3003,6 +3038,7 @@
         "answerFirst": "Answer the question or approval first.",
         "attachmentExpired": "This attachment expired.",
         "backgroundTasksRunning": "Background tasks are still running.",
+        "cancelNotSaved": "Couldn't cancel this question or approval.",
         "cannotRunHere": "Orca can't run this agent in a chat here.",
         "capacity": "Orca on the computer running this chat has hit a request limit. Update Orca there, then try again.",
         "chatNotFound": "Orca can't find this chat.",
@@ -3132,6 +3168,11 @@
       "viewing": "Viewing: {{path}}"
     }
   },
+  "jira": {
+    "workspace": {
+      "open": "Open workspace linked to {{key}}"
+    }
+  },
   "menu": {
     "quitApp": "Quit {{appName}}"
   },
@@ -3166,6 +3207,16 @@
     "findPath": "Find a folder…",
     "finishEditing": "Save or cancel the preset to continue creating your workspace.",
     "pathHelp": "One repository-relative directory per line. Spaces within a path are preserved."
+  },
+  "terminal": {
+    "newerDaemonBanner": {
+      "reopenTerminal_one": "Reopen terminal",
+      "reopenTerminal_other": "Reopen {{count}} terminals",
+      "reopened_one": "Reopened {{count}} terminal",
+      "reopened_other": "Reopened {{count}} terminals",
+      "resumed_one": "{{count}} agent session resumed.",
+      "resumed_other": "{{count}} agent sessions resumed."
+    }
   },
   "worktreeJumpPalette": {
     "filter": {

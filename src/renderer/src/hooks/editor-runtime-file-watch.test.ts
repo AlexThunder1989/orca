@@ -12,7 +12,7 @@ const runtime = vi.hoisted(() => ({
   payloads: new Array<(payload: FsChangedPayload) => void>(),
   errors: new Array<(error: Error) => void>()
 }))
-vi.mock('@/runtime/runtime-file-client', () => ({
+vi.mock('@/runtime/runtime-file-watch-client', () => ({
   subscribeRuntimeFileChanges: runtime.subscribe
 }))
 vi.mock('@/runtime/runtime-host-contact-regained', () => ({

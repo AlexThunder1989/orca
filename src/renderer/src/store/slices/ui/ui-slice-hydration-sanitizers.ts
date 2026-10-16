@@ -11,10 +11,7 @@ import type {
 import type { WorkspaceCleanupDismissal } from '../../../../../shared/workspace-cleanup'
 import { WORKSPACE_CLEANUP_CLASSIFIER_VERSION } from '../../../../../shared/workspace-cleanup'
 import { isTopLevelView } from '../../../../../shared/top-level-view'
-import {
-  normalizeVisibleExecutionHostIds,
-  normalizeExecutionHostScope
-} from '../../../../../shared/execution-host'
+import { resolveVisibleWorkspaceHostIds } from '../../../../../shared/workspace-view/workspace-host-visibility'
 import { persistedUIValuesEqual } from '../../../../../shared/persisted-ui-equality'
 import { DEFAULT_STATUS_BAR_ITEMS } from '../../../../../shared/constants'
 import type { UISlice } from './ui-slice-contract'
@@ -192,12 +189,7 @@ export function hydratedUIPartialMatchesState(
 export function normalizeHydratedVisibleWorkspaceHostIds(
   ui: PersistedUIState
 ): VisibleWorkspaceHostIds {
-  const visibleHostIds = normalizeVisibleExecutionHostIds(ui.visibleWorkspaceHostIds)
-  if (visibleHostIds) {
-    return visibleHostIds
-  }
-  const legacyScope = normalizeExecutionHostScope(ui.workspaceHostScope)
-  return legacyScope === 'all' ? null : [legacyScope]
+  return resolveVisibleWorkspaceHostIds(ui.visibleWorkspaceHostIds, ui.workspaceHostScope)
 }
 
 export function clampPetSize(

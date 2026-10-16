@@ -27,6 +27,7 @@ const PACKAGED_RUNTIME_PACKAGE_ROOTS = [
   'posthog-node',
   'proper-lockfile',
   'qrcode',
+  'smol-toml',
   'ssh2',
   'tweetnacl',
   'ws',
@@ -36,9 +37,15 @@ const PACKAGED_RUNTIME_PACKAGE_ROOTS = [
 // Why macOS only: serve-sim drives the iOS Simulator, and its native addon is a Mach-O that
 // Windows signing rejects as a PE file.
 const DARWIN_PACKAGED_RUNTIME_PACKAGE_ROOTS = ['serve-sim']
+/** The compiled binary each workspace Windows addon loads, relative to its package. */
+const WORKSPACE_WINDOWS_ADDON_BINARIES = [
+  ['@orca/windows-registry', 'build/Release/orca_windows_registry.node'],
+  ['@orca/windows-security', 'build/Release/orca_windows_security.node']
+]
 const WINDOWS_PACKAGED_RUNTIME_PACKAGE_ROOTS = [
   '@vscode/windows-process-tree',
-  '@orca/windows-registry'
+  '@orca/windows-registry',
+  '@orca/windows-security'
 ]
 
 const NODE_PTY_PREBUILD_PREFIX_BY_PLATFORM = {
@@ -612,10 +619,20 @@ function assertPackagedNativeVariantsInstalled(electronPlatformName, electronArc
   }
 
   // Why one package: @vscode/windows-process-tree is the only os: win32 npm addon;
-  // @orca/windows-registry is a workspace link present on every host, so its presence proves nothing.
+  // the @orca/windows-* addons are workspace links present on every host, so their presence proves nothing.
   const missingWindowsAddons = []
   if (electronPlatformName === 'win32' && !isInstalled('@vscode/windows-process-tree')) {
     missingWindowsAddons.push('@vscode/windows-process-tree')
+  }
+  // Why the binary, not the package: the link exists everywhere, and a missing or foreign-arch
+  // .node would otherwise surface only at runtime (secure files unrestricted, orcad refusing to start).
+  if (electronPlatformName === 'win32') {
+    for (const [name, binary] of WORKSPACE_WINDOWS_ADDON_BINARIES) {
+      const addon = join(nodeModulesDir, name, binary)
+      if (!existsSync(addon) || readPeMachine(addon) !== PE_MACHINE[architecture]) {
+        missingWindowsAddons.push(`${name} (${binary} for ${architecture})`)
+      }
+    }
   }
 
   if (missing.length === 0 && missingWindowsAddons.length === 0) {

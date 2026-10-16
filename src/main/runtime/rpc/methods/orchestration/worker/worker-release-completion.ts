@@ -6,7 +6,7 @@ import type {
   WorkerTerminalRetainedReason
 } from '../../../../orchestration/worker-terminal-ownership'
 import { summarizeWorkerOutputArchive } from '../../../../orchestration/worker-output-archive'
-import type { OrcaRuntimeService } from '../../../../orca-runtime'
+import type { WorkerTerminalReleaseRuntime } from '../../../../orchestration/worker-terminal-release-runtime'
 import { describeUnconfirmedAgentStop } from '../../../../../../shared/pty-liveness-verdict'
 import { inspectWorkerTerminal } from './worker-observation'
 import { orchestrationTimestampToMs } from './worker-output'
@@ -34,7 +34,7 @@ export type WorkerReleaseReceipt = {
 }
 
 type WorkerTerminalReleaseArgs = {
-  runtime: OrcaRuntimeService
+  runtime: WorkerTerminalReleaseRuntime
   db: OrchestrationDb
   dispatchId: string
   resource: WorkerTerminalResourceRow
@@ -47,7 +47,7 @@ type ActiveWorkerTerminalRelease = {
 }
 
 const activeReleaseByRuntime = new WeakMap<
-  OrcaRuntimeService,
+  WorkerTerminalReleaseRuntime,
   Map<string, ActiveWorkerTerminalRelease>
 >()
 

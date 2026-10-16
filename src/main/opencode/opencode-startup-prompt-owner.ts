@@ -1,6 +1,6 @@
 import { agentHookServer } from '../agent-hooks/server'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import type { IPtyProvider, PtySpawnResult } from '../providers/types'
+import type { IPtyProvider, PtySpawnResult } from '../providers/pty-provider-contract'
 import { ptyIncarnationById, ptyOwnership } from '../ipc/pty/provider/ownership-state'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { isPtyIncarnationId } from '../../shared/pty-incarnation'

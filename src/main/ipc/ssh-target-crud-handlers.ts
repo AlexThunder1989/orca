@@ -53,6 +53,7 @@ function omitRendererSshTargetGeneration<
     orcadFence?: unknown
     managedServerUnavailable?: unknown
     managedServerMoveOffered?: unknown
+    managedServerLeaveBehind?: unknown
     managedServerUpdateFailure?: unknown
     remoteRuntimeResolution?: unknown
   }
@@ -65,6 +66,7 @@ function omitRendererSshTargetGeneration<
   | 'orcadFence'
   | 'managedServerUnavailable'
   | 'managedServerMoveOffered'
+  | 'managedServerLeaveBehind'
   | 'managedServerUpdateFailure'
   | 'remoteRuntimeResolution'
 > {
@@ -74,6 +76,7 @@ function omitRendererSshTargetGeneration<
     orcadFence: _orcadFence,
     managedServerUnavailable: _managedServerUnavailable,
     managedServerMoveOffered: _managedServerMoveOffered,
+    managedServerLeaveBehind: _managedServerLeaveBehind,
     managedServerUpdateFailure: _managedServerUpdateFailure,
     remoteRuntimeResolution: _remoteRuntimeResolution,
     ...rest

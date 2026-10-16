@@ -16,11 +16,8 @@ import {
   type RuntimeCapability
 } from '../../../shared/protocol-version'
 import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../shared/agent-session-create-capabilities'
-import {
-  callRuntimeRpc,
-  runtimeEnvironmentSupportsCapability,
-  type RuntimeClientTarget
-} from './runtime-rpc-client'
+import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import {
   ensureLocalRuntimeCapabilities,
   readLocalRuntimeCapabilitiesOrUnknown

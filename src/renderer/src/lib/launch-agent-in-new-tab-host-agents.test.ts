@@ -103,8 +103,9 @@ describe('a new tab whose chat route waits on the host agent list', () => {
       throw new Error('expected the launch to wait for the host agent list')
     }
     const relaunch = fakeRelaunch()
+    const focusIntent = { request: vi.fn(), cancel: vi.fn() }
 
-    const result = launchOnceHostAnswered(route, args, startupPlan, relaunch)
+    const result = launchOnceHostAnswered(route, { ...args, focusIntent }, startupPlan, relaunch)
 
     expect(result?.surface).toEqual({ kind: 'host-published' })
     expect(relaunch).not.toHaveBeenCalled()
@@ -114,6 +115,7 @@ describe('a new tab whose chat route waits on the host agent list', () => {
     })
     expect(relaunch.mock.calls[0]?.[0]).toMatchObject({
       requestId: undefined,
+      focusIntent,
       agentSessionLaunchPlan: { route: 'structured-native-chat', requestId: 'request-1' }
     })
   })

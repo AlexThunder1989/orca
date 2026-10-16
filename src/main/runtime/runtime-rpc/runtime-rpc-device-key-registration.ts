@@ -35,7 +35,8 @@ export function registerSocketDeviceKey(
   const entry = registry.forkDeviceKey(
     legacy.deviceId,
     params.devicePublicKeyB64,
-    sanitizeDeviceLabel(params.deviceLabel, legacy.name)
+    sanitizeDeviceLabel(params.deviceLabel, legacy.name),
+    { ephemeral: params.ephemeral === true }
   )
   return { deviceId: entry.deviceId, credentialRevision: entry.credentialRevision ?? 0 }
 }

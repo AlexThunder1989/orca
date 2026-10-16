@@ -166,11 +166,10 @@ export class DaemonClient {
       if (!sameDaemonIdentity(controlIdentity, streamHello.identity)) {
         throw new DaemonProtocolError('Daemon identity changed during connection')
       }
-      pendingListenerCleanups.push(
-        attachStreamEventReader(this.streamSocket, streamHello, (event) => {
-          this.eventListeners.each((listener) => listener(event))
-        })
-      )
+      const streamReader = attachStreamEventReader(this.streamSocket, streamHello, (event) => {
+        this.eventListeners.each((listener) => listener(event))
+      })
+      pendingListenerCleanups.push(streamReader.detach)
 
       this.assertConnectionAttemptCurrent(attemptGeneration)
       this.connected = true
@@ -181,8 +180,11 @@ export class DaemonClient {
 
       const gen = this.connectionGeneration
       pendingListenerCleanups.push(
-        armDaemonSocketCloseHandlers(this.controlSocket, this.streamSocket, () =>
-          this.handleDisconnect(gen)
+        armDaemonSocketCloseHandlers(
+          this.controlSocket,
+          this.streamSocket,
+          () => this.handleDisconnect(gen),
+          streamReader.drainBuffered
         )
       )
       this.cleanupSocketListeners = cleanupPendingListeners

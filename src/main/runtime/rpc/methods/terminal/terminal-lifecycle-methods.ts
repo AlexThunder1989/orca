@@ -73,7 +73,6 @@ export const TERMINAL_LIFECYCLE_METHODS = [
                 : {}),
               title: params.title,
               focus,
-              rendererBacked: params.rendererBacked === true,
               activate,
               presentation,
               tabId: params.tabId,

@@ -1,3 +1,4 @@
+import type * as ExecCommandModule from './ssh-relay-exec-command'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,11 +10,14 @@ import {
   RUNTIME_STORE_LOCK_OWNER_FILENAME,
   withRuntimeStoreLock
 } from './remote-node-runtime-store-lock'
-import { execCommand } from './ssh-relay-deploy-helpers'
+import { execCommand } from './ssh-relay-exec-command'
 import { tryCreateInstallLockCommand } from './ssh-relay-install-lock-commands'
 import { getRemoteHostPlatform } from './ssh-remote-platform'
 
-vi.mock('./ssh-relay-deploy-helpers', () => ({ execCommand: vi.fn() }))
+vi.mock('./ssh-relay-exec-command', async (importOriginal) => ({
+  ...(await importOriginal<typeof ExecCommandModule>()),
+  execCommand: vi.fn()
+}))
 
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every remote call goes through the mocked execCommand, which runs it in a local shell.
 const conn = {} as SshConnection

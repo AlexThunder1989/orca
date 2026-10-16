@@ -1,13 +1,19 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import { Pause, Play } from 'lucide-react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { AlertCircle, ChevronDown, ChevronRight, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import { useAppStore } from '../../store'
 import { translate } from '@/i18n/i18n'
-import { NativeChatQueuedMessageCard } from './NativeChatQueuedMessageCard'
+import {
+  NativeChatQueuedMessageCard,
+  queuedMessageCardCaption
+} from './NativeChatQueuedMessageCard'
 import type { StructuredAgentSessionQueuedMessagesController } from './use-structured-agent-session-queued-messages'
 import type { AgentSessionFailureFact } from '../../../../shared/agent-session-failure'
 import { NATIVE_CHAT_ROOT_SELECTOR } from '@/lib/native-chat-paste-request'
 import { focusNativeChatPromptCard } from './use-native-chat-prompt-card-focus'
+import { QUEUED_MESSAGE_PAUSED_SEND_FAILED } from '../../../../shared/agent-session-wire'
 
 /**
  * Host-held drafts stacked between the transcript and the composer — never in
@@ -36,7 +42,22 @@ export function NativeChatQueuedMessageList({
   const regionRef = useRef<HTMLDivElement>(null)
   const queueRef = useRef<HTMLDivElement>(null)
   const { cards, pause } = controller
+  const listId = useId()
+  const [expanded, setExpanded] = useState(true)
+  // Collapsing is local to this queue's run: once it empties, the next card shows open.
+  if (cards.length === 0 && !expanded) {
+    setExpanded(true)
+  }
   const newest = cards.at(-1)
+  const attentionCard = !expanded
+    ? cards.find(
+        (card) =>
+          card.state === 'returned' || card.pausedReason === QUEUED_MESSAGE_PAUSED_SEND_FAILED
+      )
+    : undefined
+  const attentionCaption = attentionCard
+    ? queuedMessageCardCaption(attentionCard, agentName, statedFailures)
+    : null
   const listRef = useRef<HTMLUListElement>(null)
   const newestPosition = newest?.position ?? 0
   const newestIsPersons = newest !== undefined && !newest.from
@@ -55,7 +76,7 @@ export function NativeChatQueuedMessageList({
   const turnOffQueueing = controller.queueCapable
     ? () => void updateSettings({ nativeChatQueueFollowUps: false })
     : undefined
-  // Only when focus was on the queue (a card, or Resume) — never pull it from wherever the user
+  // Only when focus was on the queue (a card, or the header) — never pull it from wherever the user
   // moved on to. A question or approval holding the composer's slot takes it instead.
   const refocusAfter = (action: Promise<unknown>): void => {
     void action.then(() => {
@@ -81,17 +102,25 @@ export function NativeChatQueuedMessageList({
     <div ref={regionRef} aria-live="polite">
       {cards.length > 0 ? (
         <div ref={queueRef} className="mx-auto w-full max-w-(--chat-content-max-width) px-4 py-1">
-          {/* One box: the pause row, when shown, is its first row, and each card a row below it. */}
+          {/* One box: the header is its first row, and each card a row below it. */}
           <div className="divide-y divide-border rounded-md border border-border bg-card text-card-foreground">
-            {pause ? (
-              <NativeChatQueuePauseRow
-                pause={pause}
-                resuming={controller.resuming}
-                onResume={() => refocusAfter(controller.resume())}
-              />
-            ) : null}
+            <NativeChatQueueHeader
+              count={cards.length}
+              attentionCaption={attentionCaption}
+              pause={pause}
+              resuming={controller.resuming}
+              clearCapable={controller.clearCapable}
+              expanded={expanded}
+              listId={listId}
+              onToggle={() => setExpanded(!expanded)}
+              onClearAll={() => refocusAfter(controller.clear())}
+              onResume={() => refocusAfter(controller.resume())}
+            />
             <ul
               ref={listRef}
+              id={listId}
+              // Hidden, not unmounted: an open edit keeps its typing while the list is collapsed.
+              hidden={!expanded}
               aria-label={translate(
                 'components.native-chat.queuedMessages.listLabel',
                 'Queued messages'
@@ -128,39 +157,95 @@ export function NativeChatQueuedMessageList({
   )
 }
 
-/** Why the queue sends nothing on its own. An unknown reason (a newer host) is a plain pause. */
-function queuePauseText(pause: { reason: string }): string {
-  switch (pause.reason) {
-    case 'stopped':
-      return translate(
-        'components.native-chat.queuedMessages.queuePausedStopped',
-        'Queue paused because you interrupted'
-      )
-    default:
-      return translate('components.native-chat.queuedMessages.queuePaused', 'Queue paused')
-  }
-}
-
-function NativeChatQueuePauseRow({
+/** "Queued" and the count; while the host holds the queue after a Stop, "Paused" with Clear all
+ *  and Resume. Collapsing hides only the cards. */
+function NativeChatQueueHeader({
+  count,
+  attentionCaption,
   pause,
   resuming,
+  clearCapable,
+  expanded,
+  listId,
+  onToggle,
+  onClearAll,
   onResume
 }: {
-  pause: { reason: string }
+  count: number
+  attentionCaption: string | null
+  pause: { reason: string } | null
   resuming: boolean
+  clearCapable: boolean
+  expanded: boolean
+  listId: string
+  onToggle: () => void
+  onClearAll: () => void
   onResume: () => void
 }): React.JSX.Element {
-  const text = queuePauseText(pause)
+  const toggleLabel = expanded
+    ? translate('components.native-chat.queuedMessages.collapse', 'Collapse')
+    : translate('components.native-chat.queuedMessages.expand', 'Expand')
   return (
-    <div className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-muted-foreground">
-      <Pause className="size-3.5 shrink-0" aria-hidden />
-      <p className="min-w-0 flex-1 truncate" title={text}>
-        {text}
+    <div
+      className={cn(
+        'flex items-center gap-1 rounded-t-md py-1 pr-1 pl-2.5 text-xs text-muted-foreground',
+        pause && 'bg-muted',
+        !expanded && 'rounded-b-md'
+      )}
+    >
+      <p className={cn('truncate', pause && 'font-medium text-foreground')}>
+        {pause
+          ? translate('components.native-chat.queuedMessages.paused', 'Paused')
+          : translate('components.native-chat.queuedMessages.queued', 'Queued')}
       </p>
-      <Button type="button" variant="ghost" size="xs" disabled={resuming} onClick={onResume}>
-        <Play className="size-3" />
-        {translate('components.native-chat.queuedMessages.resume', 'Resume')}
-      </Button>
+      <span className={cn('tabular-nums', attentionCaption ? 'shrink-0' : 'min-w-0 flex-1')}>
+        {count}
+      </span>
+      {attentionCaption ? (
+        <span className="flex min-w-0 flex-1 items-center gap-1 text-destructive">
+          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{attentionCaption}</span>
+        </span>
+      ) : null}
+      {pause ? (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            disabled={!clearCapable}
+            onClick={onClearAll}
+          >
+            <Trash2 />
+            {translate('components.native-chat.queuedMessages.clearAll', 'Clear all')}
+          </Button>
+          <Button type="button" variant="ghost" size="xs" disabled={resuming} onClick={onResume}>
+            <Play />
+            {translate('components.native-chat.queuedMessages.resume', 'Resume')}
+          </Button>
+        </>
+      ) : null}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={translate(
+              'components.native-chat.queuedMessages.listLabel',
+              'Queued messages'
+            )}
+            aria-expanded={expanded}
+            aria-controls={listId}
+            onClick={onToggle}
+          >
+            {expanded ? <ChevronDown /> : <ChevronRight />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={4}>
+          {toggleLabel}
+        </TooltipContent>
+      </Tooltip>
     </div>
   )
 }

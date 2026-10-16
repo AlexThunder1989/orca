@@ -1,6 +1,5 @@
 import {
   readAgentAttentionUnreadReason,
-  type AgentAttentionRemainder,
   type ReadableAgentAttentionUnread
 } from './agent-attention-contract'
 
@@ -10,13 +9,6 @@ export type AgentAttentionTurnRecords = {
   /** Turns kept after their session ended, so a finished agent can still be acknowledged. */
   retainedTurns: Record<string, { entry: { stateStartedAt: number } }>
   acknowledgedTurnStartedAt: Record<string, number>
-}
-
-export type AgentAttentionAcknowledgementSink = {
-  acknowledgeSubjects: (subjectKeys: string[]) => void
-  clearWorkspaceUnread: (workspaceId: string) => void
-  clearGroupUnread: (groupId: string) => void
-  clearSubjectUnread: (subjectKey: string) => void
 }
 
 export function readAgentAttentionTurnStartedAt(
@@ -92,77 +84,4 @@ export function computeLapsedManualUnreadProtections(
     }
   }
   return lapsed
-}
-
-/**
- * One workspace's attention as every surface kind sees it.
- *
- * Why a union: workspace unread is owned by the workspace, not by a surface kind, so a surface
- * that can only see its own tabs would report a sibling of another kind as absent and let the
- * clear through. A workspace owns surfaces when any kind owns one.
- */
-export function mergeAgentAttentionRemainders(
-  remainders: readonly AgentAttentionRemainder[]
-): AgentAttentionRemainder {
-  return {
-    hasSurfaces: remainders.some((remainder) => remainder.hasSurfaces),
-    unreadSubjectKeys: remainders.flatMap((remainder) => [...remainder.unreadSubjectKeys]),
-    unreadGroupIds: remainders.flatMap((remainder) => [...remainder.unreadGroupIds])
-  }
-}
-
-/**
- * Workspace unread is coarse, so a hidden sibling still wanting attention keeps it lit even
- * while the user acknowledges the subject in front of them.
- */
-export function shouldClearWorkspaceAttention(
-  remainder: AgentAttentionRemainder,
-  args: { viewedGroupId: string; clearedSubjectKeys: ReadonlySet<string> }
-): boolean {
-  if (!remainder.hasSurfaces) {
-    return true
-  }
-  for (const subjectKey of remainder.unreadSubjectKeys) {
-    if (!args.clearedSubjectKeys.has(subjectKey)) {
-      return false
-    }
-  }
-  for (const groupId of remainder.unreadGroupIds) {
-    if (groupId !== args.viewedGroupId) {
-      return false
-    }
-  }
-  return true
-}
-
-export function applyAgentAttentionAcknowledgement(
-  sink: AgentAttentionAcknowledgementSink,
-  args: {
-    /** Null when a hidden sibling still owns the workspace's attention. */
-    workspaceIdToClear: string | null
-    viewedGroupId: string
-    subjectKeys: string[]
-    viewedUnreadSubjectKey?: string | null
-  }
-): void {
-  const subjectKeysToClear = new Set(args.subjectKeys)
-  if (args.viewedUnreadSubjectKey) {
-    subjectKeysToClear.add(args.viewedUnreadSubjectKey)
-  }
-
-  if (args.subjectKeys.length === 0 && subjectKeysToClear.size === 0) {
-    return
-  }
-
-  if (args.subjectKeys.length > 0) {
-    sink.acknowledgeSubjects(args.subjectKeys)
-  }
-  if (args.workspaceIdToClear !== null) {
-    // Why: the selected agent is now visible, so drop the Dock-driving workspace unread.
-    sink.clearWorkspaceUnread(args.workspaceIdToClear)
-  }
-  sink.clearGroupUnread(args.viewedGroupId)
-  for (const subjectKey of subjectKeysToClear) {
-    sink.clearSubjectUnread(subjectKey)
-  }
 }

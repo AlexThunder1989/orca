@@ -10,12 +10,16 @@ import { structuredAgentSessionCreateFingerprint } from '../../../shared/structu
 import { isStructuredAgentSessionMainAgentWorking } from '../../../shared/structured-agent-session-main-agent-working'
 import type { HostCreateSupport } from './structured-agent-session-host-admission'
 
-const mocks = vi.hoisted(() => ({
-  call: vi.fn<(target: unknown, method: string, params: unknown) => Promise<unknown>>(),
-  supports: vi.fn<() => Promise<boolean>>(),
-  admit: vi.fn<() => Promise<HostCreateSupport>>(),
-  inventory: vi.fn()
-}))
+const mocks = vi.hoisted(() => {
+  const settings: Record<string, unknown> = {}
+  return {
+    call: vi.fn<(target: unknown, method: string, params: unknown) => Promise<unknown>>(),
+    supports: vi.fn<() => Promise<boolean>>(),
+    admit: vi.fn<() => Promise<HostCreateSupport>>(),
+    inventory: vi.fn(),
+    settings
+  }
+})
 vi.mock('@/runtime/structured-agent-session-client', () => ({
   callStructuredAgentSession: mocks.call,
   supportsStructuredAgentSessionCreateMessage: mocks.supports
@@ -29,7 +33,7 @@ vi.mock('@/runtime/structured-session-tab-inventory', () => ({
 vi.mock('@/store', () => ({
   useAppStore: {
     getState: () => ({
-      settings: {},
+      settings: mocks.settings,
       unifiedTabsByWorktree: {},
       seedNativeChatLaunchDraft: vi.fn(),
       clearNativeChatLaunchDraft: vi.fn()
@@ -46,6 +50,7 @@ import {
   getStructuredAgentSessionLaunchLifecycle
 } from './structured-agent-session-launch'
 import { holdStructuredAgentSessionLaunchOption } from './structured-agent-session-launch-options'
+import { recordHostModelCatalogSnapshot } from '@/runtime/host-model-catalog-snapshots'
 import { resetStructuredAgentLaunchRegistryForTests } from './structured-agent-session-launch-registry'
 import {
   resetStructuredAgentLaunchPersistenceForTests,
@@ -192,6 +197,39 @@ describe('the first message owned by create', () => {
     expect(mocks.inventory).not.toHaveBeenCalled()
     expect(mocks.call.mock.calls.map(([, method]) => method)).toEqual(['agentSession.create'])
   })
+
+  it.each([
+    ['new', {}],
+    ['resumed', { resumeFrom: { providerSessionId: 'provider-session-1' } }]
+  ])(
+    "carries the model the host's saved list moves a gone saved one to, %s, as a send does",
+    async (_kind, resume) => {
+      mocks.settings = {
+        nativeChatSessionOptions: {
+          claude: { model: 'claude-gone' }
+        }
+      }
+      const xhigh = [{ value: 'xhigh', label: 'xhigh' }]
+      recordHostModelCatalogSnapshot(target, 'claude', null, {
+        origin: 'probe',
+        fetchedAt: 1,
+        models: [{ id: 'opus[1m]', label: 'Opus', isDefault: true, efforts: xhigh }]
+      })
+      mocks.call.mockImplementation(async () => created())
+      try {
+        const launch = startStructuredAgentLaunch('workspace-1', 'claude', {
+          requestId: newAgentLaunchRequestId(),
+          executionHostId: 'local',
+          prompt: 'opening text',
+          ...resume
+        })
+        await launch.launchResult
+        expect(createParams().options?.model).toBe('opus[1m]')
+      } finally {
+        mocks.settings = {}
+      }
+    }
+  )
 
   it('returns a refused create once after the new draft, with no later send', async () => {
     const create = deferred<unknown>()

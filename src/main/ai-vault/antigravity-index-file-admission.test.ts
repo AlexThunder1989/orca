@@ -42,7 +42,6 @@ afterEach(async () => {
 })
 
 describe('bounded regular metadata reads', () => {
-
   it.skipIf(process.platform === 'win32')(
     'rejects a regular path replaced by a FIFO between stat and open',
     async () => {

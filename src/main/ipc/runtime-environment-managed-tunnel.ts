@@ -1,4 +1,8 @@
 import { resolveEnvironment } from '../../shared/runtime-environment-store'
+import {
+  getOrcadSshDeployment,
+  isWslHostRuntimeEnvironment
+} from '../../shared/runtime-environments'
 import type {
   SshManagedServerStatus,
   SshManagedServerUpdateNote,
@@ -19,6 +23,8 @@ import {
 import { getSshHostServerStatus, setSshHostServerStatus } from '../ssh/ssh-host-server-status'
 import { getSshTargetRegistryStore } from '../ssh/ssh-target-registry'
 import { connectionManager, getCurrentMainWindow } from './ssh-ipc-context'
+import { getWslHostService } from '../wsl/wsl-host-service-instance'
+import { assertWslHostReachable } from '../wsl/wsl-host-gate'
 import { broadcastSshState } from './ssh-renderer-broadcast'
 
 export async function resolveManagedRuntimeEnvironment(
@@ -26,13 +32,20 @@ export async function resolveManagedRuntimeEnvironment(
   selector: string
 ): Promise<ReturnType<typeof resolveEnvironment>> {
   const environment = resolveEnvironment(userDataPath, selector)
+  // Every call, subscription and status probe passes here, so a gated-off WSL host is never reached.
+  assertWslHostReachable(environment)
+  if (isWslHostRuntimeEnvironment(environment)) {
+    // Reached over the wsl.exe bridge; connects only when an open project or terminal needs it.
+    await getWslHostService()?.ensureForRuntimeCall(environment.id)
+    return resolveEnvironment(userDataPath, environment.id)
+  }
   await ensureOrcadManagedTunnel(userDataPath, environment.id)
   // Why: a server that stopped (idle, killed, host rebooted) starts before the call that needs it.
   const serving = await verifyOrcadManagedServing(userDataPath, environment.id)
   const createDeps = () => ({
     ...managedServerUpdateDeps(userDataPath),
     target: () => {
-      const targetId = environment.orcadDeployment?.sshTargetId
+      const targetId = getOrcadSshDeployment(environment)?.sshTargetId
       return targetId ? (getSshTargetRegistryStore()?.getTarget(targetId) ?? null) : null
     },
     publish: publishRestoreUpdate

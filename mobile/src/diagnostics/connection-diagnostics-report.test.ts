@@ -56,6 +56,29 @@ describe('buildConnectionDiagnosticsReport', () => {
     expect(report).toContain('No connection events recorded.')
   })
 
+  it('names the shell build and bridge version under the app line when given', () => {
+    const args = {
+      hostName: 'Host 3',
+      endpoint: 'ws://192.168.1.50:6768',
+      state: 'connected' as const,
+      reconnectAttempts: 0,
+      lastConnectedAt: null,
+      platform: 'ios 26',
+      appVersion: '0.0.60',
+      entries: [],
+      nowMs: NOW
+    }
+    const lines = buildConnectionDiagnosticsReport({
+      ...args,
+      shell: { kind: 'ota', bridgeProtocolVersion: 1 }
+    }).split('\n')
+    expect(lines.slice(2, 4)).toEqual([
+      'App: Orca Mobile 0.0.60 · ios 26',
+      'Shell: ota · bridge protocol 1'
+    ])
+    expect(buildConnectionDiagnosticsReport(args)).not.toContain('Shell:')
+  })
+
   it('explains the most likely cause and redacts credentials before copying', () => {
     const report = buildConnectionDiagnosticsReport({
       hostName: 'Host 3',

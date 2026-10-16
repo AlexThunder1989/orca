@@ -5,6 +5,7 @@ import {
   CLAUDE_PROFILE_MISSING_MESSAGE,
   CLAUDE_PROFILE_SETUP_FAILED_MESSAGE
 } from './claude-profile-routing'
+import type { AgentSessionRefusalReference } from './agent-session-wire-refusals'
 
 /** Sentences a refusal notice shows too, so a chat says them one way. */
 export const TERMINAL_AGENT_HOLDS_CHAT = 'This chat is still open in a terminal agent.'
@@ -27,6 +28,8 @@ export const AGENT_SESSION_FAILURE_COPY = {
   sendAgainToTryOnceMore: 'Send your message again to try once more.',
   couldNotStart: "{{agent}} couldn't start.",
   couldNotRestart: "{{agent}} couldn't restart.",
+  codexCliTooOld:
+    'Codex {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer.',
   argumentsUnsupportedOption: 'Saved Arguments contain an unsupported option ({{option}}).',
   argumentsMissingValue: 'Saved Arguments need a value for {{option}}.',
   argumentsMultipleValues: 'Saved Arguments give {{option}} more than one value.',
@@ -68,6 +71,8 @@ export const AGENT_SESSION_FAILURE_COPY = {
   claudeAccountSetupFailed: CLAUDE_PROFILE_SETUP_FAILED_MESSAGE,
   agentCommandNotRunnable:
     "{{agent}}'s Command in Settings → Agents must be a program path or name Orca can find, with no arguments or variables. Change it or reset it.",
+  runtimeNotInstalled:
+    "{{agent}} isn't installed on the computer running this chat. Install it from the chat in a current version of Orca.",
   chooseClaudeAccount: 'Choose or add one in Claude Accounts settings.',
   chooseClaudeAccountThenRunCommand:
     'Choose or add one in Claude Accounts settings, then run /{{command}} again.',
@@ -76,8 +81,10 @@ export const AGENT_SESSION_FAILURE_COPY = {
   providerExitedRow:
     '{{agent}} stopped while this response was in progress. You can continue in this conversation.',
   providerExitedRejection: '{{agent}} stopped before this message was sent.',
-  providerRejected: 'The provider did not accept this message.',
-  providerRejectedQuoted: 'The provider did not accept this message: {{detail}}.',
+  providerExitedAnswer:
+    '{{agent}} has stopped, so your answer was not sent. Send a message to continue.',
+  providerRejected: "{{agent}} didn't accept this message.",
+  providerRejectedQuoted: "{{agent}} didn't accept this message: {{detail}}.",
   attachmentEmpty: 'An image on this message is empty, so the message was not sent.',
   attachmentTooLarge: 'An image on this message is too large, so the message was not sent.',
   attachmentLargerThan:
@@ -120,7 +127,11 @@ export const AGENT_SESSION_FAILURE_COPY = {
   cancelUnconfirmed: 'Cancellation was not confirmed.',
   stopRefused: "{{agent}} didn't stop.",
   stopRefusedQuoted: "{{agent}} didn't stop: {{detail}}.",
+  couldNotStop: "Couldn't stop {{agent}}.",
+  couldNotStopTheAgent: "Couldn't stop the agent.",
   noTurnToStop: '{{agent}} had no turn running to stop.',
+  backgroundTaskNotStopped: "The background task wasn't stopped.",
+  backgroundTasksNotStopped: "The background tasks weren't stopped.",
   answerUnconfirmed: 'Your answer was recorded but the agent did not confirm it.',
   hostFault: "Orca ran into a problem, so this didn't go through.",
   hostFaultTryAgain: "Orca ran into a problem, so this didn't go through. Try again.",
@@ -140,6 +151,8 @@ export type AgentSessionFailureCopyId = keyof typeof AGENT_SESSION_FAILURE_COPY
 
 /** What a piece's `{{name}}` placeholders stand for. */
 export type AgentSessionFailureCopyValues = {
+  installedVersion?: string
+  minimumVersion?: string
   agent?: string
   command?: string
   loginCommand?: string
@@ -157,6 +170,23 @@ export type AgentSessionFailureSay = (
   id: AgentSessionFailureCopyId,
   values?: AgentSessionFailureCopyValues
 ) => string
+
+export function codexInstallationFailureWords(
+  refusal: AgentSessionRefusalReference | undefined,
+  say: AgentSessionFailureSay
+): string | null {
+  const installation =
+    refusal?.code === 'agent_session_operation_invalid'
+      ? refusal.details?.codexInstallation
+      : undefined
+  return installation
+    ? say(installation.installedVersion === null ? 'cliMissing' : 'codexCliTooOld', {
+        agent: 'Codex',
+        installedVersion: installation.installedVersion ?? '',
+        minimumVersion: installation.minimumVersion
+      })
+    : null
+}
 
 /** The host's words, and any surface without translations. */
 export const sayAgentSessionFailureEnglish: AgentSessionFailureSay = (id, values = {}) => {

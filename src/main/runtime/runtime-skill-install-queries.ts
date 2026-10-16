@@ -5,11 +5,6 @@ import { listManagedSkillInstalls } from '../skills/skill-install-provenance'
 import { WslSkillInstallFilesystem } from '../skills/skill-wsl-install-filesystem'
 import { nativeSkillInstallFilesystem } from '../skills/skill-install-filesystem'
 import {
-  previewSkillInstallOnSshHost,
-  removeSkillInstallOnSshHost
-} from '../skills/skill-ssh-relay-service'
-import { previewSkillBundleInstallOnSshHost } from '../skills/skill-bundle-ssh-relay-service'
-import {
   previewSharedSkillBundleInstall,
   previewSharedSkillInstall,
   removeSharedSkillInstall
@@ -24,22 +19,15 @@ import type {
   SkillUploadBeginRequest,
   SkillUploadChunkRequest
 } from './runtime-skill-types'
-import { RuntimeSkillInstallCommands } from './runtime-skill-install-commands'
-import { normalizeSshRelaySkillDestination } from '../skills/skill-ssh-relay-destination'
+import {
+  RuntimeSkillInstallCommands,
+  SKILL_SSH_UNAVAILABLE
+} from './runtime-skill-install-commands'
+import { isSkillSshDestination } from './runtime-skill-install-authority'
 
 export class RuntimeSkillInstallQueries extends RuntimeSkillInstallCommands {
   async previewSharedSkillInstallRequest(request: SkillInstallPreviewRequest) {
-    const target = await this.sshTarget(request.destination)
-    if (target) {
-      return previewSkillInstallOnSshHost({
-        provider: target.provider,
-        request: {
-          ...request,
-          destination: normalizeSshRelaySkillDestination(request.destination)
-        },
-        workspace: target.workspace
-      })
-    }
+    await this.refuseSshDestination(request.destination)
     await this.host.skillTransactionRecovery
     return previewSharedSkillInstall(request, {
       authority: this.authority(),
@@ -49,17 +37,7 @@ export class RuntimeSkillInstallQueries extends RuntimeSkillInstallCommands {
     })
   }
   async previewSharedSkillBundleInstallRequest(request: SkillBundleInstallPreviewRequest) {
-    const target = await this.sshTarget(request.destination)
-    if (target) {
-      return previewSkillBundleInstallOnSshHost({
-        provider: target.provider,
-        request: {
-          ...request,
-          destination: normalizeSshRelaySkillDestination(request.destination)
-        },
-        workspace: target.workspace
-      })
-    }
+    await this.refuseSshDestination(request.destination)
     await this.host.skillTransactionRecovery
     return previewSharedSkillBundleInstall(request, {
       authority: this.authority(),
@@ -69,17 +47,7 @@ export class RuntimeSkillInstallQueries extends RuntimeSkillInstallCommands {
     })
   }
   async removeSharedSkillInstallRequest(request: SkillRemoveRequest) {
-    const target = await this.sshTarget(request.destination)
-    if (target) {
-      return removeSkillInstallOnSshHost({
-        provider: target.provider,
-        request: {
-          ...request,
-          destination: normalizeSshRelaySkillDestination(request.destination)
-        },
-        workspace: target.workspace
-      })
-    }
+    await this.refuseSshDestination(request.destination)
     await this.host.skillTransactionRecovery
     return removeSharedSkillInstall(request, {
       authority: this.authority(),
@@ -90,7 +58,7 @@ export class RuntimeSkillInstallQueries extends RuntimeSkillInstallCommands {
   }
   async listManagedSkillInstalls(connectionId?: string): Promise<ManagedSkillInstall[]> {
     if (connectionId) {
-      return this.requireSsh(connectionId)
+      throw new Error(SKILL_SSH_UNAVAILABLE)
     }
     await this.host.skillTransactionRecovery
     const runtimeId = this.host.getRuntimeId()
@@ -144,7 +112,7 @@ export class RuntimeSkillInstallQueries extends RuntimeSkillInstallCommands {
     })
   }
   async skillInstallDestinationUsesSsh(destination: SkillInstallRequest['destination']) {
-    return Boolean(await this.sshTarget(destination))
+    return isSkillSshDestination(this.host, destination)
   }
   async resolveSkillDiscoveryProviderRoots(target: {
     kind: 'native-host' | 'wsl'

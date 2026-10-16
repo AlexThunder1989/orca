@@ -101,7 +101,7 @@ export function typecheckBatches(projects, { compiler, bunConcurrency, memoryByt
   )
 }
 
-function checkProject(config, { compiler, bunThreads, root }) {
+function checkProject(config, { compiler, bunThreads, root, spawnCompiler }) {
   return new Promise((resolve, reject) => {
     const installedCompiler = resolveProjectCompilerInfo(config, root)
     // Bun 1.4.3 targets TypeScript 7.0.2; compiler upgrades require a new parity comparison.
@@ -110,7 +110,7 @@ function checkProject(config, { compiler, bunThreads, root }) {
         `Bun CI compiler targets TypeScript 7.0.2, but ${config} resolves ${installedCompiler.version}`
       )
     }
-    const child = spawnProcess({
+    const child = spawnCompiler({
       program: compiler === 'bun' ? 'bun' : process.execPath,
       args:
         compiler === 'bun'
@@ -138,15 +138,37 @@ export async function runTypecheckProjects({
   bunThreads = 4,
   root = repoRoot,
   projects = TYPECHECK_PROJECTS,
+  spawnCompiler = spawnProcess,
   memoryBytes = totalmem(),
   parallelism = availableParallelism()
 } = {}) {
   const batches = typecheckBatches(projects, { compiler, bunConcurrency, memoryBytes, parallelism })
+  if (compiler === 'bun') {
+    // Equal Bun reservations let a freed slot start the next project without waiting for peers.
+    const pending = batches.flat()
+    const failures = []
+    let next = 0
+    await Promise.all(
+      Array.from({ length: Math.max(0, ...batches.map((batch) => batch.length)) }, async () => {
+        while (next < pending.length) {
+          const index = next++
+          try {
+            await checkProject(pending[index].config, { compiler, bunThreads, root, spawnCompiler })
+          } catch (reason) {
+            failures.push({ index, reason })
+          }
+        }
+      })
+    )
+    return failures.sort((left, right) => left.index - right.index).map(({ reason }) => reason)
+  }
   // Every batch runs even after one fails, so a single broken project still reports the rest.
   const failures = []
   for (const batch of batches) {
     const results = await Promise.allSettled(
-      batch.map((project) => checkProject(project.config, { compiler, bunThreads, root }))
+      batch.map((project) =>
+        checkProject(project.config, { compiler, bunThreads, root, spawnCompiler })
+      )
     )
     for (const result of results) {
       if (result.status === 'rejected') {

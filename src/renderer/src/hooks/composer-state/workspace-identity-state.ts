@@ -11,7 +11,7 @@ type WorkspaceIdentityStateInput = Pick<
   | 'newWorkspaceDraft'
   | 'persistDraft'
   | 'selectedRepoConnectionId'
-  | 'selectedRepoSettings'
+  | 'selectedRepoRuntimeEnvironmentId'
   | 'settings'
 >
 
@@ -51,7 +51,7 @@ export function useWorkspaceIdentityState(input: WorkspaceIdentityStateInput) {
     newWorkspaceDraft,
     persistDraft,
     selectedRepoConnectionId,
-    selectedRepoSettings,
+    selectedRepoRuntimeEnvironmentId,
     settings
   } = input
 
@@ -176,7 +176,7 @@ export function useWorkspaceIdentityState(input: WorkspaceIdentityStateInput) {
   )
 
   // Why: for a repo on an SSH host or runtime env, read the per-host agent list so the dialog shows the host's installed agents, not local.
-  const runtimeEnvironmentId = selectedRepoSettings?.activeRuntimeEnvironmentId?.trim() || null
+  const runtimeEnvironmentId = selectedRepoRuntimeEnvironmentId?.trim() || null
 
   // Kept as-is: uploads fence on the worktree's real host, which for a server repo is its target.
   const connectionId = selectedRepoConnectionId

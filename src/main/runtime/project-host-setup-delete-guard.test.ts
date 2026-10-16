@@ -46,7 +46,6 @@ function makeController(options: {
     getStore: () => store as never,
     listRepos: () => [targetRepo],
     addRepo: vi.fn(),
-    addRemoteRepo: vi.fn(),
     cloneRepo: vi.fn(),
     invalidateResolvedWorktrees: vi.fn(),
     invalidateWorktreeScan: vi.fn(),

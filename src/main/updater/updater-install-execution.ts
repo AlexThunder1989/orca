@@ -1,5 +1,4 @@
-import { BrowserWindow } from 'electron'
-import { killAllPty } from '../ipc/pty'
+import { releaseSessionsForInstaller } from './updater-installer-session-release'
 import { withUpdaterSpan } from '../observability/instrumentation'
 import { runWithLaunchPath } from '../startup/hydrate-shell-path'
 import {
@@ -8,15 +7,17 @@ import {
   setMacInstallPreflightInProgress
 } from '../updater-mac-install'
 import { getMacUpdateRunningInstances } from '../macos-update-running-instances'
+import { commitServeSupervisorPark } from './serve-supervisor-install-park'
 import { armUpdateInstallExitWatchdog } from '../update-install-exit-watchdog'
 import { getLinuxPackageType } from '../linux-update-package-type'
 import { LINUX_PACKAGE_MARKER_UNUSABLE_MESSAGE } from '../linux-package-downloaded-status'
 import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
 import { requestServeUpdateHandoff, failServeUpdateHandoff } from '../serve-update-handoff'
-import { UpdaterPackageRecovery } from './updater-package-recovery'
+import { UpdaterMacInstallPreflight } from './updater-mac-install-preflight'
+import { prepareThisProcessShipItStaging } from './shipit-leftover-recovery'
 import { MAC_DEFERRED_STAGING_TIMEOUT_MS } from './updater-state'
 
-export abstract class UpdaterInstallExecution extends UpdaterPackageRecovery {
+export abstract class UpdaterInstallExecution extends UpdaterMacInstallPreflight {
   protected async performQuitAndInstall(): Promise<void> {
     if (this.quitAndInstallInProgress) {
       recordUpdaterLifecycle('quit_and_install_ignored', { reason: 'already-in-progress' })
@@ -65,39 +66,12 @@ export abstract class UpdaterInstallExecution extends UpdaterPackageRecovery {
     this.quittingForUpdate = true
 
     try {
-      if (process.platform === 'darwin') {
-        setMacInstallPreflightInProgress(true)
-        let blockers: number[]
-        try {
-          blockers = await getMacUpdateRunningInstances()
-        } catch {
-          this.resetQuitForUpdateState()
-          this.mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
-          this.sendInstallFailureStatus({
-            state: 'error',
-            version: pendingVersion,
-            retryAction: 'install',
-            message:
-              'Could not check for other running Orca instances. Orca remains open. Try again. If the check keeps failing, close the other Orca instances and background orca serve servers, then quit Orca to let the update install on exit. Reopen Orca afterwards.'
-          })
-          recordUpdaterLifecycle('macos_running_instances_check_failed')
-          return
-        }
-        if (blockers.length > 0) {
-          this.resetQuitForUpdateState()
-          this.mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
-          this.sendInstallFailureStatus({
-            state: 'error',
-            version: pendingVersion,
-            retryAction: 'install',
-            message: `Close the other Orca instances (process IDs: ${blockers.slice(0, 10).join(', ')}) before installing this update. Background orca serve instances also need to stop. Orca remains open; retry the update after closing them.`
-          })
-          recordUpdaterLifecycle('macos_install_blocked_by_running_instances', {
-            pids: blockers.slice(0, 10).join(', '),
-            count: blockers.length
-          })
-          return
-        }
+      this.sendStatus(
+        { state: 'downloaded', version: pendingVersion, installing: true },
+        { force: true }
+      )
+      if (!(await this.preflightMacInstall(pendingVersion))) {
+        return
       }
       markMacQuitAndInstallInFlight()
       await withUpdaterSpan({ stage: 'install' }, async (span) => {
@@ -137,6 +111,9 @@ export abstract class UpdaterInstallExecution extends UpdaterPackageRecovery {
           return
         }
 
+        await commitServeSupervisorPark(() => getMacUpdateRunningInstances())
+        // Why here: deferred staging starts inside the native install call below.
+        await (this.isMacStagingDeferredToInstall() ? prepareThisProcessShipItStaging() : null)
         recordUpdaterLifecycle('quit_and_install_invoking_native', {
           version: pendingVersion || null
         })
@@ -188,7 +165,7 @@ export abstract class UpdaterInstallExecution extends UpdaterPackageRecovery {
           return
         }
 
-        const windowCount = this.releaseSessionsForInstaller()
+        const windowCount = releaseSessionsForInstaller()
         span.addEvent('local_pty_kill_all')
         span.addEvent('window_close_listeners_removed', { windowCount })
 
@@ -257,7 +234,7 @@ export abstract class UpdaterInstallExecution extends UpdaterPackageRecovery {
       version: this.getPendingInstallVersion() || null
     })
     try {
-      this.releaseSessionsForInstaller()
+      releaseSessionsForInstaller()
     } catch (error) {
       recordUpdaterLifecycle(
         'post_commit_cleanup_failed',
@@ -275,15 +252,6 @@ export abstract class UpdaterInstallExecution extends UpdaterPackageRecovery {
     if (this.isAwaitingMacStaging()) {
       this.handleQuitAndInstallFailure(error)
     }
-  }
-
-  private releaseSessionsForInstaller(): number {
-    killAllPty()
-    const windows = BrowserWindow.getAllWindows()
-    for (const win of windows) {
-      win.removeAllListeners('close')
-    }
-    return windows.length
   }
 
   protected commitInFlightInstall(): void {

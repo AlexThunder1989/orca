@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE } from '../../../../shared/constants'
+import { getWorktreeCardDetails } from '../../../../shared/worktree/card-properties'
 import {
   isRuntimeOwnedSshTargetId,
   parseExecutionHostId,
@@ -32,6 +33,7 @@ export function useWorktreeCardFoundation({
   const openAutomationsPage = useAppStore((s) => s.openAutomationsPage)
   const setPendingAutomationRunNavigation = useAppStore((s) => s.setPendingAutomationRunNavigation)
   const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
+  const setWorkspaceUnreadByUser = useAppStore((s) => s.setWorkspaceUnreadByUser)
   const deleteFolderWorkspace = useAppStore((s) => s.deleteFolderWorkspace)
   const setActiveWorktree = useAppStore((s) => s.setActiveWorktree)
   const renamingWorktreeId = useAppStore((s) => s.renamingWorktreeId)
@@ -45,7 +47,12 @@ export function useWorktreeCardFoundation({
     useAppStore((s) => s.agentActivityDisplayMode) ?? DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE
   const projectGroups = useAppStore((s) => s.projectGroups)
   const newCardStyle = settings?.experimentalNewWorktreeCardStyle === true
-  const compactCards = !newCardStyle && settings?.compactWorktreeCards === true
+  const compactWorktreeCards = settings?.compactWorktreeCards === true
+  const cardDetails = useMemo(
+    () => getWorktreeCardDetails(cardProps, { compactWorktreeCards, newCardStyle }),
+    [cardProps, compactWorktreeCards, newCardStyle]
+  )
+  const { compactCards } = cardDetails
   const handleEditIssue = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -221,6 +228,7 @@ export function useWorktreeCardFoundation({
     openModal,
     openTaskPage,
     updateWorktreeMeta,
+    setWorkspaceUnreadByUser,
     deleteFolderWorkspace,
     setActiveWorktree,
     renamingWorktreeId,
@@ -234,6 +242,7 @@ export function useWorktreeCardFoundation({
     projectGroups,
     newCardStyle,
     compactCards,
+    cardDetails,
     handleEditIssue,
     handleManageLinks,
     handleEditComment,

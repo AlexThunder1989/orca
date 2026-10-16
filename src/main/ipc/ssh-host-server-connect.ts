@@ -2,6 +2,7 @@
 import { getAppEnvironment } from '../../shared/app-environment'
 import type {
   SshConnectionState,
+  SshManagedServerLinkedProject,
   SshManagedServerServingNote,
   SshManagedServerUpdateNote,
   SshTarget
@@ -72,13 +73,15 @@ export function publishManagedServerConnect(
   targetId: string,
   environmentId: string,
   update?: SshManagedServerUpdateNote,
-  serving?: SshManagedServerServingNote
+  serving?: SshManagedServerServingNote,
+  linked?: SshManagedServerLinkedProject[]
 ): SshConnectionState {
   const managedServer = {
     kind: 'managed' as const,
     environmentId,
     ...(update ? { update } : {}),
-    ...(serving ? { serving } : {})
+    ...(serving ? { serving } : {}),
+    ...(linked ? { linked } : {})
   }
   setSshHostServerStatus(targetId, managedServer)
   void restoreManagedHostPortForwards(targetId)
@@ -99,7 +102,7 @@ export function publishManagedServerConnect(
  */
 export function publishUnservedHostServer(
   target: SshTarget,
-  decision: Extract<HostServerOnConnectResult, { route: 'relay' }>
+  decision: Extract<HostServerOnConnectResult, { route: 'unserved' }>
 ): Error {
   const managedServer = unservedServerStatus(decision)
   setSshHostServerStatus(target.id, managedServer)

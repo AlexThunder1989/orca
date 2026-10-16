@@ -22,6 +22,11 @@ export type RuntimeFileOpenResult = {
   opened: boolean
 }
 
+export type RuntimeFileOpenPosition = {
+  line: number
+  column?: number
+}
+
 export type RuntimeFileReadResult = {
   worktree: string
   relativePath: string

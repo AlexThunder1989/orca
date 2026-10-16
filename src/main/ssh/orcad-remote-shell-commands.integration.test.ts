@@ -581,8 +581,12 @@ describe('liveness and stop commands, run for real', () => {
     const child = spawn('/bin/sh', ['-c', 'exit 0'], { stdio: 'ignore' })
     try {
       writeFileSync(join(versionDir, ORCAD_PID_FILENAME), String(child.pid))
-      // Block the event loop so Node never reaps it; the process is now a zombie.
-      sh('sleep 1')
+      // Block Node's reaper until the shell observes the required zombie state.
+      sh(
+        `attempt=0; while [ "$attempt" -lt 100 ]; do ` +
+          `case "$(ps -o stat= -p ${child.pid} 2>/dev/null)" in *Z*) exit 0;; esac; ` +
+          `attempt=$((attempt + 1)); sleep 0.01; done; exit 1`
+      )
       expect(sh(`ps -o stat= -p ${child.pid} || echo GONE`).trim()).toMatch(/^Z/)
       expect(sh(`kill -0 ${child.pid} 2>/dev/null && echo LIVE || echo DEAD`).trim()).toBe('LIVE')
       expect(parseOrcadLiveness(sh(orcadLivenessProbeCommand(host, versionDir)))).toBe('DEAD')

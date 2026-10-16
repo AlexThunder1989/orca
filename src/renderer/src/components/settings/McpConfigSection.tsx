@@ -32,7 +32,8 @@ import { McpMissingConfigList } from './McpMissingConfigList'
 import { loadMcpConfigInspections } from './mcp-config-inspection'
 import { translate } from '@/i18n/i18n'
 import { captureDirectSshMutationExpectation } from '@/lib/ssh-mutation-expectation'
-import { writeRuntimeFile, type RuntimeFileOperationArgs } from '@/runtime/runtime-file-client'
+import { writeRuntimeFile } from '@/runtime/runtime-file-mutation-client'
+import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client-types'
 import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
 
 type McpConfigSectionProps = {

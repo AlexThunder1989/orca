@@ -15,7 +15,7 @@ import type {
   StructuredAgentSessionHostSession,
   StructuredAgentSessionProviderChild
 } from './structured-agent-session-host-types'
-import { endProviderChild } from './structured-agent-session-provider-child'
+import { recordProviderChildEnd } from './structured-agent-session-provider-child'
 import {
   releaseStoredStructuredAgentSessionOwnerAfterExit,
   type StructuredAgentSessionLeaseStore
@@ -49,14 +49,23 @@ export type StructuredAgentSessionChildExitSession = Pick<
   'child' | 'lastEndedChild'
 > & { journal: DeadGenerationJournal & Pick<AgentSessionJournal, 'cursor' | 'itemBody'> }
 
+/** The one edge every way a generation ends goes through
+ *  (`StructuredAgentSessionClientDelivery.publishGenerationEnded`). */
+export type StructuredAgentSessionGenerationEnded = (
+  sessionId: string,
+  options?: { restate?: boolean }
+) => void
+
 export type StructuredAgentSessionChildExitContext<
   TSession extends StructuredAgentSessionChildExitSession = StructuredAgentSessionHostSession
 > = {
   store: StructuredAgentSessionLeaseStore
   sessions: Map<string, TSession>
   flushLifecycle: (sessionId: string) => Promise<StructuredAgentSessionSinkBarrier>
-  publishFence: (sessionId: string, session: TSession) => void
   publishStatus?: (sessionId: string) => void
+  /** A generation ended: every reader re-derives current work and the queued-card drain is
+   *  scheduled, with no journal write needed. `restate`: each chat re-baselines at the moved fence. */
+  generationEnded: StructuredAgentSessionGenerationEnded
   /** The delivery loop hands over whatever is queued once the child is off the record. */
   wakeDelivery?: (sessionId: string) => void
   /** An ended child's start, if still open, has nothing left to time. */
@@ -145,20 +154,27 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
         ? ('hostRestarted' as const)
         : ('chatClosed' as const)
       : undefined
+  // Death first: before the tail, the settlement or the release writes anything, every reader
+  // projects this generation as ended, so no frame they publish reads it Working and no prompt it
+  // raised is answerable. The child stays on record (its sink drains the tail) until `endChild`.
+  recordProviderChildEnd(session, {
+    generation: child.generation,
+    fence: child.fence,
+    // A close keeps the cause of the stop that asked for it, and ends where it was asked.
+    cause: expected ? (close?.cause ?? 'evict') : 'exit',
+    reason: expected ? (close?.reason ?? null) : exit.reason,
+    ...(!expected && exit.failure ? { failure: exit.failure } : {}),
+    duringStartup: exitedDuringStartup,
+    // The adapter publishes an exit only once it saw the root go, first-hand or proven.
+    rootGone: true,
+    ...(expected && close ? { endedAt: close.requestedAt } : {})
+  })
+  context.generationEnded(sessionId)
   const endChild = (): void => {
     context.startupAttempts?.childEnded(sessionId, child)
-    endProviderChild(session, {
-      generation: child.generation,
-      fence: child.fence,
-      // A close keeps the cause of the stop that asked for it, and ends where it was asked.
-      cause: expected ? (close?.cause ?? 'evict') : 'exit',
-      reason: expected ? (close?.reason ?? null) : exit.reason,
-      ...(!expected && exit.failure ? { failure: exit.failure } : {}),
-      duringStartup: exitedDuringStartup,
-      // The adapter publishes an exit only once it saw the root go, first-hand or proven.
-      rootGone: true,
-      ...(expected && close ? { endedAt: close.requestedAt } : {})
-    })
+    if (session.child === child) {
+      session.child = null
+    }
     context.publishStatus?.(sessionId)
   }
   const record = context.store.getRecord(sessionId)
@@ -256,10 +272,10 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
     }
     endChild()
     // A reader re-baselines on a death of the child's own; a close Orca asked for moves no fence a
-    // reader holds, as a client resends a message when its fence moves.
-    if (released && !expected) {
-      context.publishFence(sessionId, session)
-    }
+    // reader holds, as a client resends a message when its fence moves, and discards a reply (the
+    // Stop's own) issued at the fence before. Either way every reader learns the generation ended
+    // and the queued-card drain runs, whether or not the release or the settlement was written.
+    context.generationEnded(sessionId, { restate: released && !expected })
     context.wakeDelivery?.(sessionId)
   }
 }

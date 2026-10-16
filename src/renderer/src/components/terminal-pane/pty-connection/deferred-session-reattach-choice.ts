@@ -1,7 +1,7 @@
 import { isRemoteRuntimePtyId } from '../../../../../shared/remote-runtime-pty-id'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { useAppStore } from '@/store'
-import { isWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
+import { isWebTerminalSurfaceTabId } from '../../../../../shared/terminal-surface-id'
 import { getEagerPtyBufferHandle } from '../pty-dispatcher'
 
 import {

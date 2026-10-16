@@ -263,9 +263,7 @@ describe('the next accepted turn releases a kept card', () => {
     const shown = projectStructuredAgentSessionMessages(
       page.page.items,
       [lingering],
-      page.page.submissions,
-      // The desktop's transcript, which draws a rejected send in place unless it was kept.
-      { rejectedInPlace: true }
+      page.page.submissions
     ).map((message) => ({
       text: message.blocks.map((block) => ('text' in block ? block.text : '')).join(''),
       unsent: message.unsent ?? false
@@ -482,8 +480,7 @@ describe('a message accepted while the agent starts, then the chat closes', () =
       const texts = projectStructuredAgentSessionMessages(
         page.page.items,
         [],
-        page.page.submissions,
-        { rejectedInPlace: true }
+        page.page.submissions
       )
         .flatMap((shown) => shown.blocks.map((block) => ('text' in block ? block.text : '')))
         .join('|')

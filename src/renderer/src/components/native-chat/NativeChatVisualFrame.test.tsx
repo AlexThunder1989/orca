@@ -23,16 +23,15 @@ vi.mock('@/lib/http-link-routing', () => ({
 import { NativeChatVisualFrame } from './NativeChatVisualFrame'
 import { acquireWebviewsDragPassthrough } from '../browser-pane/host-guest/webview-drag-passthrough'
 
-const visual = { revision: 'r1', html: '<p>chart</p>' }
+const visual = { revision: 'r1', html: '<p>chart</p>', path: '/v' }
 
-function Harness(props: { layout?: 'inline' | 'panel'; onRetired?: () => void }) {
+function Harness(props: { onRetired?: () => void }) {
   const scope = useRef<HTMLDivElement | null>(null)
   return (
     <div ref={scope}>
       <NativeChatVisualFrame
         document={visual}
         title="Chart"
-        layout={props.layout ?? 'inline'}
         themeScope={scope}
         onRetired={props.onRetired ?? (() => {})}
       />
@@ -119,7 +118,7 @@ afterEach(() => {
 
 describe('NativeChatVisualFrame', () => {
   it('lets a dragged tab pass over the frame while a tab drag holds pointer passthrough', () => {
-    const { container } = render(<Harness layout="panel" />)
+    const { container } = render(<Harness />)
     const frame = frameOf(container)
     expect(frame.style.pointerEvents).toBe('')
 
@@ -261,15 +260,5 @@ describe('NativeChatVisualFrame', () => {
     unmount()
     waitOutTheAnswer()
     expect(onRetired).not.toHaveBeenCalled()
-  })
-
-  it('fills a panel instead of fitting its height', () => {
-    const { container } = render(<Harness layout="panel" />)
-    const frame = frameOf(container)
-    post(
-      { type: NATIVE_CHAT_VISUAL_SIZE_TYPE, channel: channelOf(frame), height: 420 },
-      frame.contentWindow
-    )
-    expect(frame.parentElement?.style.height).toBe('')
   })
 })

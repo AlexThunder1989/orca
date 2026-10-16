@@ -38,6 +38,9 @@ export abstract class RemoteRuntimeTerminalBinarySnapshots extends RemoteRuntime
           : stream.initialSnapshotReceived
             ? 'recovery'
             : 'initial'
+      if (stream.snapshotTarget === 'recovery') {
+        this.noteResyncSnapshotProgress(stream)
+      }
       return
     }
     if (frame.opcode === TerminalStreamOpcode.SnapshotChunk) {
@@ -53,6 +56,9 @@ export abstract class RemoteRuntimeTerminalBinarySnapshots extends RemoteRuntime
         return
       }
       stream.snapshotChunks.push(frame.payload)
+      if (stream.snapshotTarget === 'recovery') {
+        this.noteResyncSnapshotProgress(stream)
+      }
       return
     }
     if (frame.opcode === TerminalStreamOpcode.SnapshotEnd) {

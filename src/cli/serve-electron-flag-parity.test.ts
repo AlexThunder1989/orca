@@ -11,7 +11,14 @@ import { SERVE_COMMAND_SPECS } from './specs/serve'
 // - help: a help launch is refused outright, not translated (see serve-mode-argv's HELP_FLAGS).
 // - pairing-code / environment: nothing in src/main reads them, so they ride through untouched.
 // - force: overrides the CLI's own pre-exec check; a direct `<binary> serve` launch has none to override.
-const UNTRANSLATED_GLOBAL_FLAGS = new Set(['help', 'pairing-code', 'environment', 'force'])
+// - supervise: the CLI is the supervisor; a direct `<binary> serve` launch has no parent to restart it.
+const UNTRANSLATED_GLOBAL_FLAGS = new Set([
+  'help',
+  'pairing-code',
+  'environment',
+  'force',
+  'supervise'
+])
 
 const serveSpec = SERVE_COMMAND_SPECS.find((spec) => spec.path.join(' ') === 'serve')
 const translatedFlags = [...new Set(serveSpec?.allowedFlags ?? [])].filter(

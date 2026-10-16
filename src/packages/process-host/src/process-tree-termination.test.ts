@@ -105,6 +105,46 @@ describe('forceTerminateProcessTree', () => {
     })
   })
 
+  it('allows a slow Windows taskkill to verify tree termination', async () => {
+    await withWindows(async () => {
+      vi.useFakeTimers()
+      const child = mockProcess(1234)
+      const taskkill = mockProcess(5678)
+      spawnMock.mockReturnValue(taskkill)
+      let settled = false
+      const pending = forceTerminateProcessTree(child)
+      void pending.then(() => {
+        settled = true
+      })
+
+      await vi.advanceTimersByTimeAsync(3_000)
+
+      expect(settled).toBe(false)
+      expect(taskkill.kill).not.toHaveBeenCalled()
+      expect(child.kill).not.toHaveBeenCalled()
+      taskkill.emit('close', 0)
+      await expect(pending).resolves.toBe(true)
+    })
+  })
+
+  it('bounds a hung Windows taskkill and leaves tree termination unverified', async () => {
+    await withWindows(async () => {
+      vi.useFakeTimers()
+      const child = mockProcess(1234)
+      const taskkill = mockProcess(5678)
+      spawnMock.mockReturnValue(taskkill)
+      const pending = forceTerminateProcessTree(child)
+
+      await vi.advanceTimersByTimeAsync(5_000)
+
+      await expect(pending).resolves.toBe(false)
+      expect(taskkill.kill).toHaveBeenCalledOnce()
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL')
+      taskkill.emit('close', 0)
+      expect(child.kill).toHaveBeenCalledOnce()
+    })
+  })
+
   it.skipIf(process.platform === 'win32')(
     'stops waiting when a POSIX process group cannot become quiescent',
     async () => {

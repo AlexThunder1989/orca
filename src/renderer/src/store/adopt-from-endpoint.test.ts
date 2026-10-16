@@ -3,7 +3,7 @@ import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../shared/project-group-types'
 import type { ProjectHostSetup } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
-import type { RuntimeClientTarget } from '../runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { adoptFromEndpoint } from './adopt-from-endpoint'
 import { getFolderWorkspaceHostId } from './folder-workspaces/folder-workspace-catalog'
 

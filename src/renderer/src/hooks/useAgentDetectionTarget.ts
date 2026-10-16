@@ -3,9 +3,9 @@ import { useAppStore } from '@/store'
 import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
 import {
   getExplicitRuntimeEnvironmentIdForWorktree,
-  getExecutionHostIdForWorktree,
-  type WorktreeRuntimeOwnerState
+  getExecutionHostIdForWorktree
 } from '@/lib/worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from '@/lib/worktree-runtime-owner-state'
 import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'

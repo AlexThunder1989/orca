@@ -8,7 +8,7 @@ import {
   isTerminalPromptMutation,
   orchestrationMigrationData
 } from '../../shared/orchestration-rpc-contract'
-import type { PairingOffer } from '../../shared/pairing'
+import type { PairedRuntimeConnection } from '../../shared/paired-runtime-connection'
 import { launchOrcaApp } from './launch'
 import { getDefaultUserDataPath, readMetadata } from './metadata'
 import { getCliStatus, projectRemoteAppStatus } from './status'
@@ -22,7 +22,7 @@ import {
 } from './terminal-prompt-mutation-recovery'
 import { markEnvironmentUsed } from './environments'
 import { createRuntimeSourceFence, type RuntimeSourceFence } from './runtime-source-fence'
-import { resolveRemotePairing } from './runtime-remote-pairing'
+import { resolveRemoteConnection } from './runtime-remote-pairing'
 import {
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   ORCHESTRATION_CONTRACT_VERSION
@@ -48,7 +48,7 @@ const loadWebSocketTransport = async () => await import('./websocket-transport.j
 export class RuntimeClient {
   private readonly userDataPath: string
   private readonly requestTimeoutMs: number
-  private readonly remotePairing: PairingOffer | null
+  private readonly remote: PairedRuntimeConnection | null
   private readonly environmentSelector: string | null
   private readonly cliExecutable: string
   private readonly originalArgs: readonly string[] | undefined
@@ -75,13 +75,13 @@ export class RuntimeClient {
     this.environmentSelector = environmentSelector
     this.cliExecutable = cliExecutable
     this.originalArgs = originalArgs ? [...originalArgs] : undefined
-    this.remotePairing = resolveRemotePairing(userDataPath, remotePairingCode, environmentSelector)
+    this.remote = resolveRemoteConnection(userDataPath, remotePairingCode, environmentSelector)
     this.remoteCompat = new RemoteRuntimeCompatGate(userDataPath, environmentSelector)
     this.runtimeSourceFence = createRuntimeSourceFence(process.env, userDataPath, requestTimeoutMs)
   }
 
   get isRemote(): boolean {
-    return this.remotePairing !== null
+    return this.remote !== null
   }
 
   async call<TResult>(
@@ -139,13 +139,13 @@ export class RuntimeClient {
       orchestrationRequestId,
       ...compatibilityEnvelope
     }
-    if (this.remotePairing) {
+    if (this.remote) {
       const transport = await loadWebSocketTransport()
       let response
       try {
         response = await this.remoteCompat.send<TResult>({
           transport,
-          pairing: this.remotePairing,
+          connection: this.remote,
           method,
           params,
           timeoutMs: effectiveTimeoutMs,
@@ -217,7 +217,7 @@ export class RuntimeClient {
   }
 
   async getCliStatus(): Promise<RuntimeRpcSuccess<CliStatusResult>> {
-    if (this.remotePairing) {
+    if (this.remote) {
       const response = await this.call<RuntimeStatus>('status.get')
       this.remoteCompat.noteVerifiedStatus(response.result)
       const graphState = response.result.graphStatus
@@ -270,7 +270,7 @@ export class RuntimeClient {
 
   private async checkOrchestrationContractCompatibility(timeoutMs: number): Promise<void> {
     const response = await this.call<RuntimeStatus>('status.get', undefined, { timeoutMs })
-    if (this.remotePairing) {
+    if (this.remote) {
       this.remoteCompat.noteVerifiedStatus(response.result)
     }
     if (!response.result.capabilities?.includes(ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY)) {
@@ -284,7 +284,7 @@ export class RuntimeClient {
 
   async openOrca(timeoutMs = 15_000): Promise<RuntimeRpcSuccess<CliStatusResult>> {
     const initial = await this.getCliStatus()
-    if (this.remotePairing) {
+    if (this.remote) {
       return initial
     }
 

@@ -1,6 +1,5 @@
 import type { Readable } from 'node:stream'
-import type { ClientChannel } from 'ssh2'
-import type { SshConnection } from './ssh-connection'
+import type { RemoteCommandChannel, RemoteInstallTransport } from './remote-install-transport'
 import { createSshOperationAbortError, type SshExecOptions } from './ssh-connection-utils'
 import {
   redactRelayInstallMarkerError,
@@ -74,7 +73,7 @@ export function sshCommandExitError(
 }
 
 export async function execCommand(
-  conn: Pick<SshConnection, 'exec' | 'usesSystemSshTransport'>,
+  conn: Pick<RemoteInstallTransport, 'exec' | 'execWithClosedStdin' | 'usesSystemSshTransport'>,
   command: string,
   options?: ExecCommandOptions
 ): Promise<string> {
@@ -90,9 +89,13 @@ export async function execCommand(
   // (an `echo`, a title escape) would otherwise be read as the command's answer.
   const fence = execOptions.wrapCommand === false ? null : buildPosixStdoutFence(command, 'SSH')
   const readPayload = (stdout: string): string => fence?.readStdout(stdout) ?? stdout
-  let channel: ClientChannel
+  let channel: RemoteCommandChannel
   try {
-    channel = await conn.exec(fence?.command ?? command, execOptions)
+    // Why only without `stdin`: nothing below writes or ends the channel's stdin otherwise.
+    channel =
+      !stdin && conn.execWithClosedStdin
+        ? await conn.execWithClosedStdin(fence?.command ?? command, execOptions)
+        : await conn.exec(fence?.command ?? command, execOptions)
   } catch (error) {
     // Preserve identity/classifier fields while removing install-owner tokens.
     redactRelayInstallMarkerError(error)

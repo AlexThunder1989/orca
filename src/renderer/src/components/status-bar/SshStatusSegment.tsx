@@ -14,9 +14,12 @@ import { translate } from '@/i18n/i18n'
 import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import {
   isRuntimeOwnedSshTargetId,
-  toRuntimeExecutionHostId
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
 } from '../../../../shared/execution-host'
-import { isUserManagedRuntimeEnvironment } from '../../../../shared/runtime-environments'
+import { buildExecutionHostRegistry } from '../../../../shared/execution-host-registry'
+import { pickerExecutionHosts } from '../../../../shared/managed-orcad-execution-host'
+import { isListedRemoteServer } from '../../../../shared/runtime-environments'
 import { RuntimeHostStatusRow } from './RuntimeHostStatusRow'
 import { connectedHostCountLabel, connectingHostsLabel } from './ssh-status-segment-copy'
 import { SshTargetStatusRow } from './SshTargetStatusRow'
@@ -52,26 +55,46 @@ export function SshStatusSegment({
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
 
   const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const userManagedEnvironments = runtimeEnvironments.filter(isListedRemoteServer)
+  // Why the registry: a managed server and its SSH host are one machine, shown on its active route.
+  const visibleHostLabels = new Map(
+    pickerExecutionHosts(
+      buildExecutionHostRegistry({
+        repos: [],
+        settings,
+        hostSource: 'configured-only',
+        sshTargetLabels,
+        sshConnectionStates,
+        runtimeEnvironments: userManagedEnvironments,
+        runtimeStatusByEnvironmentId,
+        hostLabelOverrides
+      })
+    ).map((host) => [host.id, host.label])
+  )
   const targets = Array.from(sshTargetLabels.entries())
     // Why: runtime-owned (per-workspace-env) SSH targets are hidden — never list them
     // as a user-facing SSH host in the status bar.
-    .filter(([id]) => !isRuntimeOwnedSshTargetId(id))
+    .filter(
+      ([id]) => !isRuntimeOwnedSshTargetId(id) && visibleHostLabels.has(toSshExecutionHostId(id))
+    )
     .map(([id, label]) => {
       const state = sshConnectionStates.get(id)
       return {
         id,
-        label,
+        label: visibleHostLabels.get(toSshExecutionHostId(id)) || label,
         status: state?.status ?? ('disconnected' satisfies SshConnectionStatus)
       }
     })
-  const runtimeHosts = runtimeEnvironments
-    .filter(isUserManagedRuntimeEnvironment)
+  const runtimeHosts = userManagedEnvironments
+    .filter((environment) => visibleHostLabels.has(toRuntimeExecutionHostId(environment.id)))
     .map((environment) => {
       const statusEntry = runtimeStatusByEnvironmentId.get(environment.id)
-      const override = hostLabelOverrides.get(toRuntimeExecutionHostId(environment.id))
       return {
         id: environment.id,
-        label: override || environment.name || environment.id,
+        label:
+          visibleHostLabels.get(toRuntimeExecutionHostId(environment.id)) ||
+          environment.name ||
+          environment.id,
         snapshot: statusEntry?.snapshot,
         status: statusEntry?.status ?? null,
         active: settings?.activeRuntimeEnvironmentId === environment.id,

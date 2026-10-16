@@ -5,7 +5,8 @@ import type {
 } from '../../../../shared/agent-session-journal-types'
 import type { StructuredAgentSessionOptimisticMessage } from '../../../../shared/structured-agent-session-message-projection'
 import { projectStructuredAgentSessionMessages as projectMessages } from '../../../../shared/structured-agent-session-message-projection'
-import { projectStructuredQuestionMessages } from './structured-agent-question-projection'
+import { projectStructuredQuestionMessages } from '../../../../shared/structured-agent-question-projection'
+import { isActionableStructuredAgentSessionPrompt } from '../../../../shared/structured-agent-session-live-turn'
 
 /** The desktop's transcript: a message the host accepted and then rejected stays where it was
  *  sent, as not sent, unless the queue holds it as a card. */
@@ -14,25 +15,26 @@ export function projectStructuredAgentSessionMessages(
   optimistic: readonly StructuredAgentSessionOptimisticMessage[],
   submissions: readonly AgentJournalSubmission[]
 ) {
-  return projectMessages(
-    items,
-    optimistic,
-    submissions,
-    { rejectedInPlace: true },
-    projectStructuredQuestionMessages
-  )
+  return projectMessages(items, optimistic, submissions, projectStructuredQuestionMessages)
 }
 
 export type StructuredPromptItem = AgentJournalRenderItem & {
   body: Extract<AgentJournalRenderItem['body'], { kind: 'approval' | 'question' }>
 }
 
-export function pendingStructuredSessionPrompts(
-  items: AgentJournalRenderItem[]
-): StructuredPromptItem[] {
-  return agentSessionCurrentContextRows(items).items.filter(
+/** The prompt cards a person can answer: pending, and named by the host as waiting
+ *  (`isActionableStructuredAgentSessionPrompt`) when the host names them. */
+export function pendingStructuredSessionPrompts({
+  journalItems,
+  actionablePromptIds
+}: {
+  journalItems: AgentJournalRenderItem[]
+  actionablePromptIds?: readonly string[]
+}): StructuredPromptItem[] {
+  return agentSessionCurrentContextRows(journalItems).items.filter(
     (item): item is StructuredPromptItem =>
       (item.body.kind === 'approval' || item.body.kind === 'question') &&
-      item.body.resolution.state === 'pending'
+      item.body.resolution.state === 'pending' &&
+      isActionableStructuredAgentSessionPrompt(item.itemId, actionablePromptIds)
   )
 }

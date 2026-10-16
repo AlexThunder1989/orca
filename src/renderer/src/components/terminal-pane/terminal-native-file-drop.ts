@@ -1,10 +1,10 @@
 import { toast } from 'sonner'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
-import { importExternalPathsToRuntime } from '@/runtime/runtime-file-client'
+import { importExternalPathsToRuntime } from '@/runtime/runtime-file-import-client'
 import { translate } from '@/i18n/i18n'
 import { isWslUncPath } from '../../../../shared/wsl-paths'
-import type { PtyTransport } from './pty-transport'
+import type { PtyTransport } from './pty-transport-types'
 import { recordTerminalUserInputForLeaf } from './terminal-input-activity'
 import { reportTerminalDropUploadSkipsAndFailures } from './terminal-drop-upload-report'
 import {
@@ -17,7 +17,6 @@ import {
   resolveTerminalDropTargetShell
 } from './terminal-drop-shell'
 import { writeTerminalDropPathsToCapturedTarget } from './terminal-drop-path-writer'
-import { getTerminalPasteSshRemotePlatform } from './terminal-paste-ssh-platform'
 import { showTerminalDropWriteFailure } from './terminal-drop-write-failure'
 import { joinRuntimeTerminalDropDir } from './terminal-drop-worktree-path'
 import type { captureTerminalDropTransportOwner } from './terminal-drop-transport-owner'
@@ -72,8 +71,7 @@ export async function deliverNativeTerminalFileDrop(
   const targetShell = resolveTerminalDropTargetShell({
     activeRuntimeEnvironmentId: null,
     worktreePath,
-    connectionId,
-    remotePlatform: getTerminalPasteSshRemotePlatform(connectionId)
+    connectionId
   })
   const isRemote = connectionId !== null
 

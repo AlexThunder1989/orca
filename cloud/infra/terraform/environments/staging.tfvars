@@ -22,6 +22,7 @@ relay_max_instances                   = 2
 # Staging proves these before production turns them on.
 relay_director_cloud_sql_proxy_sidecar = true
 relay_event_loop_stall_alert           = true
+relay_dead_cell_verdict_alert          = true
 # What the serving staging director runs (revision 00171, 2026-10-11). Pinned so the sidecar apply,
 # whose revision the next deploy adopts as its shape, does not also drop it to the 80 / 30 s defaults.
 relay_director_concurrency             = 1000
@@ -47,8 +48,8 @@ relay_gce_cells = {
     boot_disk_gb      = 30
     boot_image        = "https://www.googleapis.com/compute/v1/projects/cos-cloud/global/images/cos-stable-121-18867-528-7"
     capacity_requests = 4000
-    # Step-5 image D (#27049-#27107). Never 2d0f6e6: it cannot report capped telemetry.
-    image = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:ac2ab357d3ed9f104ed3d5c440ef3d1ad493d9661e86d1c404d8dfc6b7c59c02"
+    # Step-5 image G (main 2de73812, reports preAuthLatencyMs). Never 2d0f6e6: it cannot report capped telemetry.
+    image = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:07b5bf67a7706b2a61ef5e9a6d8ce85ee37c2a08609496a94eb5254881b5b87d"
     # Step-5 staging e2e: c1 is the second US reserve cell, so it needs a cap and rehome trust.
     connection_hard_cap         = 600
     connection_unobserved_bound = 60
@@ -60,7 +61,7 @@ relay_gce_cells = {
     boot_disk_gb                = 30
     boot_image                  = "https://www.googleapis.com/compute/v1/projects/cos-cloud/global/images/cos-stable-121-18867-528-7"
     capacity_requests           = 4000
-    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:ac2ab357d3ed9f104ed3d5c440ef3d1ad493d9661e86d1c404d8dfc6b7c59c02"
+    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:41cba995b288cab70579882ebef23e74c5ee426b6f8924cea7c986aba23bcbfe"
     connection_hard_cap         = 600
     connection_unobserved_bound = 60
   }
@@ -85,7 +86,7 @@ relay_gce_cells = {
     boot_image                  = "https://www.googleapis.com/compute/v1/projects/cos-cloud/global/images/cos-stable-121-18867-528-21"
     capacity_requests           = 6000
     database_pool_max           = 10
-    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:94bc2b2d5d42e87ce9528372734862b7616810b81a5b03c3ed140c6c5dd82fc8"
+    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:07b5bf67a7706b2a61ef5e9a6d8ce85ee37c2a08609496a94eb5254881b5b87d"
     initially_enabled           = false
     connection_hard_cap         = 3000
     connection_unobserved_bound = 60
@@ -99,7 +100,7 @@ relay_gce_cells = {
     boot_disk_gb                = 30
     boot_image                  = "https://www.googleapis.com/compute/v1/projects/cos-cloud/global/images/cos-stable-121-18867-528-7"
     capacity_requests           = 4000
-    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:ac2ab357d3ed9f104ed3d5c440ef3d1ad493d9661e86d1c404d8dfc6b7c59c02"
+    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:07b5bf67a7706b2a61ef5e9a6d8ce85ee37c2a08609496a94eb5254881b5b87d"
     connection_hard_cap         = 600
     connection_unobserved_bound = 60
   }
@@ -110,7 +111,7 @@ relay_gce_cells = {
     boot_disk_gb                = 30
     boot_image                  = "https://www.googleapis.com/compute/v1/projects/cos-cloud/global/images/cos-stable-121-18867-528-7"
     capacity_requests           = 4000
-    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:ac2ab357d3ed9f104ed3d5c440ef3d1ad493d9661e86d1c404d8dfc6b7c59c02"
+    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:07b5bf67a7706b2a61ef5e9a6d8ce85ee37c2a08609496a94eb5254881b5b87d"
     connection_hard_cap         = 600
     connection_unobserved_bound = 60
   }
@@ -121,7 +122,7 @@ relay_gce_cells = {
     boot_disk_gb                = 30
     boot_image                  = "https://www.googleapis.com/compute/v1/projects/cos-cloud/global/images/cos-stable-121-18867-528-7"
     capacity_requests           = 4000
-    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:ac2ab357d3ed9f104ed3d5c440ef3d1ad493d9661e86d1c404d8dfc6b7c59c02"
+    image                       = "us-central1-docker.pkg.dev/onorca-cloud-staging/orca-cloud/relay@sha256:07b5bf67a7706b2a61ef5e9a6d8ce85ee37c2a08609496a94eb5254881b5b87d"
     connection_hard_cap         = 600
     connection_unobserved_bound = 60
   }

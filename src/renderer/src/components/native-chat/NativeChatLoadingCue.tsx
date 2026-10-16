@@ -11,7 +11,7 @@ export function NativeChatLoadingCue(): React.JSX.Element {
       data-native-chat-loading-cue="true"
       className="flex h-full w-full items-center justify-center animate-in fade-in delay-250 [--tw-animation-fill-mode:backwards]"
     >
-      <LoadingSpinner className="size-5 text-muted-foreground" />
+      <LoadingSpinner className="size-5 text-chat-foreground-faint" />
     </div>
   )
 }

@@ -1,10 +1,8 @@
 import type { WorktreeSlice } from '../../worktree-helpers'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import { parseExecutionHostId } from '../../../../../../shared/execution-host'
-import {
-  runtimeTargetForOwnerEnvironment,
-  type RuntimeClientTarget
-} from '../../../../runtime/runtime-client-target'
+import { runtimeTargetForOwnerEnvironment } from '../../../../runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import {
   applyWorktreeLineageUpdate,
   refreshWorktreeLineageForTarget,

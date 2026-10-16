@@ -5,11 +5,7 @@ import type { ComposerModel } from './composer-model'
 
 type TargetInput = Pick<
   ComposerModel,
-  | 'selectedProjectGroup'
-  | 'selectedRepoPath'
-  | 'selectedRepoExecutionHostId'
-  | 'selectedRepoSettings'
-  | 'connectionId'
+  'selectedProjectGroup' | 'selectedRepoPath' | 'selectedRepoExecutionHostId' | 'connectionId'
 > & { selectedRepo: Pick<Repo, 'id'> | undefined }
 
 export function resolveComposerAttachmentTarget(input: TargetInput) {
@@ -30,9 +26,6 @@ export function resolveComposerAttachmentTarget(input: TargetInput) {
         ? null
         : (group.connectionId ?? null)
       : input.connectionId,
-    settings: {
-      ...input.selectedRepoSettings,
-      activeRuntimeEnvironmentId: host?.kind === 'runtime' ? host.environmentId : null
-    }
+    runtimeEnvironmentId: host?.kind === 'runtime' ? host.environmentId : null
   }
 }

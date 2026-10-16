@@ -15,7 +15,7 @@ import {
   nativeChatRowContentMetrics,
   NATIVE_CHAT_SUBAGENT_SECTION_HEAD_PX
 } from './native-chat-row-height-estimate'
-import type { NativeChatResolvedPrompt } from './native-chat-resolution-receipt'
+import type { NativeChatResolvedPrompt } from '../../../../shared/native-chat-resolution-receipt'
 import { compareMessages } from './native-chat-session-assembler'
 import {
   nativeChatSubagentEntryRuns,

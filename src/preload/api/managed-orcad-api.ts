@@ -46,6 +46,8 @@ export type ManagedOrcadPreloadApi = {
   previewDeltaMove: (args: { sshTargetId: string }) => Promise<OrcadDeltaMovePreview>
   moveDelta: (args: { sshTargetId: string }) => Promise<OrcadDeltaMoveResult>
   keepServerVersion: (args: { sshTargetId: string }) => Promise<void>
+  /** "Move anyway": the next connect leaves what can't move on this desktop. */
+  allowMoveLeavingBehind: (args: { sshTargetId: string }) => Promise<void>
 }
 
 export const managedOrcadApi: ManagedOrcadPreloadApi = {
@@ -65,5 +67,7 @@ export const managedOrcadApi: ManagedOrcadPreloadApi = {
   previewDeltaMove: (args) => ipcRenderer.invoke('runtimeEnvironments:previewOrcadDeltaMove', args),
   moveDelta: (args) => ipcRenderer.invoke('runtimeEnvironments:moveOrcadDelta', args),
   keepServerVersion: (args) =>
-    ipcRenderer.invoke('runtimeEnvironments:keepOrcadServerVersion', args)
+    ipcRenderer.invoke('runtimeEnvironments:keepOrcadServerVersion', args),
+  allowMoveLeavingBehind: (args) =>
+    ipcRenderer.invoke('runtimeEnvironments:allowOrcadMoveLeavingBehind', args)
 }
