@@ -3,6 +3,7 @@ import type { OrcadTerminalCensus } from './orcad-terminal-census'
 import type { OrcadMigrationBlocker } from './orcad-migration-preflight'
 import type { OrcadMigrationSourceCutoverPhase } from './orcad-migration-source-cutover'
 import type { OrcadDaemonRetirementVerdict } from './orcad-stop-request'
+import type { SshManagedServerLinkedProject } from './ssh-types'
 
 export const ORCAD_MANAGED_REMOTE_PORT = 6_768
 
@@ -138,6 +139,8 @@ export type OrcadManagedConversionResult =
       outcome: 'converted'
       environment: PublicKnownRuntimeEnvironment
       migrationId: string
+      /** Projects the server already held, so this desktop's own state for them did not move. */
+      linkedProjects?: SshManagedServerLinkedProject[]
     }
   | OrcadManagedDeferral
   | OrcadManagedRefusal

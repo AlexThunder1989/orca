@@ -20,7 +20,6 @@ vi.mock('./terminal-drop-worktree-path', () => ({ resolveTerminalDropWorktreePat
 vi.mock('./terminal-drop-shell', () => ({
   resolveTerminalDropTargetShell: () => ({ kind: 'posix' })
 }))
-vi.mock('./terminal-paste-ssh-platform', () => ({ getTerminalPasteSshRemotePlatform: () => null }))
 vi.mock('./terminal-drop-path-writer', () => ({
   writeTerminalDropPathsToCapturedTarget: mocks.write
 }))

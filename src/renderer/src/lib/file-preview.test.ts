@@ -235,6 +235,34 @@ describe('openFileInBrowserTab', () => {
     expect(mocks.focusGroup).not.toHaveBeenCalled()
   })
 
+  // Why: the split is part of the tab create, so reusing an open document must leave no empty group.
+  it('creates no split when a side preview reuses an open document', () => {
+    mocks.connectionId = 'ssh-1'
+    mocks.browserTabsByWorktree = {
+      'wt-1': [
+        {
+          id: 'browser-9',
+          docLocation: {
+            kind: 'workspace-doc',
+            worktreeId: 'wt-1',
+            filePath: '/home/alice/report.html'
+          }
+        }
+      ]
+    }
+
+    openFilePreviewToSide({
+      language: 'html',
+      filePath: '/home/alice/report.html',
+      worktreeId: 'wt-1',
+      sourceGroupId: 'group-1'
+    })
+
+    expect(mocks.createEmptySplitGroup).not.toHaveBeenCalled()
+    expect(mocks.createBrowserTab).not.toHaveBeenCalled()
+    expect(mocks.setActiveBrowserTab).toHaveBeenCalledWith('browser-9')
+  })
+
   it('opens a second document in its own tab', () => {
     mocks.connectionId = 'ssh-1'
     mocks.browserTabsByWorktree = {
@@ -296,11 +324,11 @@ describe('openFileInBrowserTab', () => {
       sourceGroupId: 'group-1'
     })
 
-    expect(mocks.createEmptySplitGroup).toHaveBeenCalledWith('wt-1', 'group-1', 'right', {
-      activate: false
-    })
+    expect(mocks.createEmptySplitGroup).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).toHaveBeenCalledWith(
-      ...docPreviewCall('/srv/repo/example.html', { targetGroupId: 'group-2' })
+      ...docPreviewCall('/srv/repo/example.html', {
+        split: { sourceGroupId: 'group-1', splitDirection: 'right', activate: false }
+      })
     )
   })
 
@@ -312,10 +340,10 @@ describe('openFileInBrowserTab', () => {
       sourceGroupId: 'group-1'
     })
 
-    expect(mocks.createEmptySplitGroup).toHaveBeenCalledWith('wt-1', 'group-1', 'right')
+    expect(mocks.createEmptySplitGroup).not.toHaveBeenCalled()
     expect(mocks.createBrowserTab).toHaveBeenCalledWith('wt-1', 'file:///tmp/example.html', {
       title: 'example.html',
-      targetGroupId: 'group-2',
+      split: { sourceGroupId: 'group-1', splitDirection: 'right', activate: true },
       activate: true
     })
   })

@@ -5,7 +5,7 @@ import {
   EMPTY_WORKSPACE_LAYOUT_CACHE,
   type WorkspaceLayoutCache
 } from '../store/workspace-layout-cache'
-import type { RuntimeClientTarget } from './runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { subscribeRuntimeLayout, type RuntimeLayoutStreamStatus } from './runtime-layout-client'
 
 type FakeStream = {
@@ -142,15 +142,6 @@ describe.each(targets)('runtime layout client over the %s transport', (_name, ta
     return host.streams[count - 1]!
   }
 
-  /** Whether a retry opens exactly `delayMs` after the previous loss. */
-  async function expectRetryAfter(delayMs: number): Promise<FakeStream> {
-    const count = host.streams.length
-    await vi.advanceTimersByTimeAsync(delayMs - 1)
-    expect(host.streams).toHaveLength(count)
-    await vi.advanceTimersByTimeAsync(1)
-    return opened(count + 1)
-  }
-
   function snapshot(workspaces: { key: string; layout: PublishedWorkspaceLayout }[] = []) {
     return { type: 'snapshot', subscriptionId: 'layout-1', workspaces }
   }
@@ -186,7 +177,7 @@ describe.each(targets)('runtime layout client over the %s transport', (_name, ta
     expect(stream.unsubscribed).toBe(false)
   })
 
-  it('after a lost stream, resubscribes and the new snapshot replaces the cache', async () => {
+  it('after a lost stream, keeps the last state and never reopens it', async () => {
     subscribe()
     const first = await opened(1)
     first.send(
@@ -197,36 +188,27 @@ describe.each(targets)('runtime layout client over the %s transport', (_name, ta
     )
     first.drop()
     expect(first.unsubscribed).toBe(true)
-    // The last state stays until the runtime sends a new one; nothing is cleared or guessed.
-    expect(cache).toEqual({ a: layout('a', ['t1', 't2']), b: layout('b') })
-    const second = await expectRetryAfter(250)
-    // A late frame from the dropped stream changes nothing.
+    expect(status).toEqual({ state: 'lost' })
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(host.streams).toHaveLength(1)
+    // The last state stays; a late frame from the dropped stream changes nothing.
     first.send({ type: 'removed', key: 'a' })
-    expect(cache).toHaveProperty('a')
-    second.send(snapshot([{ key: 'a', layout: layout('a', ['t2']) }]))
-    expect(cache).toEqual({ a: layout('a', ['t2']) })
+    expect(cache).toEqual({ a: layout('a', ['t1', 't2']), b: layout('b') })
   })
 
-  it('backs off on failed subscribes and error frames, and a snapshot alone does not reset it', async () => {
-    host.rejectNextSubscribe()
-    subscribe()
-    await vi.advanceTimersByTimeAsync(0)
-    expect(host.streams).toHaveLength(0)
-    const first = await expectRetryAfter(250)
-    first.fail('stream failed')
-    expect(first.unsubscribed).toBe(true)
-    // A host that snapshots then drops at once keeps backing off instead of looping fast.
-    let stream = await expectRetryAfter(500)
-    for (const delay of [1000, 2000, 4000, 5000, 5000]) {
-      stream.send(snapshot())
-      stream.drop()
-      stream = await expectRetryAfter(delay)
-    }
-    // A change after the snapshot proves the stream stayed up; the next loss starts over.
-    stream.send(snapshot())
-    stream.send({ type: 'workspace', key: 'a', layout: layout('a') })
-    stream.drop()
-    await expectRetryAfter(250)
+  it.each([
+    ['a failed subscribe', () => host.rejectNextSubscribe(), async () => {}],
+    ['an error frame', () => {}, async () => (await opened(1)).fail('stream failed')]
+  ])('stops after %s without retrying', async (_case, before, fail) => {
+    before()
+    const subscription = subscribe()
+    await fail()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(status).toEqual({ state: 'lost' })
+    expect(host.streams.length).toBeLessThanOrEqual(1)
+    expect(host.streams.every((stream) => stream.unsubscribed)).toBe(true)
+    subscription.close()
+    expect(status).toEqual({ state: 'lost' })
   })
 
   it.each([
@@ -260,7 +242,7 @@ describe.each(targets)('runtime layout client over the %s transport', (_name, ta
     expect(status).toMatchObject({ state: 'refused', code: 'method_not_found' })
   })
 
-  it('close unsubscribes, stops retrying and ignores later frames', async () => {
+  it('close unsubscribes and ignores later frames', async () => {
     const subscription = subscribe()
     const stream = await opened(1)
     stream.send(snapshot())
@@ -272,15 +254,6 @@ describe.each(targets)('runtime layout client over the %s transport', (_name, ta
     await vi.advanceTimersByTimeAsync(10_000)
     expect(host.streams).toHaveLength(1)
     expect(cache).toEqual({})
-  })
-
-  it('close while waiting to retry cancels the retry', async () => {
-    const subscription = subscribe()
-    ;(await opened(1)).drop()
-    expect(status).toEqual({ state: 'retrying' })
-    subscription.close()
-    await vi.advanceTimersByTimeAsync(10_000)
-    expect(host.streams).toHaveLength(1)
   })
 
   it('close before the subscribe settles releases the stream it then gets', async () => {

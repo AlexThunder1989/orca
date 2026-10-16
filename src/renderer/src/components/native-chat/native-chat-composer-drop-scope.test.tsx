@@ -25,20 +25,21 @@ const electron = vi.hoisted(() => ({
   getPathForFile: vi.fn((file: File) => `/repro/${file.name}`)
 }))
 
-const intake = vi.hoisted(() => ({
-  owner: { kind: 'local' } as { kind: string; connectionId?: string },
-  stat: vi.fn(),
-  readFile: vi.fn(),
-  upload: vi.fn(),
-  prepare: vi.fn(async ({ paths }: { paths: string[] }) => ({ paths, failures: [] })),
-  pick: vi.fn()
-}))
+const intake = vi.hoisted(() => {
+  const owner: { kind: string } = { kind: 'local' }
+  return {
+    owner,
+    stat: vi.fn(),
+    readFile: vi.fn(),
+    prepare: vi.fn(async ({ paths }: { paths: string[] }) => ({ paths, failures: [] })),
+    pick: vi.fn()
+  }
+})
 vi.mock('@/store', () => ({ useAppStore: { getState: () => ({ tabsByWorktree: {} }) } }))
 // Keeps the real notice strings so the silent-failure guards assert what users see.
 vi.mock('./native-chat-attachment-upload', async (importOriginal) => ({
   ...(await importOriginal<typeof AttachmentUploadModule>()),
-  resolveNativeChatAttachmentOwner: () => intake.owner,
-  uploadNativeChatAttachmentPaths: intake.upload
+  resolveNativeChatAttachmentOwner: () => intake.owner
 }))
 
 vi.mock('electron', () => ({
@@ -182,7 +183,6 @@ describe('native chat composer drop scoping', () => {
     electron.getPathForFile.mockReset().mockImplementation((file: File) => `/repro/${file.name}`)
     intake.stat.mockReset().mockResolvedValue(undefined)
     intake.readFile.mockReset().mockResolvedValue({ content: '', isBinary: false })
-    intake.upload.mockReset()
     intake.prepare.mockReset().mockImplementation(async ({ paths }) => ({ paths, failures: [] }))
     intake.pick.mockReset()
     vi.stubGlobal('IntersectionObserver', undefined)
@@ -232,10 +232,9 @@ describe('native chat composer drop scoping', () => {
     intake.prepare.mockImplementationOnce(() => gate.promise)
     const view = render(<ComposerProbe pane="chat-a" />)
     await dropTwoImages(view.container.querySelector('.ProseMirror')!)
-    intake.owner = { kind: 'ssh', connectionId: 'other-host' }
+    intake.owner = { kind: 'remote' }
     await act(async () => gate.resolve({ paths: ['/prepared/a.png'], failures: [] }))
     expect(intake.stat).not.toHaveBeenCalled()
-    expect(intake.upload).not.toHaveBeenCalled()
     expect(readNativeChatAttachmentCache('chat-a')).toEqual([])
   })
   it('refuses preparation captured for a draft that changed in the same pane', async () => {
@@ -281,7 +280,7 @@ describe('native chat composer drop scoping', () => {
 
   it('notices an OS drop whose owner changes while checking the files', async () => {
     intake.stat.mockImplementation(async () => {
-      intake.owner = { kind: 'ssh', connectionId: 'conn-1' }
+      intake.owner = { kind: 'remote' }
     })
     const view = render(<ComposerProbe pane="chat-a" />)
 
@@ -415,33 +414,10 @@ describe('native chat composer drop scoping', () => {
       [{ filePath: '/repro/second.png', access: { kind: 'user-file' } }]
     ])
     expect(intake.readFile).toHaveBeenCalledTimes(2)
-    expect(intake.upload).not.toHaveBeenCalled()
     expect(readNativeChatAttachmentCache('chat-a')).toHaveLength(2)
     expect(readNativeChatAttachmentCache('chat-b')).toEqual([])
     await expect(intake.readFile({ filePath: '/repro/sibling.png' })).rejects.toThrow(
       'Access denied'
     )
-  })
-
-  it('uploads once for the SSH drop owner without checking remote paths locally', async () => {
-    intake.owner = { kind: 'ssh', connectionId: 'conn-1' }
-    intake.upload.mockResolvedValue(['/remote/first.png', '/remote/second.png'])
-    const view = render(
-      <>
-        <ComposerProbe pane="chat-a" />
-        <ComposerProbe pane="chat-b" hidden />
-      </>
-    )
-    await dropTwoImages(view.container.querySelector('[data-pane="chat-a"] .ProseMirror')!)
-    expect(intake.upload).toHaveBeenCalledExactlyOnceWith(
-      ['/repro/first.png', '/repro/second.png'],
-      intake.owner
-    )
-    expect(intake.stat).not.toHaveBeenCalled()
-    expect(readNativeChatAttachmentCache('chat-a').map(({ path }) => path)).toEqual([
-      '/remote/first.png',
-      '/remote/second.png'
-    ])
-    expect(readNativeChatAttachmentCache('chat-b')).toEqual([])
   })
 })

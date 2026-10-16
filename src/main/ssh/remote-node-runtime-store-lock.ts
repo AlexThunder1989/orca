@@ -5,7 +5,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { ORCAD_RUNTIMES_DIRNAME } from '../../shared/orcad-artifacts'
-import type { SshConnection } from './ssh-connection'
+import type { RemoteInstallTransport } from './remote-install-transport'
 import { shellEscape } from './ssh-connection-utils'
 import { execHostCommand } from './ssh-relay-host-exec'
 import { isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
@@ -72,7 +72,7 @@ function heldLock(
 }
 
 async function releaseRuntimeStoreLock(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   host: RemoteHostPlatform,
   storeDir: string,
   owner: InstallLockOwnerFile
@@ -92,7 +92,7 @@ async function releaseRuntimeStoreLock(
 
 /** One attempt, stealing only a stale or previous-boot lock. A missing store is simply not acquired. */
 async function tryAcquireRuntimeStoreLock(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   host: RemoteHostPlatform,
   storeDir: string,
   owner: InstallLockOwnerFile,
@@ -132,7 +132,7 @@ function newOwner(): InstallLockOwnerFile {
 }
 
 async function runHoldingLock<T>(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   host: RemoteHostPlatform,
   storeDir: string,
   owner: InstallLockOwnerFile,
@@ -154,7 +154,7 @@ async function runHoldingLock<T>(
 
 /** Runs `task` holding the store lock, waiting for it within the deploy bound. */
 export async function withRuntimeStoreLock<T>(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   host: RemoteHostPlatform,
   storeDir: string,
   task: (held: HeldRuntimeStoreLock) => Promise<T>,
@@ -172,7 +172,7 @@ export async function withRuntimeStoreLock<T>(
 
 /** Runs `task` only when the lock is free now; null when another holder has it. */
 export async function tryWithRuntimeStoreLock<T>(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   host: RemoteHostPlatform,
   storeDir: string,
   task: () => Promise<T>,

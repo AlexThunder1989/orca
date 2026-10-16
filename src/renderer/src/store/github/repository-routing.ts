@@ -5,10 +5,8 @@ import type {
   GitHubPRRefreshReason
 } from '../../../../shared/github/pull-request-refresh-types'
 import type { Repo } from '../../../../shared/repo-types'
-import {
-  runtimeTargetForOwnerEnvironment,
-  type RuntimeClientTarget
-} from '../../runtime/runtime-client-target'
+import { runtimeTargetForOwnerEnvironment } from '../../runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { getGitHubRepoLookupIndex } from '../slices/github-repo-lookup-index'
 import {
   LOCAL_EXECUTION_HOST_ID,

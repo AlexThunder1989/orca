@@ -5,7 +5,6 @@ import type { JiraIssue } from '../../../../shared/jira-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { LinearIssue } from '../../../../shared/linear/issue-types'
 import type { SparsePreset } from '../../../../shared/worktree/create-types'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { PendingSmartGitHubSubmitResolution } from './source-selection-decisions'
 import type { SmartWorkspaceNameSelection } from '@/components/new-workspace/smart-workspace-name-field-model'
 export type ComposerSourceModel = {
@@ -68,7 +67,7 @@ export type ComposerSourceModel = {
   smartNameSelection: SmartWorkspaceNameSelection | null
   uploadComposerPaths: (
     sourcePaths: string[],
-    targetSettings?: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null,
+    targetEnvironmentId?: string | null,
     targetConnectionId?: string | null,
     targetRepoPath?: string | null,
     targetWorktreeId?: string | null,

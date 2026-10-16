@@ -1,4 +1,4 @@
-import { registerPaneKeyTeardownListener, getPtyIdForPaneKey } from '../ipc/pty'
+import { registerPaneKeyTeardownListener, getPtyIdForPaneKey } from '../ipc/pty/pane/key-state'
 import { agentHookServer } from '../agent-hooks/server'
 import type { AgentStatusState } from '../../shared/agent-status-types'
 import type { SyntheticAgentTitleProfile } from '../../shared/synthetic-agent-title'

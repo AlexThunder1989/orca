@@ -63,7 +63,11 @@ export function closePane(model: WorkspaceLayoutModel, command: CommandOf<'close
   if (!tab || !layoutContainsLeafId(tab.panes.root, command.leafId)) {
     return applied(model, { alreadyClosed: true })
   }
-  const ptyId = model.workspaces[command.workspace]!.leaves?.[command.leafId]?.ptyId
+  const leaf = model.workspaces[command.workspace]!.leaves?.[command.leafId]
+  if (command.userPaneClose && tab.panes.root?.type === 'leaf') {
+    return refuse('last_pane')
+  }
+  const ptyId = leaf?.ptyId
   const retired = retireTerminalPane(
     model,
     { workspaceKey: command.workspace, tab },

@@ -7,7 +7,7 @@ import { parseExecutionHostId } from '../../../../../shared/execution-host'
 import { resolveTerminalWorktreeRoute } from '@/lib/terminal-worktree-route'
 import { getConnectionId } from '@/lib/connection-context'
 import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
-import { isWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
+import { isWebTerminalSurfaceTabId } from '../../../../../shared/terminal-surface-id'
 
 import { settleTerminalPaneRecovery } from '../terminal-pane-recovery'
 import type { ConnectPanePtySession } from './connect-pane-pty-session'

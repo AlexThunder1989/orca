@@ -11,8 +11,6 @@ export type RemoteLayoutSnapshotWorkspace = Omit<
  * the server is offline can still draw its tabs. Display-only: never edited, never sent back.
  */
 export type RemoteLayoutSnapshot = {
-  receivedAt: number
-  serverRuntimeId: string
   /** Keyed by worktree id, each from the server's last `session.tabs` result for it. */
   workspaces: Record<string, RemoteLayoutSnapshotWorkspace>
 }

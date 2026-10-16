@@ -43,7 +43,14 @@ function setup(overrides?: Partial<E2EEChannelOptions>) {
     serverSecretKey: serverKeys.secretKey,
     resolveAuthenticatedDevice: (token) =>
       token === 'valid-token'
-        ? { deviceId: 'device-1', deviceToken: token, scope: 'mobile', clientId: token, callerFingerprint: 'test-fingerprint', credentialRevision: 0 }
+        ? {
+            deviceId: 'device-1',
+            deviceToken: token,
+            scope: 'mobile',
+            clientId: token,
+            callerFingerprint: 'test-fingerprint',
+            credentialRevision: 0
+          }
         : null,
     onReady: vi.fn(),
     onError,

@@ -1,6 +1,4 @@
 import type { SshConnectionStore } from './ssh-connection-store'
-import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
-import type { SshChannelMultiplexer } from './ssh-channel-multiplexer'
 import type { SshConnectionManager } from './ssh-connection-manager'
 import type {
   SshConnectionState,
@@ -21,12 +19,17 @@ import type {
  * This holds only the registry: the store plus the two callbacks the handler layer
  * installs. `registerSshHandlers` populates it; the runtime reads it. Keeping the
  * indirection (rather than the runtime holding a manager directly) is deliberate —
- * SSH providers register after construction and may reconnect, so callers must
- * resolve the current generation rather than freeze one.
+ * `registerSshHandlers` may re-run, so callers must resolve the current generation
+ * rather than freeze one.
  */
 
 let sshStore: SshConnectionStore | null = null
-let registeredConnectSshTarget: ((targetId: string) => Promise<SshConnectionState>) | null = null
+type ConnectSshTarget = (
+  targetId: string,
+  options?: { automatic?: boolean }
+) => Promise<SshConnectionState>
+
+let registeredConnectSshTarget: ConnectSshTarget | null = null
 let registeredGetSshState: ((targetId: string) => SshConnectionState | undefined) | null = null
 
 export function setSshTargetRegistryStore(store: SshConnectionStore | null): void {
@@ -38,20 +41,24 @@ export function getSshTargetRegistryStore(): SshConnectionStore | null {
 }
 
 export function setSshTargetRegistryHandlers(handlers: {
-  connect: ((targetId: string) => Promise<SshConnectionState>) | null
+  connect: ConnectSshTarget | null
   getState: ((targetId: string) => SshConnectionState | undefined) | null
 }): void {
   registeredConnectSshTarget = handlers.connect
   registeredGetSshState = handlers.getState
 }
 
-export async function connectRegisteredSshTarget(targetId: string): Promise<SshConnectionState> {
+/** `automatic`: no user asked for this connect, so a cancelled sign-in stays cancelled. */
+export async function connectRegisteredSshTarget(
+  targetId: string,
+  options?: { automatic?: boolean }
+): Promise<SshConnectionState> {
   if (!registeredConnectSshTarget) {
     // Why this still throws: a headless host that never registered handlers must fail
     // loudly rather than report a target as unreachable, which would read as `exited`.
     throw new Error('ssh_handlers_not_registered')
   }
-  return registeredConnectSshTarget(targetId)
+  return registeredConnectSshTarget(targetId, options)
 }
 
 export function getRegisteredSshState(targetId: string): SshConnectionState | undefined {
@@ -88,16 +95,7 @@ export function getRegisteredSshTargetMutations(): SshTargetMutations {
   return registeredSshTargetMutations
 }
 
-/**
- * The relay channel multiplexer is gone, so no SSH target is served here: every caller is a dead
- * SSH arm and gets the typed "not served" error, never an `exited` verdict.
- */
-export function getActiveMultiplexer(connectionId: string): SshChannelMultiplexer | undefined {
-  throw new SshHostNotServedError(connectionId)
-}
-
 let registeredGetSshConnectionManager: (() => SshConnectionManager | null) | null = null
-let registeredHasDirectSshAuthority: ((targetId: string) => boolean) | null = null
 
 export function setSshConnectionManagerResolver(
   resolve: (() => SshConnectionManager | null) | null
@@ -115,15 +113,4 @@ export function setSshConnectionManagerResolver(
  */
 export function getSshConnectionManager(): SshConnectionManager | null {
   return registeredGetSshConnectionManager?.() ?? null
-}
-
-export function setDirectSshAuthorityResolver(
-  resolve: ((targetId: string) => boolean) | null
-): void {
-  registeredHasDirectSshAuthority = resolve
-}
-
-/** Whether this process currently holds the target's relay session; false when unregistered. */
-export function hasRegisteredDirectSshAuthority(targetId: string): boolean {
-  return registeredHasDirectSshAuthority?.(targetId) ?? false
 }

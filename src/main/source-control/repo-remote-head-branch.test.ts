@@ -1,18 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { gitExecFileAsyncMock, getSshGitProviderMock, getSshGitProviderGenerationMock } = vi.hoisted(
-  () => ({
-    gitExecFileAsyncMock: vi.fn(),
-    getSshGitProviderMock: vi.fn(),
-    getSshGitProviderGenerationMock: vi.fn(() => 0)
-  })
-)
+const { gitExecFileAsyncMock } = vi.hoisted(() => ({
+  gitExecFileAsyncMock: vi.fn()
+}))
 
 vi.mock('../git/runner', () => ({ gitExecFileAsync: gitExecFileAsyncMock }))
-vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock,
-  getSshGitProviderGeneration: getSshGitProviderGenerationMock
-}))
 
 import { bumpScopeGeneration, hostedReviewRepoScope } from './hosted-review-scope-generations'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
@@ -30,8 +22,6 @@ function remoteHead(remote: string, branch: string): { stdout: string; stderr: s
 describe('getRemoteHeadBranchName', () => {
   beforeEach(() => {
     gitExecFileAsyncMock.mockReset()
-    getSshGitProviderMock.mockReset()
-    getSshGitProviderGenerationMock.mockReset().mockReturnValue(0)
     __resetRepoDefaultBranchCacheForTests()
   })
 
@@ -90,26 +80,7 @@ describe('getRemoteHeadBranchName', () => {
     ])
   })
 
-  it('isolates native, WSL and SSH results for the same path and remote', async () => {
-    gitExecFileAsyncMock.mockImplementation(async (_args, options: { wslDistro?: string }) =>
-      remoteHead('upstream', options.wslDistro ? 'wsl-default' : 'native-default')
-    )
-    const exec = vi.fn().mockResolvedValue(remoteHead('upstream', 'ssh-default'))
-    getSshGitProviderMock.mockReturnValue({ exec })
-    await expect(getRemoteHeadBranchName('/repo', 'upstream')).resolves.toBe('native-default')
-    await expect(
-      getRemoteHeadBranchName('/repo', 'upstream', null, { wslDistro: 'Ubuntu' })
-    ).resolves.toBe('wsl-default')
-    await expect(getRemoteHeadBranchName('/repo', 'upstream', 'ssh-1')).resolves.toBe('ssh-default')
-    expect(exec).toHaveBeenCalledWith(
-      ['for-each-ref', '--format=%(refname)%00%(symref)', 'refs/remotes/upstream/HEA[D]'],
-      '/repo',
-      { timeoutMs: expect.any(Number) }
-    )
-  })
-
   it('does not run local Git for a disconnected SSH host', async () => {
-    getSshGitProviderMock.mockReturnValue(undefined)
     await expect(getRemoteHeadBranchName('/repo', 'upstream', 'ssh-gone')).resolves.toBeNull()
     expect(gitExecFileAsyncMock).not.toHaveBeenCalled()
   })
@@ -129,17 +100,6 @@ describe('getRemoteHeadBranchName', () => {
     } finally {
       now.mockRestore()
     }
-  })
-
-  it('does not reuse defaults from a replaced SSH provider', async () => {
-    getSshGitProviderGenerationMock.mockReturnValue(1)
-    const exec = vi.fn().mockResolvedValue(remoteHead('upstream', 'old-default'))
-    getSshGitProviderMock.mockReturnValue({ exec })
-    await expect(getRemoteHeadBranchName('/repo', 'upstream', 'ssh-1')).resolves.toBe('old-default')
-    getSshGitProviderGenerationMock.mockReturnValue(2)
-    exec.mockResolvedValue(remoteHead('upstream', 'new-default'))
-    await expect(getRemoteHeadBranchName('/repo', 'upstream', 'ssh-1')).resolves.toBe('new-default')
-    expect(exec).toHaveBeenCalledTimes(2)
   })
 
   it('refreshes defaults after the repository review scope is invalidated', async () => {

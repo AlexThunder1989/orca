@@ -1,5 +1,5 @@
 import type { Readable, Writable } from 'node:stream'
-import type { z } from 'zod'
+import { z } from 'zod'
 import {
   AcpAgentError,
   AcpAuthRequiredError,
@@ -28,6 +28,7 @@ import {
   SetSessionModeResponseSchema,
   SetSessionModelResponseSchema,
   SetSessionConfigOptionResponseSchema,
+  SessionIdSchema,
   type InitializeRequest,
   type InitializeResponse,
   type AuthenticateResponse,
@@ -41,6 +42,8 @@ import {
   type SetSessionModelRequest,
   type SetSessionModelResponse
 } from './generated/acp-protocol.generated'
+
+const ForkSessionResponseSchema = z.looseObject({ sessionId: SessionIdSchema })
 
 type Meta = PromptRequest['_meta']
 const withMeta = (meta: Meta): { _meta?: Meta } => (meta ? { _meta: meta } : {})
@@ -140,6 +143,13 @@ export class AcpSessionRuntime {
     }
     await this.initialize()
     return this.peer.request(method, params, { timeoutMs: null })
+  }
+
+  /** Copies saved session `sessionId` into a new one the agent saves (`session/fork`) and answers
+   *  its id; this connection starts no session of its own. Ask only an agent that advertises it. */
+  async forkSession(sessionId: string, cwd: string): Promise<string> {
+    const params = { sessionId, cwd, mcpServers: [] }
+    return (await this.call('session/fork', params, ForkSessionResponseSchema)).sessionId
   }
 
   start(options: AcpSessionStartOptions): Promise<AcpSessionStarted> {

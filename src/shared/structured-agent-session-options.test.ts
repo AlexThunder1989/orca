@@ -8,13 +8,18 @@ import {
   applyStructuredAgentSessionOptions,
   createStructuredAgentSessionOptionState,
   settleStructuredAgentSessionBuiltinCatalog,
-  structuredAgentSessionOptionSnapshot
+  structuredAgentSessionOptionSnapshot,
+  type StructuredAgentSessionOptionState
 } from './structured-agent-session-options'
 import { structuredAgentSessionOptionView } from './structured-agent-session-option-view'
 
-function viewModel(...args: Parameters<typeof structuredAgentSessionOptionView>) {
+function viewModel(
+  state: StructuredAgentSessionOptionState,
+  seed: Readonly<Record<string, string>> | undefined,
+  held: Readonly<Record<string, string>>
+) {
   const model = structuredAgentSessionOptionSnapshot(
-    structuredAgentSessionOptionView(...args)
+    structuredAgentSessionOptionView(state, seed, held, true)
   ).find((descriptor) => descriptor.id === 'model')
   return model?.kind.type === 'select' ? model.kind.currentValue : undefined
 }
@@ -279,7 +284,7 @@ describe('structured agent session options', () => {
     // A saved pick the host's list does not name shows the quiet placeholder, never its raw id.
     expect(
       structuredAgentSessionOptionSnapshot(
-        structuredAgentSessionOptionView(seeded, { model: 'gpt-next' }, {})
+        structuredAgentSessionOptionView(seeded, { model: 'gpt-next' }, {}, true)
       )
     ).toEqual([expect.objectContaining({ id: 'model', settable: false, valueSource: 'unknown' })])
     // Before the host answers, and on the built-in list, no saved pick is named.

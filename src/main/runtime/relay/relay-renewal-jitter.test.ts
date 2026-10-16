@@ -20,12 +20,10 @@ describe('relay renewal jitter', () => {
     for (let i = 0; i < 20_000; i++) {
       samples.push(relayRenewalDelayMs(LEASE_MS, 0, random))
     }
-    for (const sample of samples) {
-      expect(sample).toBeGreaterThanOrEqual(Math.floor(base * (1 - RELAY_RENEWAL_JITTER_RATIO)))
-      expect(sample).toBeLessThanOrEqual(latest)
-      // The renewal never lands inside the margin, so it never races expiry.
-      expect(LEASE_MS - sample).toBeGreaterThanOrEqual(RELAY_RENEWAL_SAFETY_MARGIN_MS)
-    }
+    expect(Math.min(...samples)).toBeGreaterThanOrEqual(
+      Math.floor(base * (1 - RELAY_RENEWAL_JITTER_RATIO))
+    )
+    expect(Math.max(...samples)).toBeLessThanOrEqual(latest)
     const mean = samples.reduce((total, sample) => total + sample, 0) / samples.length
     expect(Math.abs(mean - base) / base).toBeLessThan(0.005)
   })

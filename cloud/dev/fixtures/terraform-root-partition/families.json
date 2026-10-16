@@ -141,10 +141,12 @@
     "google_logging_metric.relay_cell_reregistration_stalled",
     "google_logging_metric.relay_cell_reserve_dead_man_tripped",
     "google_logging_metric.relay_control_flags_unreadable",
+    "google_logging_metric.relay_dead_cell_verdict_withheld",
     "google_logging_metric.relay_incident",
     "google_logging_metric.relay_event_loop_stall",
     "google_logging_metric.relay_long_cell_inventory_hold",
     "google_logging_metric.relay_reserve_placement_off_with_reserve_cells",
+    "google_logging_metric.relay_reserve_watch_alarm",
     "google_logging_metric.relay_snapshot",
     "google_monitoring_alert_policy.relay_assignment_5xx",
     "google_monitoring_alert_policy.relay_assignment_edge_429",
@@ -164,6 +166,7 @@
     "google_monitoring_alert_policy.relay_control_flags_unreadable",
     "google_monitoring_alert_policy.relay_custom",
     "google_monitoring_alert_policy.relay_database_rejection_fenced",
+    "google_monitoring_alert_policy.relay_dead_cell_verdict_withheld",
     "google_monitoring_alert_policy.relay_director_cell_inventory_hold",
     "google_monitoring_alert_policy.relay_far_cell_accept_latency",
     "google_monitoring_alert_policy.relay_gce_connection_headroom",
@@ -174,6 +177,7 @@
     "google_monitoring_alert_policy.relay_process_fatal",
     "google_monitoring_alert_policy.relay_region_hint_skew",
     "google_monitoring_alert_policy.relay_reserve_placement_off_with_reserve_cells",
+    "google_monitoring_alert_policy.relay_reserve_watch_alarm",
     "google_monitoring_dashboard.relay_incident",
     "google_project_iam_custom_role.github_production_relay_capacity_mutation",
     "google_project_iam_custom_role.github_relay_asia_topology_mutation",
@@ -299,6 +303,10 @@
       "staging": "apps"
     },
     "google_project_iam_member.github_compute_viewer": {
+      "production": "relay",
+      "staging": "apps"
+    },
+    "google_project_iam_member.github_log_writer": {
       "production": "relay",
       "staging": "apps"
     },

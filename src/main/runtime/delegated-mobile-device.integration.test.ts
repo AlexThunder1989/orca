@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -72,7 +73,7 @@ describe('pairing.delegatedMobileDevice.sync', () => {
     phones: { phoneKey: string; name: string }[]
   ): Promise<DelegatedDevice[]> {
     const response = await sendRemoteRuntimeRequest<DelegatedMobileDeviceSyncResult>(
-      desktop,
+      pairedRuntimeConnectionFromOffer(desktop),
       DELEGATED_MOBILE_DEVICE_SYNC_METHOD,
       { phones },
       5_000
@@ -84,7 +85,12 @@ describe('pairing.delegatedMobileDevice.sync', () => {
   }
 
   function sendSync(desktop: PairingOffer, phones: unknown) {
-    return sendRemoteRuntimeRequest(desktop, DELEGATED_MOBILE_DEVICE_SYNC_METHOD, { phones }, 5_000)
+    return sendRemoteRuntimeRequest(
+      pairedRuntimeConnectionFromOffer(desktop),
+      DELEGATED_MOBILE_DEVICE_SYNC_METHOD,
+      { phones },
+      5_000
+    )
   }
 
   function asPhone(desktop: PairingOffer, device: DelegatedDevice): PairingOffer {
@@ -99,7 +105,7 @@ describe('pairing.delegatedMobileDevice.sync', () => {
   it('advertises the capability a desktop gates on', async () => {
     const { server } = await startServer()
     const status = await sendRemoteRuntimeRequest<{ capabilities: string[] }>(
-      pairDesktop(server),
+      pairedRuntimeConnectionFromOffer(pairDesktop(server)),
       'status.get',
       {},
       5_000
@@ -130,16 +136,23 @@ describe('pairing.delegatedMobileDevice.sync', () => {
     })
 
     const phone = asPhone(desktop, child)
-    await expect(sendRemoteRuntimeRequest(phone, 'status.get', {}, 5_000)).resolves.toMatchObject({
+    await expect(
+      sendRemoteRuntimeRequest(pairedRuntimeConnectionFromOffer(phone), 'status.get', {}, 5_000)
+    ).resolves.toMatchObject({
       ok: true,
       result: { deviceScope: 'mobile' }
     })
     // The mobile allowlist applies, including to sync itself.
     await expect(
-      sendRemoteRuntimeRequest(phone, 'worktree.list', {}, 5_000)
+      sendRemoteRuntimeRequest(pairedRuntimeConnectionFromOffer(phone), 'worktree.list', {}, 5_000)
     ).resolves.toMatchObject({ ok: false, error: { code: 'forbidden' } })
     await expect(
-      sendRemoteRuntimeRequest(phone, DELEGATED_MOBILE_DEVICE_SYNC_METHOD, { phones: [] }, 5_000)
+      sendRemoteRuntimeRequest(
+        pairedRuntimeConnectionFromOffer(phone),
+        DELEGATED_MOBILE_DEVICE_SYNC_METHOD,
+        { phones: [] },
+        5_000
+      )
     ).resolves.toMatchObject({ ok: false, error: { code: 'forbidden' } })
   })
 
@@ -148,7 +161,7 @@ describe('pairing.delegatedMobileDevice.sync', () => {
     const phone = pair(server, { name: 'phone', scope: 'mobile' })
     await expect(
       sendRemoteRuntimeRequest(
-        phone,
+        pairedRuntimeConnectionFromOffer(phone),
         DELEGATED_MOBILE_DEVICE_SYNC_METHOD,
         { phones: [{ phoneKey: 'p', name: 'p' }] },
         5_000
@@ -176,7 +189,7 @@ describe('pairing.delegatedMobileDevice.sync', () => {
     const directPhone = pair(server, { name: 'phone', scope: 'mobile' })
     const registerPush = (caller: PairingOffer) =>
       sendRemoteRuntimeRequest(
-        caller,
+        pairedRuntimeConnectionFromOffer(caller),
         'notifications.registerPush',
         { platform: 'android', token: 'fcm-token', filter: {} },
         5_000
@@ -212,7 +225,12 @@ describe('pairing.delegatedMobileDevice.sync', () => {
     expect(rotated.available && rotated.deviceId).not.toBe(child!.deviceId)
     expect(registry.getDevice(child!.deviceId)).not.toBeNull()
     await expect(
-      sendRemoteRuntimeRequest(asPhone(desktop, child!), 'status.get', {}, 5_000)
+      sendRemoteRuntimeRequest(
+        pairedRuntimeConnectionFromOffer(asPhone(desktop, child!)),
+        'status.get',
+        {},
+        5_000
+      )
     ).resolves.toMatchObject({ ok: true })
   })
 

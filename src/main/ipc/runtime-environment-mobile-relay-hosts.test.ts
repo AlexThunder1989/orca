@@ -12,7 +12,8 @@ vi.mock('electron', () => ({ app: { getPath: () => '/user-data' } }))
 vi.mock('../../shared/runtime-environment-store', () => ({
   listEnvironments: () => mocks.environments
 }))
-vi.mock('../../shared/runtime-environments', () => ({
+vi.mock('../../shared/runtime-environments', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   getPreferredPairingOffer: (environment: { endpoint: string }) => ({
     endpoint: environment.endpoint
   })
@@ -48,6 +49,23 @@ describe('runtime environment mobile relay hosts', () => {
     })
     mocks.call.mockReset()
     mocks.snapshots = []
+  })
+
+  it('keeps WSL hosts away from phones: neither listed nor resolvable', async () => {
+    mocks.environments = [
+      { id: 'env-1', name: 'VM', createdAt: 1, runtimeId: null },
+      {
+        id: 'wsl:ubuntu',
+        name: 'Ubuntu (WSL)',
+        createdAt: 2,
+        runtimeId: null,
+        orcadDeployment: { kind: 'wsl', distro: 'Ubuntu', localPort: 42000, remotePort: 6768 }
+      }
+    ]
+    const hosts = createRuntimeEnvironmentMobileRelayHosts()
+    expect(hosts.list().environments.map((environment) => environment.id)).toEqual(['env-1'])
+    await expect(hosts.resolve('wsl:ubuntu')).resolves.toBeNull()
+    expect(mocks.resolveManaged).not.toHaveBeenCalled()
   })
 
   it("lists configured servers with the desktop's own status, ignoring another pairing's snapshot", () => {

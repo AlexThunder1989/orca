@@ -72,7 +72,6 @@ async function expectIdentity(identity: string): Promise<void> {
 }
 
 describe('network SSH configuration with real Git', () => {
-
   it('preserves command-line SSH configuration ahead of repository configuration', async () => {
     await git(['config', 'core.sshCommand', sshCommand('repository')])
     await expect(

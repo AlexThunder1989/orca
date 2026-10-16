@@ -12,9 +12,7 @@ const mocks = vi.hoisted(() => ({
   readImage: vi.fn(),
   readBuffer: vi.fn(),
   toPNG: vi.fn(),
-  writeFile: vi.fn(),
-  writeFileBase64: vi.fn(),
-  requireSshFilesystemProvider: vi.fn()
+  writeFile: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -37,13 +35,9 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   return { ...fs, default: { ...fs, writeFile: mocks.writeFile } }
 })
 vi.mock('../persistence', () => ({ Store: vi.fn() }))
-vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  requireSshFilesystemProvider: mocks.requireSshFilesystemProvider
-}))
 vi.mock('./clipboard-remote-file-copy', () => ({
   cleanupExpiredRemoteClipboardFiles: vi.fn(),
-  scheduleLegacyRemoteClipboardFileCleanup: vi.fn(),
-  writeRemoteFileToClipboard: vi.fn()
+  scheduleLegacyRemoteClipboardFileCleanup: vi.fn()
 }))
 vi.mock('./native-chat-paste-files', () => ({
   restoreNativeChatPastes: vi.fn(),
@@ -88,11 +82,6 @@ beforeEach(() => {
   mocks.has.mockImplementation((type: string) => type === 'public.png')
   mocks.toPNG.mockReturnValue(PNG)
   mocks.writeFile.mockResolvedValue(undefined)
-  mocks.writeFileBase64.mockResolvedValue(undefined)
-  mocks.requireSshFilesystemProvider.mockReturnValue({
-    getTempDir: async () => '/remote/tmp',
-    writeFileBase64: mocks.writeFileBase64
-  })
   setImage()
   setTrustedClipboardRendererWebContentsId(17)
   registerClipboardHandlers(new Store())
@@ -149,21 +138,11 @@ describe('macOS clipboard image data beside a file URL', () => {
     expect(mocks.writeFile).not.toHaveBeenCalled()
   })
 
-  it('rejects oversized PNG bytes before looking up an SSH target', async () => {
+  it('rejects oversized PNG bytes before refusing an SSH target', async () => {
     mocks.toPNG.mockReturnValue(Buffer.alloc(CLIPBOARD_IMAGE_MAX_SOURCE_BYTES + 1))
     await expect(
       invoke('clipboard:saveImageAsTempFile', { connectionId: 'ssh-1' })
     ).rejects.toThrow('Clipboard image is too large')
-    expect(mocks.requireSshFilesystemProvider).not.toHaveBeenCalled()
-    expect(mocks.writeFileBase64).not.toHaveBeenCalled()
-    expect(mocks.writeFile).not.toHaveBeenCalled()
-  })
-
-  it('saves native image data on the SSH host instead of the client', async () => {
-    const savedPath = await invoke('clipboard:saveImageAsTempFile', { connectionId: 'ssh-1' })
-    expect(savedPath).toMatch(/^\/remote\/tmp\/orca-paste-.+\.png$/)
-    expect(mocks.requireSshFilesystemProvider).toHaveBeenCalledWith('ssh-1')
-    expect(mocks.writeFileBase64).toHaveBeenCalledWith(savedPath, PNG.toString('base64'))
     expect(mocks.writeFile).not.toHaveBeenCalled()
   })
 })

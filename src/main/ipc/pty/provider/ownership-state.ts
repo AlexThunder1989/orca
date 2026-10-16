@@ -22,14 +22,9 @@ export function setPtyOwnership(id: string, hostId: ExecutionHostId): void {
   ptyOwnership.set(id, hostId)
 }
 
-/** An adopted PTY that names no SSH target keeps the host already recorded for its id. */
-export function setAdoptedPtyOwnership(id: string, connectionId: string | null | undefined): void {
-  ptyOwnership.set(
-    id,
-    connectionId
-      ? toSshExecutionHostId(connectionId)
-      : (ptyOwnership.get(id) ?? LOCAL_EXECUTION_HOST_ID)
-  )
+/** An adopted PTY keeps the host already recorded for its id. */
+export function setAdoptedPtyOwnership(id: string): void {
+  ptyOwnership.set(id, ptyOwnership.get(id) ?? LOCAL_EXECUTION_HOST_ID)
 }
 
 export function restorePtyIncarnation(id: string, incarnationId: string): void {

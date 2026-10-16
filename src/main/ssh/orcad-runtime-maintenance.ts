@@ -19,9 +19,10 @@ import { runTargetLifecycle } from '../ipc/ssh-target-lifecycle-queue'
 import type { ServeReadiness } from '../server/serve-readiness'
 import { recoverInterruptedOrcadActivation } from './orcad-activation-recovery'
 import { probeActiveOrcadReadiness } from './orcad-active-readiness'
-import { materializeOrcadArtifact } from './orcad-artifact-materializer'
+import { materializeOrcadArtifact } from '../orcad/orcad-artifact-materializer'
 import { CURRENT_ORCAD_DAEMON_PROTOCOL } from './orcad-daemon-protocol-crossing'
-import { ensureOrcadManagedTunnel } from './orcad-managed-tunnel'
+import { ensureOrcadManagedTunnel, rebuildOrcadManagedTunnel } from './orcad-managed-tunnel'
+import { wakeAlreadyActiveOrcad } from './orcad-already-active-wake'
 import {
   clearManagedOrcadUpdateDeferral,
   recordManagedOrcadUpdateDeferral
@@ -138,6 +139,7 @@ export async function runManagedOrcadUpdate(
     return deferral
   }
   clearManagedOrcadUpdateDeferral(environment.id)
+  const started = result.outcome === 'already-active' && (await wakeAlreadyActiveOrcad(slot))
   const readiness = await probeManagedOrcadReadiness(
     context,
     localOrcadDir,
@@ -151,6 +153,10 @@ export async function runManagedOrcadUpdate(
     readiness
   })
   const updated = refreshPairing(userDataPath, environment, readiness, deployment.localPort)
+  if (started) {
+    // The started slot may have bound another port than the forward in use.
+    await rebuildOrcadManagedTunnel(userDataPath, environment.id)
+  }
   return {
     outcome: result.outcome === 'already-active' ? 'already-current' : 'updated',
     environment: redactRuntimeEnvironment(updated),

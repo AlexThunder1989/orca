@@ -13,7 +13,7 @@ import {
 } from '../project-runtime-git-options'
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import { isFolderRepo } from '../../shared/repo-kind'
-import type { Store } from '../persistence'
+import type { ProjectRuntimeResolutionStore } from '../local-project-runtime-resolution'
 
 export type RuntimeGitHubWorktreeBaseArgs = {
   repoSelector: string
@@ -25,7 +25,10 @@ export type RuntimeGitHubWorktreeBaseArgs = {
 
 export async function resolveRuntimeGitHubWorktreeBase(
   args: RuntimeGitHubWorktreeBaseArgs,
-  deps: { store: Store | null; resolveRepo: (selector: string) => Promise<Repo> }
+  deps: {
+    store: ProjectRuntimeResolutionStore | null
+    resolveRepo: (selector: string) => Promise<Repo>
+  }
 ): Promise<GitHubPrStartPoint | { error: string }> {
   if (!deps.store) {
     throw new Error('runtime_unavailable')
@@ -54,9 +57,11 @@ export async function resolveRuntimeGitHubWorktreeBase(
       gitExec
     })
   const fetchRemoteTrackingRef = (remote: string, branch: string): Promise<void> =>
-    fetchPrHeadTrackingRef(repo, null, remote, branch, { localGitExecOptions })
+    fetchPrHeadTrackingRef(repo, remote, branch, { localGitExecOptions })
   const fetchPullRequestHeadRef = (remote: string, prNumber: number): Promise<string> =>
-    fetchGitHubPullRequestHeadRef(repo, null, remote, prNumber, { localGitExecOptions })
+    fetchGitHubPullRequestHeadRef(repo, remote, prNumber, {
+      localGitExecOptions
+    })
   return resolveGitHubPrStartPoint({
     repoPath: repo.path,
     prNumber: args.prNumber,

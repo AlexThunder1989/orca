@@ -13,7 +13,13 @@ const runtimeFiles = vi.hoisted(() => ({
   readRuntimeFileContent: vi.fn(),
   writeRuntimeFile: vi.fn()
 }))
-vi.mock('@/runtime/runtime-file-client', () => runtimeFiles)
+vi.mock('@/runtime/runtime-file-mutation-client', () => ({
+  readRuntimeDirectory: runtimeFiles.readRuntimeDirectory,
+  writeRuntimeFile: runtimeFiles.writeRuntimeFile
+}))
+vi.mock('@/runtime/runtime-file-read-client', () => ({
+  readRuntimeFileContent: runtimeFiles.readRuntimeFileContent
+}))
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 

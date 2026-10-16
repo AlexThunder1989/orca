@@ -1,7 +1,9 @@
 import { app } from 'electron'
+import { pairedRuntimeBrowserClientHostsPage } from '../browser/paired-runtime-browser-client-host-runtime'
 import { listEnvironments } from '../../shared/runtime-environment-store'
 import {
   getPreferredPairingOffer,
+  isWslHostRuntimeEnvironment,
   type KnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
 import {
@@ -24,13 +26,23 @@ export function retireMobileDesktopRelayEnvironment(environmentId: string): void
   }
 }
 
+/**
+ * Servers a phone may reach through this desktop. Not WSL hosts: they are this desktop's own
+ * distros, connected only for work open here, so a phone must not wake or route to them.
+ */
+function listRelayableEnvironments(userDataPath: string) {
+  return listEnvironments(userDataPath).filter(
+    (environment) => !isWslHostRuntimeEnvironment(environment)
+  )
+}
+
 /** The desktop's configured servers, addressed only by exact environment id. */
 export function createRuntimeEnvironmentMobileRelayHosts(): MobileDesktopRelayHosts {
   // Why userData: configured servers live where the runtime-environment handlers keep them.
   const userDataPath = app.getPath('userData')
   return {
     list: () => {
-      const environments = listEnvironments(userDataPath)
+      const environments = listRelayableEnvironments(userDataPath)
       const statusByEnvironmentId = new Map<string, RuntimeEnvironmentStatus>()
       for (const snapshot of getRuntimeEnvironmentStatusSnapshots()) {
         const environment = environments.find((entry) => entry.id === snapshot.environmentId)
@@ -56,13 +68,14 @@ export function createRuntimeEnvironmentMobileRelayHosts(): MobileDesktopRelayHo
           source: environment.source,
           orcadDeployment: environment.orcadDeployment,
           pairingRevision: pairingRevision(environment),
-          runtimeId: environment.runtimeId
+          runtimeId: environment.runtimeId,
+          ...(environment.pairedDeviceId ? { pairedDeviceId: environment.pairedDeviceId } : {})
         })),
         statusByEnvironmentId
       }
     },
     resolve: async (environmentId) => {
-      if (!listEnvironments(userDataPath).some((entry) => entry.id === environmentId)) {
+      if (!listRelayableEnvironments(userDataPath).some((entry) => entry.id === environmentId)) {
         return null
       }
       const environment = await resolveManagedRuntimeEnvironment(userDataPath, environmentId)
@@ -85,6 +98,7 @@ export function createRuntimeEnvironmentMobileRelayHosts(): MobileDesktopRelayHo
           ? { expectedEnvironmentRuntimeId: options.expected.runtimeId }
           : undefined
       ),
+    hostsBrowserPage: pairedRuntimeBrowserClientHostsPage,
     onEnvironmentRetired: (listener) => {
       retirementListeners.add(listener)
       return () => retirementListeners.delete(listener)

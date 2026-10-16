@@ -9,6 +9,9 @@
  * `ORCA_LAYOUT_ORACLE_REPEAT=<n>` repeats every scenario n times (catch-rate measurement).
  */
 
+import { mkdtempSync, rmSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import {
@@ -33,6 +36,7 @@ import {
   wakeByClick
 } from './helpers/setup-split-and-sleep-journeys'
 import { runOracleScenario, type OracleRun } from './helpers/workspace-layout-oracle-session'
+import { RuntimeClient } from '../../src/cli/runtime/client'
 import { unexpectedFindings } from './workspace-layout-oracle-known-on-main'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 import type { RuntimeMobileSessionTabsResult } from '../../src/shared/runtime-session-contracts'
@@ -69,6 +73,46 @@ async function reopenActiveWorktree(page: Page): Promise<void> {
   await waitForSessionReady(page)
   await ensureTerminalVisible(page)
   await waitForActiveTerminalManager(page, 30_000)
+}
+
+/** A client paired to the window's runtime over its WebSocket offer, with its own state directory. */
+// Both clients use the window's one runtime offer, as the headless corpus's two clients share one.
+async function pairWindowClient(run: OracleRun, stateDir: string): Promise<RuntimeClient> {
+  const offer = await run.page.evaluate(() =>
+    window.api.mobile.getRuntimePairingUrl({ address: '127.0.0.1' })
+  )
+  if (!offer.available || !offer.pairingUrl) {
+    throw new Error('The window runtime did not offer a pairing')
+  }
+  return new RuntimeClient(stateDir, 30_000, offer.pairingUrl, null)
+}
+
+/** Each paired client's tab order must equal the CLI's; a difference is a `client` finding. */
+async function compareClientTabOrders(
+  run: OracleRun,
+  step: string,
+  worktreeId: string,
+  clients: Record<string, RuntimeClient>
+): Promise<void> {
+  const order = async (client: RuntimeClient) =>
+    JSON.stringify(
+      (
+        await client.call<RuntimeMobileSessionTabsResult>('session.tabs.list', {
+          worktree: `id:${worktreeId}`
+        })
+      ).result.tabGroups?.map((group) => group.tabOrder) ?? []
+    )
+  const expected = await order(run.client)
+  for (const [name, client] of Object.entries(clients)) {
+    const seen = await order(client)
+    if (seen !== expected) {
+      run.oracle.findings.push({
+        check: 'client',
+        step,
+        details: [`${name} tab order ${seen} vs CLI ${expected}`]
+      })
+    }
+  }
 }
 
 async function splitTwice(page: Page): Promise<void> {
@@ -228,6 +272,40 @@ const SCENARIOS: Scenario[] = [
       await run.oracle.step('client moves tab to a new group', { worktreeId, panesPerTab: [1, 1] })
       await run.client.call('session.tabs.close', { worktree, tabId, reason: 'user' })
       await run.oracle.step('client closes tab', { worktreeId, panesPerTab: [1], removed: 1 })
+    }
+  },
+  {
+    // #9450 with a window attached: paired client A creates, paired client B closes.
+    id: 'two-clients-create-close',
+    journey: async (run, worktreeId) => {
+      const stateDir = mkdtempSync(path.join(os.tmpdir(), 'layout-oracle-clients-'))
+      try {
+        const clients = {
+          'client A': await pairWindowClient(run, path.join(stateDir, 'a')),
+          'client B': await pairWindowClient(run, path.join(stateDir, 'b'))
+        }
+        const worktree = `id:${worktreeId}`
+        const create = async () =>
+          (
+            await clients['client A'].call<{ tab: { parentTabId: string } }>(
+              'session.tabs.createTerminal',
+              { worktree }
+            )
+          ).result.tab.parentTabId
+        const first = await create()
+        await create()
+        await run.oracle.step('A creates two tabs', { worktreeId, panesPerTab: [1, 1, 1] })
+        await compareClientTabOrders(run, 'A creates two tabs', worktreeId, clients)
+        await clients['client B'].call('session.tabs.close', {
+          worktree,
+          tabId: first,
+          reason: 'user'
+        })
+        await run.oracle.step('B closes one', { worktreeId, panesPerTab: [1, 1], removed: 1 })
+        await compareClientTabOrders(run, 'B closes one', worktreeId, clients)
+      } finally {
+        rmSync(stateDir, { recursive: true, force: true })
+      }
     }
   },
   {

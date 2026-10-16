@@ -49,9 +49,9 @@ describe('orcad migration manifest', () => {
 
     expect(normalized).toHaveLength(MAX_ORCAD_MIGRATION_IMPORT_RECEIPTS)
     expect(normalized.some((entry) => entry.migrationId === 'migration-0')).toBe(false)
-    expect(
-      normalized.find((entry) => entry.migrationId === 'migration-10')?.source.targetLabel
-    ).toBe('Newest')
+    expect(normalized.find((entry) => entry.migrationId === 'migration-10')?.source).toMatchObject({
+      targetLabel: 'Newest'
+    })
   })
 
   it('normalizes receipts without Node 20-only array methods', () => {

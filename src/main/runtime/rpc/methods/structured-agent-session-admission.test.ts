@@ -1,3 +1,4 @@
+import '../unused-default-rpc-methods.test-fixture'
 // The host's own structured-chat setting is its user's launch preference, not admission control:
 // a paired client that can read structured sessions reaches every method whatever that setting says.
 

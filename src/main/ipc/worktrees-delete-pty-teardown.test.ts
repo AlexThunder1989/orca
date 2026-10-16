@@ -4,15 +4,14 @@ import {
   assertWorktreeCleanForRemovalMock,
   removeWorktreeMock,
   getEffectiveHooksMock,
-  getEffectiveHooksFromConfigMock,
   runHookMock,
-  getSshGitProviderMock,
   deleteWorktreeHistoryDirMock,
   killAllProcessesForWorktreeMock,
   clearProviderPtyStateMock
 } from './worktrees-test-module-mocks'
 import { handlers, mainWindow, setupWorktreeHandlers, store } from './worktrees-test-harness'
 import { mockKnownFeatureWorktree } from './worktrees-test-fixtures'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 
 vi.mock('electron', async () =>
   (await import('./worktrees-test-module-mocks')).electronModuleMock()
@@ -37,18 +36,11 @@ vi.mock('../github/client', async () =>
 vi.mock('../source-control/hosted-review', async () =>
   (await import('./worktrees-test-module-mocks')).hostedReviewModuleMock()
 )
-vi.mock('../providers/ssh-git-dispatch', async () =>
-  (await import('./worktrees-test-module-mocks')).sshGitDispatchModuleMock()
-)
 vi.mock('../providers/ssh-filesystem-dispatch', async () =>
   (await import('./worktrees-test-module-mocks')).sshFilesystemDispatchModuleMock()
 )
 vi.mock('./worktree-symlinks', async () =>
   (await import('./worktrees-test-module-mocks')).worktreeSymlinksModuleMock()
-)
-vi.mock('./ssh', async () => (await import('./worktrees-test-module-mocks')).sshModuleMock())
-vi.mock('../ssh/ssh-target-registry', async () =>
-  (await import('./worktrees-test-module-mocks')).sshTargetRegistryModuleMock()
 )
 vi.mock('../hooks', async () => (await import('./worktrees-test-module-mocks')).hooksModuleMock())
 vi.mock('../setup-runner-script-text', async (importOriginal) =>
@@ -94,7 +86,12 @@ vi.mock('../workspace-cleanup-removal-snapshot-prune', async () =>
 vi.mock('../runtime/worktree-teardown', async () =>
   (await import('./worktrees-test-module-mocks')).worktreeTeardownModuleMock()
 )
-vi.mock('./pty', async () => (await import('./worktrees-test-module-mocks')).ptyModuleMock())
+vi.mock('./pty/provider/registry', async () =>
+  (await import('./worktrees-test-module-mocks')).ptyRegistryModuleMock()
+)
+vi.mock('./pty/provider/state-cleanup', async () =>
+  (await import('./worktrees-test-module-mocks')).ptyStateCleanupModuleMock()
+)
 
 // Why: every removal and listing reply now names the catalog it produced or scanned.
 const anyCatalogVersion = { epoch: expect.any(String), sequence: expect.any(Number) }
@@ -293,7 +290,7 @@ describe('registerWorktreeHandlers', () => {
 
   // Why: this process holds no SSH PTY provider, so an SSH delete must refuse rather than sweep
   // the same-id local workspace's terminals.
-  it('refuses an SSH worktree delete it cannot stop terminals for', async () => {
+  it('refuses an SSH worktree delete this process does not serve, never deleting here', async () => {
     const repo = {
       id: 'repo-ssh',
       path: '/remote/repo',
@@ -305,26 +302,13 @@ describe('registerWorktreeHandlers', () => {
     }
     store.getRepos.mockReturnValue([repo])
     store.getRepo.mockReturnValue(repo)
-    getSshGitProviderMock.mockReturnValue({
-      listWorktrees: vi.fn().mockResolvedValue([
-        { path: '/remote/repo', head: 'main', branch: 'main', isBare: false, isMainWorktree: true },
-        {
-          path: '/remote/feature-wt',
-          head: 'feature',
-          branch: 'feature',
-          isBare: false,
-          isMainWorktree: false
-        }
-      ]),
-      removeWorktree: vi.fn().mockResolvedValue({}),
-      worktreeIsClean: vi.fn().mockResolvedValue({ clean: true })
-    })
-    getEffectiveHooksFromConfigMock.mockReturnValue(null)
 
     await expect(
       handlers['worktrees:remove'](null, { worktreeId: 'repo-ssh::/remote/feature-wt' })
-    ).rejects.toThrow('PTY provider unavailable for worktree deletion')
+    ).rejects.toThrow(SshHostNotServedError)
 
+    expect(listWorktreesMock).not.toHaveBeenCalled()
+    expect(removeWorktreeMock).not.toHaveBeenCalled()
     expect(killAllProcessesForWorktreeMock).not.toHaveBeenCalled()
   })
 

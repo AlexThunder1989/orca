@@ -62,14 +62,10 @@ describe.skipIf(isWindows)('legacy WSL auth drain apply script', () => {
     expect(outcome.markerExists).toBe(true)
   })
 
-  it('promotes the validated source into the account home', () => {
+  it('promotes the validated source without changing the legacy home', () => {
     const outcome = runApplyScript()
     expect(outcome.targetAuth).toBe(SOURCE_AUTH)
-  })
-
-  it('leaves the legacy home untouched while promoting', () => {
-    // One-directional: the promote step must never write back to the old home.
-    expect(runApplyScript().legacyAuth).toBe(SOURCE_AUTH)
+    expect(outcome.legacyAuth).toBe(SOURCE_AUTH)
   })
 
   it('refuses torn bytes and leaves the account home intact', () => {

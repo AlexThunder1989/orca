@@ -1,4 +1,4 @@
-import { RuntimeRpcCallError } from './runtime-rpc-client'
+import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { getRemoteRuntimeTerminalMultiplexer } from './remote-runtime-terminal-multiplexer'
 import { parseRemoteRuntimePtyId } from '../../../shared/remote-runtime-pty-id'
 

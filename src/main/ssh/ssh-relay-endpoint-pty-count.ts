@@ -10,7 +10,7 @@ import type { SshConnection } from './ssh-connection'
 import { SshChannelMultiplexer } from './ssh-channel-multiplexer'
 import { shellEscape } from './ssh-connection-utils'
 import { SHORT_RELAY_SOCKET_DIR_PREFIX } from './relay-socket-path-limit'
-import { waitForSentinel } from './ssh-relay-deploy-helpers'
+import { waitForSentinel } from './ssh-relay-sentinel'
 
 const RELAY_PTY_COUNT_TIMEOUT_MS = 10_000
 

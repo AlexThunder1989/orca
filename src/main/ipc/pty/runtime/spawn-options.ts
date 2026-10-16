@@ -1,6 +1,6 @@
 import { getAppEnvironment } from '../../../../shared/app-environment'
 import { getLegacyOpenCodeEnvKeysToDelete } from '../../../opencode/legacy-shared-config-dir'
-import type { IPtyProvider, PtySpawnResult } from '../../../providers/types'
+import type { IPtyProvider, PtySpawnResult } from '../../../providers/pty-provider-contract'
 import { LocalPtyProvider } from '../../../providers/local-pty-provider'
 import { makePaneKey, isTerminalLeafId } from '../../../../shared/stable-pane-id'
 import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'

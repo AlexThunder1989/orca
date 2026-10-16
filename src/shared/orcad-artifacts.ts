@@ -1,7 +1,6 @@
 /**
- * What a packaged `orcad` directory must contain, declared once — the same single-source
- * treatment `relay-artifacts.ts` gives the relay, for the same reason: the build, the
- * content hash and the remote install probe must not keep three lists that drift.
+ * What a packaged `orcad` directory must contain, declared once: the build, the content hash
+ * and the remote install probe must not keep three lists that drift.
  *
  * Order is load-bearing: the hash concatenates these files in sequence.
  *
@@ -13,6 +12,8 @@ export const ORCAD_BUN_RUNTIME_FILENAME = 'bun-runtime'
 export const ORCAD_WINDOWS_BUN_RUNTIME_FILENAME = 'bun-runtime.exe'
 export const ORCAD_BUILD_TARGET_FILENAME = '.build-target'
 export const ORCAD_WINDOWS_PROCESS_TREE_FILENAME = 'windows-process-tree.node'
+/** native/windows-security: secure-file ACLs without spawning icacls. */
+export const ORCAD_WINDOWS_SECURITY_FILENAME = 'windows-security.node'
 /** native/windows-cli-launcher: cmd.exe and .ps1 shims cannot carry every argv intact. */
 export const ORCAD_WINDOWS_CLI_LAUNCHER_FILENAME = 'bin/orca.exe'
 
@@ -180,6 +181,9 @@ export const ORCAD_ARTIFACTS: readonly OrcadArtifact[] = [
   { filename: ORCAD_PORT_SCAN_COMMAND_WORKER_ENTRY },
   // Forked so transcript parsing stays off the server's event loop; session search stays in-process.
   { filename: ORCAD_SESSION_SCANNER_SERVICE_ENTRY },
+  // Worker threads the account services start: CLI probes off the event loop, Claude account setup.
+  { filename: 'worker-thread-child-process-entry.js' },
+  { filename: 'claude-profile-setup-worker-entry.js' },
   // Target-specific even when the JavaScript bundle is shared across packaged slots.
   { filename: ORCAD_SERVER_TARGET_FILENAME },
   // orcad never depends on a host runtime or host-installed native module.
@@ -207,7 +211,11 @@ export function orcadArtifactFilenames(target: string): string[] {
   )
   filenames.push(...orcadNodePtyNativeArtifacts(target), orcadRipgrepArtifact(target))
   if (isWindowsTarget(target)) {
-    filenames.push(ORCAD_WINDOWS_PROCESS_TREE_FILENAME, ORCAD_WINDOWS_CLI_LAUNCHER_FILENAME)
+    filenames.push(
+      ORCAD_WINDOWS_PROCESS_TREE_FILENAME,
+      ORCAD_WINDOWS_SECURITY_FILENAME,
+      ORCAD_WINDOWS_CLI_LAUNCHER_FILENAME
+    )
   }
   return filenames
 }

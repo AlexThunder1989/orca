@@ -1,3 +1,4 @@
+import type { RuntimeAutomationController } from './runtime-automation-controller'
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import type { Automation } from '../../shared/automations-types'
@@ -299,4 +300,38 @@ describe('OrcaRuntimeService automation methods', () => {
     )
     expect(store.updateAutomation).not.toHaveBeenCalled()
   })
+})
+
+it('keeps generic automation reads on the current owner before invoking the reader', () => {
+  const runtime = new OrcaRuntimeService(null)
+  const owner = runtime['automation']
+  const result = { rows: ['run-1'] }
+  const events: string[] = []
+  const read = vi.fn(() => {
+    events.push('read')
+    return result
+  })
+  const priority = vi.spyOn(owner, 'withExternalProbePriority').mockImplementation(function <T>(
+    this: RuntimeAutomationController,
+    operation: () => T
+  ): T {
+    expect(this).toBe(owner)
+    expect(arguments.length).toBe(1)
+    events.push('priority')
+    return operation()
+  })
+  Object.defineProperty(runtime, 'automation', {
+    get() {
+      events.push('owner')
+      return owner
+    }
+  })
+  try {
+    expect(runtime['readAutomationRuns'](undefined, undefined, read)).toBe(result)
+    expect(events).toEqual(['owner', 'priority', 'read'])
+    expect(priority).toHaveBeenCalledOnce()
+    expect(read).toHaveBeenCalledOnce()
+  } finally {
+    priority.mockRestore()
+  }
 })

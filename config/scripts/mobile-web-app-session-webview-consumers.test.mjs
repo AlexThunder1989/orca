@@ -18,14 +18,6 @@ const ANSWERED = [
 describeClosure(
   'the session route web component closure',
   () => {
-    it('includes all four web components in the session route closure', async () => {
-      const closure = await mobileWebAppRouteClosure(SESSION)
-      expect(closure.local.length).toBeGreaterThan(500)
-      for (const file of ANSWERED) {
-        expect(closure.local, file).toContain(file)
-      }
-    })
-
     it('resolves all four web components and excludes their native files', async () => {
       const closure = await mobileWebAppRouteClosure(SESSION)
       for (const file of ANSWERED) {

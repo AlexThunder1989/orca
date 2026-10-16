@@ -189,7 +189,8 @@ describe('committed pin', () => {
 
   it('runs in the static analysis job', () => {
     const workflow = parse(readFileSync(path.join(projectDir, '.github/workflows/pr.yml'), 'utf8'))
+    const packageJson = JSON.parse(readFileSync(path.join(projectDir, 'package.json'), 'utf8'))
     const commands = workflow.jobs.preflight.steps.map((step) => step.run ?? '')
-    expect(commands).toContain('pnpm run check:node-runtime-pin')
+    expect(commands).toContain(packageJson.scripts['check:node-runtime-pin'])
   })
 })

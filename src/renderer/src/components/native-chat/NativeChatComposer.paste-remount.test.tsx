@@ -304,25 +304,10 @@ it('keeps a local image paste after the real composer closes and reopens', async
   await waitFor(() => expect(mocks.state.fieldProps?.imageAttachments?.[0]?.pending).toBeFalsy())
 })
 
-it.each([
-  { kind: 'local', acceptsImages: false },
-  { kind: 'ssh', acceptsImages: false },
-  { kind: 'local', acceptsImages: true },
-  { kind: 'ssh', acceptsImages: true }
-] as const)(
-  'can remove a stalled $kind paste after reopen with acceptsImages=$acceptsImages',
-  async ({ kind, acceptsImages }) => {
-    mocks.state.owner =
-      kind === 'local'
-        ? { kind: 'local' }
-        : {
-            kind: 'ssh',
-            connectionId: 'ssh-1',
-            worktreePath: '/remote/folder',
-            expectedExecutionHostId: 'ssh:ssh-1',
-            expectedSshTargetId: 'ssh-1',
-            expectedSshConnectionGeneration: 1
-          }
+it.each([false, true])(
+  'can remove a stalled paste after reopen with acceptsImages=%s',
+  async (acceptsImages) => {
+    mocks.state.owner = { kind: 'local' }
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
     const finishUpload = holdUpload()
     writeNativeChatDraftCache(PANE, 'look at this')
@@ -338,13 +323,7 @@ it.each([
       fireEvent.click(screen.getByRole('button', { name: 'Remove attachment' }))
     )
     expect(mocks.state.fieldProps?.sendButtonDisabled).toBe(false)
-    await act(async () =>
-      finishUpload(
-        kind === 'local'
-          ? '/local/native-chat-pastes/orca-paste-1-image.png'
-          : '/tmp/orca-paste-1-image.png'
-      )
-    )
+    await act(async () => finishUpload('/local/native-chat-pastes/orca-paste-1-image.png'))
     expect(readNativeChatAttachmentCache(PANE)).toEqual([])
     expect(readNativeChatDraftCache(PANE)).toBe('look at this')
     expect(mocks.state.fieldProps?.imageAttachments).toEqual([])

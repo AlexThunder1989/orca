@@ -1,7 +1,7 @@
 /**
  * Agent/tool preflight detection. Split out of `ipc/preflight.ts` so the Orca
- * runtime — which calls `detectInstalledAgentsWithShellPathHydration` and
- * `detectRemoteAgents` during normal operation — can reach this logic without
+ * runtime — which calls `detectInstalledAgentsWithShellPathHydration`
+ * during normal operation — can reach this logic without
  * dragging `ipcMain` into its module graph. The Electron handler registration
  * stays in `ipc/preflight.ts` and imports from here.
  */
@@ -15,7 +15,6 @@ import { getBitbucketAuthStatus } from '../bitbucket/client'
 import { getGiteaAuthStatus } from '../gitea/client'
 import { _resetKnownHostsCache } from '../gitlab/gl-utils'
 import { mergePersistedWindowsPathAsync } from '../pty/windows-environment-path'
-import { getActiveMultiplexer } from '../ssh/ssh-target-registry'
 import type { WslPreflightTarget } from '../ipc/preflight-wsl-agent-detection'
 import {
   getPreflightWslTarget,
@@ -120,10 +119,6 @@ export function _resetPreflightCache(): void {
   preflightCacheEpoch += 1
 }
 
-function uniqueAgentIds(ids: Iterable<string>): string[] {
-  return [...new Set(ids)]
-}
-
 /** A CLI verdict and, on the local path, the exact copy that produced it. */
 type CommandRuntime = { installed: boolean; wslTarget?: WslPreflightTarget; binary?: string }
 
@@ -216,18 +211,6 @@ export async function refreshShellPathAndDetectAgents(
     pathSource: hydration.ok ? 'shell_hydrate' : 'sync_seed_only',
     pathFailureReason: hydration.failureReason
   }
-}
-
-export async function detectRemoteAgents(args: { connectionId: string }): Promise<string[]> {
-  const mux = getActiveMultiplexer(args.connectionId)
-  if (!mux || mux.isDisposed()) {
-    // Why: an unreachable host is unverifiable, not a host with no agents; [] would be cached as one.
-    throw new Error('SSH host is not connected; its agents cannot be listed.')
-  }
-  const result = (await mux.request('preflight.detectAgents', {
-    commands: KNOWN_TUI_AGENT_DETECTION_COMMANDS
-  })) as { agents: string[] }
-  return uniqueAgentIds(result.agents)
 }
 
 // Why the probe object rather than the bare command name: on the local path

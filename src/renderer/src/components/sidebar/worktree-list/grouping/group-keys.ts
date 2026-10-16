@@ -17,16 +17,16 @@ import {
 } from '../../../../store/slices/github-cache-key'
 import { translate } from '@/i18n/i18n'
 import { isGitHubPRSuppressed } from '../../../../../../shared/worktree/github-pr-suppression'
+import {
+  getPRGroupKeyForState,
+  type PRGroupKey
+} from '../../../../../../shared/workspace-view/workspace-pr-groups'
 
-export type PRGroupKey = 'done' | 'in-review' | 'in-progress' | 'closed'
-
-export const PR_GROUP_ORDER: PRGroupKey[] = ['done', 'in-review', 'in-progress', 'closed']
-
-/** Section key for a PR lane. Shared so worktree and folder-workspace bucketing
- *  cannot drift onto different prefixes. */
-export function getPRLaneKey(prGroup: PRGroupKey): string {
-  return `pr:${prGroup}`
-}
+export {
+  PR_GROUP_ORDER,
+  getPRLaneKey,
+  type PRGroupKey
+} from '../../../../../../shared/workspace-view/workspace-pr-groups'
 
 export const PR_GROUP_META: Record<
   PRGroupKey,
@@ -154,16 +154,7 @@ export function getPRGroupKey(
   if (!pr || (typeof pr.number === 'number' && isGitHubPRSuppressed(worktree, pr.number))) {
     return 'in-progress'
   }
-  if (pr.state === 'merged') {
-    return 'done'
-  }
-  if (pr.state === 'closed') {
-    return 'closed'
-  }
-  if (pr.state === 'draft') {
-    return 'in-progress'
-  }
-  return 'in-review'
+  return getPRGroupKeyForState(pr.state ?? '')
 }
 
 /**

@@ -144,6 +144,7 @@ describe('OrcaRuntimeService', () => {
           branch: 'feature/foo',
           isArchived: false,
           isMainWorktree: false,
+          defaultBranch: false,
           hasHostSidebarActivity: true,
           parentWorktreeId: null,
           childWorktreeIds: [],

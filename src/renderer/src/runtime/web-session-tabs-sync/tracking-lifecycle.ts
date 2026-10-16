@@ -55,12 +55,14 @@ import {
 
 const sessionTabsTrackingGenerations = createBoundedGenerationMap(512)
 
+/** Null until the host has sent a frame for the worktree: unknown is not zero. */
 export function getLastKnownHostTerminalTabCount(
   environmentId: string,
   worktreeId: string
-): number {
+): number | null {
   return (
-    lastHostTerminalTabCountByWorktree.get(sessionTabsFreshnessKey(environmentId, worktreeId)) ?? 0
+    lastHostTerminalTabCountByWorktree.get(sessionTabsFreshnessKey(environmentId, worktreeId)) ??
+    null
   )
 }
 

@@ -66,7 +66,12 @@ export function useNativeChatComposerAttachments({
   clearImageAttachments: () => void
   flushPendingAttachments: () => void
   removeImageAttachment: (id: string) => void
-  beginPendingImageAttachment: (previewUrl?: string, pendingName?: string) => string | null
+  /** `serverOwned`: an image the paste saved on the remote target's own server, not a client file. */
+  beginPendingImageAttachment: (
+    previewUrl?: string,
+    pendingName?: string,
+    serverOwned?: boolean
+  ) => string | null
   resolvePendingImageAttachment: (id: string, path: string, connectionId?: string | null) => void
   revealPendingImageAttachment: (id: string, previewUrl?: string) => void
   dropPendingImageAttachment: (id: string) => boolean
@@ -116,6 +121,7 @@ export function useNativeChatComposerAttachments({
   }, [mountedRef])
 
   const nextAttachmentId = useCallback(() => createUuidV4(), [])
+  const serverOwnedPendingIds = useMemo(() => new Set<string>(), [])
 
   // Client-local paths cannot cross into a runtime target; workspace-owned
   // paths may only bypass this after the internal drop ownership gate.
@@ -167,15 +173,18 @@ export function useNativeChatComposerAttachments({
   // Placeholder chip shown the instant a paste starts, so a clipboard image that
   // takes a beat to save (or upload over SSH) never reads as a dropped paste.
   const beginPendingImageAttachment = useCallback(
-    (previewUrl?: string, pendingName?: string): string | null => {
+    (previewUrl?: string, pendingName?: string, serverOwned = false): string | null => {
       if (disabledRef.current) {
         return null
       }
-      if (attachmentTargetBlocked()) {
+      if (attachmentTargetBlocked(serverOwned)) {
         noteAttachmentTargetBlocked()
         return null
       }
       const id = nextAttachmentId()
+      if (serverOwned) {
+        serverOwnedPendingIds.add(id)
+      }
       addNativeChatPendingAttachment(attachmentScopeKey, {
         id,
         path: '',
@@ -191,17 +200,24 @@ export function useNativeChatComposerAttachments({
       disabledRef,
       nextAttachmentId,
       noteAttachmentTargetBlocked,
+      serverOwnedPendingIds,
       setPreview
     ]
   )
 
   const attachPendingReferences = useCallback(
-    (references: { id: string; path: string }[]) => {
+    (references: { id: string; path: string }[], serverOwned = false) => {
       settleNativeChatPendingAttachmentReferences(
         attachmentScopeKey,
         references,
         mountedRef.current && !disabledRef.current && !isComposing()
-          ? (paths) => attachResolvedPaths(paths, null)
+          ? (paths) =>
+              // The paste re-checked the owner just before settling a server-owned image.
+              attachResolvedPaths(
+                paths,
+                null,
+                serverOwned ? { targetOwnerIsCurrent: () => true } : undefined
+              )
           : undefined
       )
     },
@@ -210,13 +226,14 @@ export function useNativeChatComposerAttachments({
 
   const resolvePendingImageAttachment = useCallback(
     (id: string, path: string, connectionId?: string | null) => {
+      const serverOwned = serverOwnedPendingIds.delete(id)
       if (acceptsImages) {
         settleNativeChatPendingAttachment(attachmentScopeKey, id, path, connectionId)
       } else {
-        attachPendingReferences([{ id, path }])
+        attachPendingReferences([{ id, path }], serverOwned)
       }
     },
-    [acceptsImages, attachPendingReferences, attachmentScopeKey]
+    [acceptsImages, attachPendingReferences, attachmentScopeKey, serverOwnedPendingIds]
   )
 
   const revealPendingImageAttachment = useCallback(
@@ -233,9 +250,10 @@ export function useNativeChatComposerAttachments({
   const dropPendingImageAttachment = useCallback(
     (id: string): boolean => {
       releasePreview(id)
+      serverOwnedPendingIds.delete(id)
       return takeNativeChatPendingAttachment(attachmentScopeKey, id) !== undefined
     },
-    [attachmentScopeKey, releasePreview]
+    [attachmentScopeKey, releasePreview, serverOwnedPendingIds]
   )
 
   const pendingChips = useMemo(

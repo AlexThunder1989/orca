@@ -18,16 +18,22 @@ import type {
   NativeChatSettledTurns
 } from '../../../src/shared/native-chat-turn-status'
 import type { NativeChatTurnJournal } from '../../../src/shared/native-chat-turn-membership'
+import type { NativeChatResolvedPrompt } from '../../../src/shared/native-chat-resolution-receipt'
 import { colors } from '../theme/mobile-theme'
 import { styles } from './mobile-native-chat-view-styles'
 import { mobileNativeChatListFooter } from './mobile-native-chat-list-footer'
+import { mobileNativeChatListHeader } from './mobile-native-chat-list-header'
 import {
   buildMobileNativeChatTransientData,
   mobileNativeChatEmptyState,
   type MobileNativeChatPendingItem
 } from './mobile-native-chat-render-data'
+import { useMobileNativeChatPageHistory } from './use-mobile-native-chat-page-history'
 import { useMobileNativeChatPinchGesture } from './use-mobile-native-chat-pinch-gesture'
-import { useMobileNativeChatTailFollow } from './use-mobile-native-chat-tail-follow'
+import {
+  mobileNativeChatRowAnchor,
+  useMobileNativeChatTailFollow
+} from './use-mobile-native-chat-tail-follow'
 import { useMobileNativeChatTurnDisclosure } from './use-mobile-native-chat-turn-disclosure'
 import {
   mobileNativeChatComposerPlaceholder,
@@ -43,7 +49,8 @@ import { NO_COMPOSER_TRAY, type ComposerTrayProps } from './use-mobile-native-ch
 import type { MobileChatPermission } from './mobile-native-chat-permission'
 import type { MobileChatQuestion } from './mobile-native-chat-question'
 import type { MobileNativeChatSessionOptionPickersProps } from './MobileNativeChatSessionOptionPickers'
-import { MobileNativeChatMessage } from './MobileNativeChatMessage'
+import { MobileNativeChatScrollHold } from './MobileNativeChatScrollHold'
+import { useMobileNativeChatRowRenderer } from './use-mobile-native-chat-row-renderer'
 import type { MobileNativeChatStatus } from './use-mobile-native-chat-session'
 
 /** Why the composer input is locked: the transport is disconnected, or the
@@ -73,6 +80,8 @@ type Props = ComposerTrayProps & {
   settledTurns?: NativeChatSettledTurns | null
   /** Structured lane: the journal that places each row in its turn. */
   turnJournal?: NativeChatTurnJournal | null
+  receipts?: ReadonlyMap<string, NativeChatResolvedPrompt> | null
+  actionablePromptIds?: readonly string[]
   /** Interrupt the agent mid-turn (shown as a Stop button on the working bar). */
   /** Interrupt a provider turn. */
   onStop?: () => void
@@ -164,6 +173,8 @@ export function MobileNativeChatView({
   workingStartedAt,
   settledTurns,
   turnJournal = null,
+  receipts = null,
+  actionablePromptIds,
   onStop,
   streaming,
   hasMore,
@@ -241,7 +252,7 @@ export function MobileNativeChatView({
     endUserDrag,
     beginMomentum,
     endMomentum,
-    detachFromTail,
+    readerIsScrolling,
     recordScrollMetrics
   } = useMobileNativeChatTailFollow<NativeChatMessage>({ hasItems: data.length > 0 })
 
@@ -261,28 +272,23 @@ export function MobileNativeChatView({
     [onSend, onClearSendError, jumpToTail]
   )
 
-  const loadEarlier = useCallback(() => {
-    detachFromTail()
-    onLoadEarlier?.()
-  }, [detachFromTail, onLoadEarlier])
+  const loadEarlier = useCallback(() => onLoadEarlier?.(), [onLoadEarlier])
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset } = e.nativeEvent
       recordScrollMetrics(e.nativeEvent)
-      // Near the top — page in older history.
-      if (contentOffset.y < 60 && hasMore && !loadingEarlier) {
+      // Near the top — page in older history. Only the reader's scroll: a pin reports offsets too.
+      if (contentOffset.y < 60 && hasMore && !loadingEarlier && readerIsScrolling()) {
         loadEarlier()
       }
     },
-    [hasMore, loadingEarlier, loadEarlier, recordScrollMetrics]
+    [hasMore, loadingEarlier, loadEarlier, readerIsScrolling, recordScrollMetrics]
   )
 
   // Per-turn status rows: one live indicator while the turn runs, then a settled
   // "Worked for N" row. The structured lane owns them; the bridge lane keeps its
   // three-dot indicator.
-  // The display status, decided once in the session hook.
-  const stopping = turnIndicator?.stopping === true
   const turns = useMobileNativeChatTurnDisclosure({
     messages: data,
     enabled: structuredActivityUi,
@@ -292,25 +298,25 @@ export function MobileNativeChatView({
     turnJournal,
     thinking: turnIndicator?.thinking === true,
     activityText: turnIndicator?.activityText ?? null,
-    stopping,
+    // The display status, decided once in the session hook.
+    stopping: turnIndicator?.stopping === true,
     lineYields: structuredActivityUi && (ask != null || permission != null || question != null),
     scopeKey: sendSurfaceId
   })
 
-  const renderItem = useCallback(
-    ({ item, index }: { item: NativeChatMessage; index: number }) => (
-      <MobileNativeChatMessage
-        message={item}
-        toolsExpanded={toolsExpanded}
-        fontScale={fontScale}
-        onOpenFile={onOpenFile}
-        structuredActivityUi={structuredActivityUi}
-        onToggleTurn={turns.onToggleTurn}
-        {...turns.resolveRow(index, item)}
-      />
-    ),
-    [toolsExpanded, fontScale, onOpenFile, structuredActivityUi, turns]
-  )
+  const renderItem = useMobileNativeChatRowRenderer({
+    toolsExpanded,
+    fontScale,
+    onOpenFile,
+    structuredActivityUi,
+    turns,
+    turnJournal,
+    agent,
+    receipts,
+    actionablePromptIds
+  })
+
+  const history = useMobileNativeChatPageHistory(turns.listMessages, renderItem)
 
   const liveStatus = turns.liveLine ? (
     <MobileNativeChatLiveLine
@@ -322,7 +328,6 @@ export function MobileNativeChatView({
   ) : null
 
   const emptyState = mobileNativeChatEmptyState(status, agent ?? null, error)
-  const showLoading = status === 'loading' && messages.length === 0
 
   const lockReason = useSettledMobileNativeChatInputLock(inputLockReason)
   // Why only Send, terminal-backed only: that send types into the agent's prompt and can answer it,
@@ -344,18 +349,19 @@ export function MobileNativeChatView({
 
   return (
     <View style={[styles.root, { paddingBottom: bottomPad }]}>
-      {showLoading ? (
+      {status === 'loading' && messages.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.textSecondary} />
         </View>
       ) : (
         <GestureHandlerRootView style={styles.listWrap}>
+          <MobileNativeChatScrollHold headKey={turns.listMessages[0]?.id} listRef={listRef} />
           <GestureDetector gesture={pinchGesture}>
             <FlatList
               ref={listRef}
-              data={turns.listMessages}
+              data={history.listRows}
               keyExtractor={(item) => item.id}
-              renderItem={renderItem}
+              renderItem={history.renderListRow}
               contentContainerStyle={styles.listContent}
               // Let link/file taps land while the composer keyboard is up
               // instead of being swallowed by the dismiss gesture.
@@ -368,21 +374,10 @@ export function MobileNativeChatView({
               scrollEventThrottle={32}
               onContentSizeChange={pinToTailAfterContentResize}
               onLayout={pinToTail}
-              ListHeaderComponent={
-                hasMore ? (
-                  <Pressable
-                    style={styles.loadEarlier}
-                    onPress={loadEarlier}
-                    disabled={loadingEarlier}
-                  >
-                    {loadingEarlier ? (
-                      <ActivityIndicator size="small" color={colors.textMuted} />
-                    ) : (
-                      <Text style={styles.loadEarlierText}>Load earlier messages</Text>
-                    )}
-                  </Pressable>
-                ) : null
-              }
+              maintainVisibleContentPosition={mobileNativeChatRowAnchor(hasMore === true)}
+              ListHeaderComponent={history.withHistory(
+                mobileNativeChatListHeader(hasMore, loadingEarlier, loadEarlier)
+              )}
               ListFooterComponent={mobileNativeChatListFooter(
                 liveStatus,
                 turns.waitingRows,

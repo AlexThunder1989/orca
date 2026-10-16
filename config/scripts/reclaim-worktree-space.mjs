@@ -7,10 +7,17 @@ import { runProcess } from '@orca/process-host'
 export async function reclaimWorktreeSpace({
   repoRoot = process.cwd(),
   apply = false,
+  automatic = false,
   execute = runProcess,
   acquireLock = lock,
-  commonDirectory
+  commonDirectory,
+  testsStopped = false,
+  excludeWorktree,
+  releaseCacheMinAgeDays = 30
 } = {}) {
+  if (!Number.isFinite(releaseCacheMinAgeDays) || releaseCacheMinAgeDays < 0) {
+    throw new Error('--release-cache-min-age-days requires a non-negative number')
+  }
   if (!commonDirectory) {
     const result = await runProcess({
       program: 'git',
@@ -37,10 +44,23 @@ export async function reclaimWorktreeSpace({
   let cleanupError
   try {
     const scripts = ['reclaim-electron-dists.mjs', 'reclaim-dev-electron-bundles.mjs']
+    if (!automatic && testsStopped) {
+      scripts.unshift('reclaim-release-test-caches.mjs')
+    }
     for (const script of scripts) {
       const args = [resolve(import.meta.dirname, script), '--repo', repoRoot]
       if (apply) {
         args.push('--apply')
+      }
+      if (excludeWorktree && script !== 'reclaim-release-test-caches.mjs') {
+        args.push('--exclude-worktree', excludeWorktree)
+      }
+      if (script === 'reclaim-release-test-caches.mjs') {
+        args.unshift('--import', import.meta.resolve('tsx'))
+        args.push('--min-age-days', String(releaseCacheMinAgeDays))
+        if (testsStopped) {
+          args.push('--tests-stopped')
+        }
       }
       const result = await execute({
         program: process.execPath,
@@ -75,33 +95,10 @@ export async function reclaimWorktreeSpace({
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
-  if (process.argv.includes('--help')) {
-    console.log('Usage: pnpm run reclaim:worktree-space [--repo DIRECTORY] [--apply]')
-    console.log(
-      'Previews Electron distribution sharing and idle dev bundle removal; --apply performs them.'
-    )
-    process.exit(0)
-  }
-  const repoIndex = process.argv.indexOf('--repo')
-  for (let index = 2; index < process.argv.length; index += 1) {
-    const argument = process.argv[index]
-    if (argument === '--repo') {
-      index += 1
-    } else if (argument !== '--apply') {
-      throw new Error(`Unknown argument: ${argument}`)
-    }
-  }
-  if (
-    repoIndex !== -1 &&
-    (!process.argv[repoIndex + 1] || process.argv[repoIndex + 1].startsWith('--'))
-  ) {
-    throw new Error('--repo requires a directory')
-  }
-  await reclaimWorktreeSpace({
-    repoRoot: repoIndex !== -1 ? resolve(process.argv[repoIndex + 1]) : process.cwd(),
-    apply: process.argv.includes('--apply')
-  }).catch((error) => {
-    console.error(error.message)
-    process.exitCode = 1
-  })
+  import('./reclaim-worktree-command.mjs')
+    .then(({ runReclaimCommand }) => runReclaimCommand(process.argv.slice(2)))
+    .catch((error) => {
+      console.error(error.message)
+      process.exitCode = 1
+    })
 }

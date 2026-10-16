@@ -1,7 +1,5 @@
 import type { TerminalOscLinkRange } from '../../../../../shared/terminal-osc-link-ranges'
 import type { TerminalSnapshotUnavailableReason } from '../../../../../shared/terminal-snapshot-unavailability'
-import type { TerminalSourceRangeLedger } from '../../terminal-source-range-ledger'
-import type { RemoteTerminalSourceRangeReplacementReservation } from '../../../remote-terminal-source-range-consumer'
 import type {
   TerminalOutputFrameChunk,
   TerminalOutputMeta
@@ -62,11 +60,6 @@ export type TerminalMultiplexStream = {
   client: TerminalViewportClient | undefined
   isMobile: boolean
   ackOutput: boolean
-  ackOutputSourceRanges: boolean
-  streamGeneration: string
-  sourceRangeLedger: TerminalSourceRangeLedger | null
-  sourceRangeConsumerAttached: boolean
-  sourceRangeReplacement: RemoteTerminalSourceRangeReplacementReservation | null
   ackInFlightBytes: number
   ackWindowBytes: number
   supportsOutputPause: boolean

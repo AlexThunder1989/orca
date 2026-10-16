@@ -26,11 +26,10 @@ function fixture() {
     CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT, type TEXT,
       seq INTEGER, data TEXT, time_created INTEGER, time_updated INTEGER);
     INSERT INTO session_v2 VALUES ('session');`)
+  const insertMessage = db.prepare('INSERT INTO session_message VALUES (?, ?, ?, ?, ?, ?, ?)')
   let sequence = 0
   const insert = (id: string, type: string, data: unknown, time = 1) =>
-    db
-      .prepare('INSERT INTO session_message VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, 'session', type, ++sequence, JSON.stringify(data), time, time)
+    insertMessage.run(id, 'session', type, ++sequence, JSON.stringify(data), time, time)
   return { db, path, insert }
 }
 
@@ -159,6 +158,8 @@ describe('OpenCode 2 native transcript', () => {
 
   it('refuses excessive sparse scans instead of returning a partial transcript', () => {
     const { db, path, insert } = fixture()
+    // The regression is the scan cap; avoid quadratic fixture scans between batches.
+    db.exec('CREATE INDEX session_message_sequence ON session_message (session_id, seq)')
     db.exec('BEGIN')
     for (let index = 0; index < 10001; index++) {
       insert(String(index), 'idle', {})

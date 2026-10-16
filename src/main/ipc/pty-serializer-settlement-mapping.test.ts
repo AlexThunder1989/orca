@@ -3,12 +3,10 @@ import { spawnMock } from './pty-ipc-mock-registry'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { makePaneKey } from '../../shared/stable-pane-id'
 import type * as WslManagedCliModule from '../cli/wsl-managed-cli'
-import {
-  registerPtyHandlers,
-  clearProviderPtyState,
-  hasPendingRendererSerializerForPaneKey,
-  setLocalPtyProvider
-} from './pty'
+import { registerPtyHandlers } from './pty/register-handlers'
+import { clearProviderPtyState } from './pty/provider/state-cleanup'
+import { hasPendingRendererSerializerForPaneKey } from './pty/pane/serializer-state'
+import { setLocalPtyProvider } from './pty/provider/registry'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))

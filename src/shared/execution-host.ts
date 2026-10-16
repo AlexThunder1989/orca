@@ -10,6 +10,14 @@ export type ExecutionHostId = typeof LOCAL_EXECUTION_HOST_ID | `ssh:${string}` |
 
 export type ExecutionHostScope = typeof ALL_EXECUTION_HOSTS_SCOPE | ExecutionHostId
 
+/** Whether work at this location runs natively on this machine, in a folder this process can read. */
+export function isNativeLocalLocation(location: {
+  executionHostId: string
+  wslDistro: string | null
+}): boolean {
+  return location.executionHostId === LOCAL_EXECUTION_HOST_ID && location.wslDistro === null
+}
+
 export type ParsedExecutionHost =
   | { kind: 'local'; id: typeof LOCAL_EXECUTION_HOST_ID }
   | { kind: 'ssh'; id: `ssh:${string}`; targetId: string }
@@ -45,9 +53,9 @@ export function getLocalExecutionHostLabel(platform: NodeJS.Platform | null = nu
   return 'This computer'
 }
 
-function normalizeHostPart(value: string | null | undefined): string | null {
-  const trimmed = value?.trim()
-  return trimmed ? trimmed : null
+/** Trims a stored id; blank is absent, since no write path normalizes it. */
+export function normalizeHostPart(value: string | null | undefined): string | null {
+  return value?.trim() || null
 }
 
 export function toSshExecutionHostId(targetId: string): `ssh:${string}` {

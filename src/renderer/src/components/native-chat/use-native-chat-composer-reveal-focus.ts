@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { shouldPreserveEditableFocus } from '@/components/terminal-pane/pane-helpers'
 import { scheduleNextFrame } from '@/components/terminal-pane/terminal-ime-input-context-refresh'
@@ -7,7 +7,16 @@ import type { NativeChatComposerHandle } from './NativeChatComposer'
 /** Focus attempts per reveal, including recovery from delayed programmatic restoration. */
 const REVEAL_FOCUS_FRAMES = 6
 
-type NativeChatComposerRevealFocusArgs = {
+const revealedComposerReclaims = new Map<string, () => void>()
+
+/** Re-clicking a chat's active tab claims its composer again, as a terminal tab refocuses xterm. */
+export function requestNativeChatComposerFocus(tabId: string): void {
+  revealedComposerReclaims.get(tabId)?.()
+}
+
+export type NativeChatComposerRevealFocusArgs = {
+  /** The tab whose activation re-runs the claim (the terminal tab for a chat view over a TUI). */
+  tabId: string
   rootRef: RefObject<HTMLElement | null>
   composerRef: RefObject<NativeChatComposerHandle | null>
   isVisible: boolean
@@ -25,6 +34,7 @@ type NativeChatComposerRevealFocusArgs = {
  * the reveal edge, not mount, is the signal.
  */
 export function useNativeChatComposerRevealFocus({
+  tabId,
   rootRef,
   composerRef,
   isVisible,
@@ -34,10 +44,31 @@ export function useNativeChatComposerRevealFocus({
 }: NativeChatComposerRevealFocusArgs): void {
   const revealed = isVisible && isFocusedGroup
   const claimedRef = useRef(false)
+  // An explicit tab activation takes focus from inside the pane too, short of a text field.
+  const explicitRef = useRef(false)
+  const [reclaimCount, setReclaimCount] = useState(0)
+
+  useEffect(() => {
+    if (!revealed || !composerReady) {
+      return
+    }
+    const reclaim = (): void => {
+      claimedRef.current = false
+      explicitRef.current = true
+      setReclaimCount((count) => count + 1)
+    }
+    revealedComposerReclaims.set(tabId, reclaim)
+    return () => {
+      if (revealedComposerReclaims.get(tabId) === reclaim) {
+        revealedComposerReclaims.delete(tabId)
+      }
+    }
+  }, [composerReady, revealed, tabId])
 
   useEffect(() => {
     if (!revealed || !composerReady) {
       claimedRef.current = false
+      explicitRef.current = false
       return
     }
     if (claimedRef.current) {
@@ -61,6 +92,7 @@ export function useNativeChatComposerRevealFocus({
     }
     const finish = (): void => {
       claimedRef.current = true
+      explicitRef.current = false
       stopWatchingUserIntent()
     }
     ownerDocument?.addEventListener('pointerdown', cancelForPointer, true)
@@ -76,12 +108,16 @@ export function useNativeChatComposerRevealFocus({
       const active = rootRef.current?.ownerDocument.activeElement ?? null
       // Focus already inside this pane is our own take landing or the user's click; either ends it.
       // A just-collapsed card is hidden and inert, so focus left in it is about to drop to body.
-      if (rootRef.current?.contains(active) === true && !active?.closest('[hidden], [inert]')) {
+      if (
+        !explicitRef.current &&
+        rootRef.current?.contains(active) === true &&
+        !active?.closest('[hidden], [inert]')
+      ) {
         finish()
         return
       }
-      // Why: a live text field elsewhere is a user edit — a batch worktree-create keeps its
-      // next name field open behind the pane we just revealed.
+      // Why: a live text field is a user edit — a batch worktree-create keeps its next name
+      // field open behind the pane we just revealed, and the find bar keeps its query.
       if (shouldPreserveEditableFocus(active)) {
         finish()
         return
@@ -101,5 +137,5 @@ export function useNativeChatComposerRevealFocus({
       cancelled = true
       stopWatchingUserIntent()
     }
-  }, [composerReady, composerRef, revealed, rootRef, scheduleFrame])
+  }, [composerReady, composerRef, reclaimCount, revealed, rootRef, scheduleFrame])
 }

@@ -1,7 +1,6 @@
 import type { TerminalReplyQuerySequence } from '../../../../../shared/terminal-reply-query-scan'
 import {
   iterateTerminalOutputFrameChunks,
-  sliceTerminalOutputSourceRanges,
   type TerminalOutputFrameChunk,
   type TerminalOutputMeta
 } from '../../terminal-output-frame-chunks'
@@ -58,12 +57,7 @@ export function getOutputAfterSnapshotSeq(
     bytes: chunk.bytes,
     meta: {
       ...chunk.meta,
-      rawLength: chunk.meta.rawLength - offset,
-      sourceRanges: sliceTerminalOutputSourceRanges(
-        chunk.meta.sourceRanges,
-        offset,
-        chunk.data.length
-      )
+      rawLength: chunk.meta.rawLength - offset
     }
   }
 }

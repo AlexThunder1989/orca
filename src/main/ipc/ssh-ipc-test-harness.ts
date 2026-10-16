@@ -1,29 +1,15 @@
 import { vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { registerSshHandlers, resetSshHandlerStateForTests } from './ssh'
-import { clearProviderPtyState, deletePtyOwnership, getPtyIdsForConnection } from './pty'
 import type { SshIpcMocks } from './ssh-ipc-module-mocks'
 import type { SshConnectionManagerMock, SshPortForwardManagerMock } from './ssh-ipc-mock-shapes'
 
-/** Lease + consumer-recovery slice of the app store the SSH handlers write through. */
+/** Lease slice of the app store the SSH handlers write through. */
 export type SshLeaseStoreMock = {
   getRepos: () => unknown[]
-  getSshPtyConsumerRecovery: Mock
-  upsertSshPtyConsumerRecovery: Mock
-  removeSshPtyConsumerRecovery: Mock
   getSshRemotePtyLeases: Mock
-  reconcileSshRemotePtyLeasesForTarget: Mock
   markSshRemotePtyLease: Mock
-  markSshRemotePtyLeases: Mock
-  markSshRemotePtyLeasesAsync: Mock
-  markSshRemotePtyLeasesForShutdown: Mock
-  markSshRemotePtyLeasesAttachedAsync: Mock
   removeSshRemotePtyLeases: Mock
-  getSshRemotePtyKillIntents: Mock
-  pruneExpiredSshRemotePtyKillIntents: Mock
-  recordSshRemotePtyKillIntent: Mock
-  clearSshRemotePtyKillIntent: Mock
-  noteSshRemotePtyKillReplayAttempt: Mock
 }
 
 export type MockBrowserWindow = { isDestroyed: () => boolean; webContents: { send: Mock } }
@@ -48,10 +34,7 @@ export function createSshIpcHarness(mocks: SshIpcMocks): SshIpcHarness {
     powerMonitorOnMock,
     mockSshStore,
     mockConnectionManager,
-    mockAcceptSshPtyOutputData,
-    mockAcceptSshPtyOutputExit,
     mockMux,
-    mockRegisterSshGitProvider,
     mockPortForwardManager,
     mockPortScannerCallbacks,
     mockNextConnectionManagers,
@@ -60,22 +43,9 @@ export function createSshIpcHarness(mocks: SshIpcMocks): SshIpcHarness {
   const handlers = new Map<string, (_event: unknown, args: unknown) => unknown>()
   const mockStore = {
     getRepos: () => [],
-    getSshPtyConsumerRecovery: vi.fn().mockReturnValue(null),
-    upsertSshPtyConsumerRecovery: vi.fn(),
-    removeSshPtyConsumerRecovery: vi.fn(),
     getSshRemotePtyLeases: vi.fn().mockReturnValue([]),
-    reconcileSshRemotePtyLeasesForTarget: vi.fn(),
     markSshRemotePtyLease: vi.fn(),
-    markSshRemotePtyLeases: vi.fn(),
-    markSshRemotePtyLeasesAsync: vi.fn(),
-    markSshRemotePtyLeasesForShutdown: vi.fn(),
-    markSshRemotePtyLeasesAttachedAsync: vi.fn(),
-    removeSshRemotePtyLeases: vi.fn(),
-    getSshRemotePtyKillIntents: vi.fn().mockReturnValue([]),
-    pruneExpiredSshRemotePtyKillIntents: vi.fn(),
-    recordSshRemotePtyKillIntent: vi.fn(),
-    clearSshRemotePtyKillIntent: vi.fn(),
-    noteSshRemotePtyKillReplayAttempt: vi.fn()
+    removeSshRemotePtyLeases: vi.fn()
   }
   const mockWindow = {
     isDestroyed: () => false,
@@ -91,6 +61,7 @@ export function createSshIpcHarness(mocks: SshIpcMocks): SshIpcHarness {
     disconnectConnection: vi.fn(),
     reconnect: vi.fn(),
     getConnection: vi.fn(),
+    hasCachedCredential: vi.fn().mockReturnValue(false),
     getState: vi.fn(),
     disconnectAll: vi.fn(),
     setCallbacks: vi.fn(),
@@ -102,6 +73,7 @@ export function createSshIpcHarness(mocks: SshIpcMocks): SshIpcHarness {
     removeForward: vi.fn(),
     listForwards: vi.fn().mockReturnValue([]),
     removeAllForwards: vi.fn(),
+    closeAll: vi.fn(),
     dispose: vi.fn(),
     setCallbacks: vi.fn(),
     callbacksRef: { current: null as unknown }
@@ -127,23 +99,18 @@ export function createSshIpcHarness(mocks: SshIpcMocks): SshIpcHarness {
     mockWindow.webContents.send.mockReset()
     mockStore.getSshRemotePtyLeases.mockReset().mockReturnValue([])
     mockStore.markSshRemotePtyLease.mockReset()
-    mockStore.markSshRemotePtyLeases.mockReset()
-    mockStore.markSshRemotePtyLeasesAsync.mockReset()
-    mockStore.markSshRemotePtyLeasesAttachedAsync.mockReset()
     mockStore.removeSshRemotePtyLeases.mockReset()
-    mockStore.upsertSshPtyConsumerRecovery.mockReset()
 
     mockConnectionManager.connect.mockReset()
     mockConnectionManager.disconnect.mockReset()
     mockConnectionManager.disconnectConnection.mockReset().mockResolvedValue(undefined)
     mockConnectionManager.reconnect.mockReset()
     mockConnectionManager.getConnection.mockReset()
+    mockConnectionManager.hasCachedCredential.mockReset().mockReturnValue(false)
     mockConnectionManager.getState.mockReset()
     mockConnectionManager.disconnectAll.mockReset()
     mockConnectionManager.setCallbacks.mockReset()
     mockConnectionManager.callbacksRef.current = null
-    mockAcceptSshPtyOutputData.mockReset().mockResolvedValue({})
-    mockAcceptSshPtyOutputExit.mockReset().mockResolvedValue(undefined)
 
     mockMux.dispose.mockReset()
     mockMux.isDisposed.mockReset().mockReturnValue(false)
@@ -152,21 +119,18 @@ export function createSshIpcHarness(mocks: SshIpcMocks): SshIpcHarness {
     mockMux.onDispose.mockReset().mockReturnValue(() => {})
     mockMux.request.mockReset().mockResolvedValue({})
     mockMux.probeLiveness.mockReset().mockResolvedValue(false)
-    mockRegisterSshGitProvider.mockReset()
     mockPortForwardManager.addForward.mockReset()
     mockPortForwardManager.updateForward.mockReset()
     mockPortForwardManager.removeForward.mockReset()
     mockPortForwardManager.removeForwardAndWait.mockReset()
     mockPortForwardManager.listForwards.mockReset().mockReturnValue([])
     mockPortForwardManager.removeAllForwards.mockReset()
+    mockPortForwardManager.closeAll.mockReset().mockResolvedValue(undefined)
     mockPortForwardManager.dispose.mockReset()
     mockPortForwardManager.setCallbacks.mockReset()
     mockPortForwardManager.callbacksRef.current = null
     powerMonitorOnMock.mockReset()
     powerMonitorOffMock.mockReset()
-    vi.mocked(getPtyIdsForConnection).mockReset().mockReturnValue([])
-    vi.mocked(clearProviderPtyState).mockReset()
-    vi.mocked(deletePtyOwnership).mockReset()
 
     registerSshHandlers(mockStore as never, () => mockWindow as never)
   }

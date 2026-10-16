@@ -124,6 +124,22 @@ describe('Loader precedence for stored data that disagrees with itself, and its 
     expect(loaded.layout.workspaces[GIT_KEY]!.groups[0]!.tabOrder).toEqual(['tab-b', 'tab-a'])
   })
 
+  it('keeps a tab in the group its tab-bar entry names, as the window does', () => {
+    const stored = addWorkspace(emptySession(), GIT_KEY, [
+      { id: 'g1', tabs: [{ id: 'tab-a', leaves: [[leaf(1), 'pty-a']] }] },
+      { id: 'g2', tabs: [{ id: 'tab-b', leaves: [[leaf(2), 'pty-b']] }] },
+      { id: 'g3', tabs: [{ id: 'tab-c', leaves: [[leaf(3), 'pty-c']] }] }
+    ])
+    // An earlier group also lists tab-b; tab-c's entry names g1, which does not list it.
+    stored.tabGroups![GIT_KEY]![0]!.tabOrder.push('tab-b')
+    stored.unifiedTabs![GIT_KEY]![2]!.groupId = 'g1'
+    const groups = load(stored).layout.workspaces[GIT_KEY]!.groups
+    expect(groups.map((group) => [group.id, group.tabOrder])).toEqual([
+      ['g1', ['tab-a', 'tab-c']],
+      ['g2', ['tab-b']]
+    ])
+  })
+
   it('unbinds the later of two panes bound to one terminal, in tab order', () => {
     const stored = twoTabs()
     stored.terminalLayoutsByTabId['tab-b']!.ptyIdsByLeafId = { [leaf(2)]: 'pty-a' }

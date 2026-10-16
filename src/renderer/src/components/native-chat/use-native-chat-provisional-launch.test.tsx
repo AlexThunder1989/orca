@@ -27,7 +27,7 @@ vi.mock('@/lib/launch-structured-agent-session', async () => {
   return { ...actual, launchStructuredAgentSession: mocks.launch }
 })
 
-vi.mock('@/runtime/local-structured-session-tabs-sync', () => ({
+vi.mock('@/runtime/local-structured-session-tabs-sync/inventory-refresh', () => ({
   refreshLocalStructuredSessionTabs: () => Promise.resolve(publishedTabs)
 }))
 

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PROTOCOL_VERSION } from './types'
+const { recoverRetired } = vi.hoisted(() => ({ recoverRetired: vi.fn(async () => {}) }))
+vi.mock('./macos-retired-daemon-recovery', () => ({ recoverRetiredMacDaemonJobs: recoverRetired }))
 
 const {
   probeSocketExistsMock,
@@ -40,10 +42,12 @@ vi.mock('./client', () => moduleFactories.client())
 vi.mock('./daemon-lifecycle-event', () => moduleFactories.daemonLifecycleEvent())
 vi.mock('./daemon-spawner', () => moduleFactories.daemonSpawner())
 vi.mock('./daemon-pty-adapter', () => moduleFactories.daemonPtyAdapter())
-vi.mock('../ipc/pty', () => moduleFactories.ipcPty())
+vi.mock('../ipc/pty/provider/registry', () => moduleFactories.ptyProviderRegistry())
+vi.mock('../ipc/pty/provider/listener-lifecycle', () => moduleFactories.ptyListenerLifecycle())
 
 describe('daemon-init: runRestartDaemon (7-step sequence)', () => {
   beforeEach(() => {
+    recoverRetired.mockReset().mockResolvedValue(undefined)
     installDefaultNetConnectStub()
   })
 
@@ -73,9 +77,50 @@ describe('daemon-init: runRestartDaemon (7-step sequence)', () => {
 
     // killedCount must be 3 — proves the count was taken *before* fanout cleared the set (a swapped-order bug reports 0).
     expect(result.killedCount).toBe(3)
-    expect(originalAdapter.fanoutSyntheticExits).toHaveBeenCalledWith(-1)
+    expect(originalAdapter.fanoutSyntheticExits).toHaveBeenCalledWith(-1, {
+      replacedByRestart: true
+    })
     // Ordering invariant: synthetic exits must reach the renderer *before* listeners are torn down (Step 1 before 2).
     expect(order).toEqual(['fanout', 'unbind'])
+    expect(recoverRetired).toHaveBeenCalledOnce()
+    expect(recoverRetired.mock.invocationCallOrder[0]).toBeLessThan(
+      originalAdapter.fanoutSyntheticExits.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('still restarts the current daemon when retired-daemon recovery cannot prove cleanup', async () => {
+    const mod = await importFresh()
+    await mod.initDaemonPtyProvider()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    recoverRetired.mockRejectedValueOnce(new Error('retired descendants unverifiable'))
+    await expect(mod.restartDaemon()).resolves.toBeDefined()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('retired descendants unverifiable'))
+    expect(adapterInstances[0].fanoutSyntheticExits).toHaveBeenCalled()
+    expect(spawnerInstances[0].resetHandle).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('refuses a targeted restart before ending anything when another daemon owns the endpoint', async () => {
+    const mod = await importFresh()
+    await mod.initDaemonPtyProvider()
+    const originalAdapter = adapterInstances[0]
+    daemonClientMock.mockImplementation(function MockDaemonClient() {
+      return {
+        ensureConnected: vi.fn(async () => {}),
+        ensureConnectedWithin: vi.fn(async () => {}),
+        getDaemonIdentity: vi.fn(() => ({ pid: 9000, startedAtMs: 1, launchNonce: 'other' })),
+        request: vi.fn(async () => ({ sessions: [] })),
+        disconnect: vi.fn()
+      }
+    })
+
+    await expect(mod.restartDaemon({ expectedDaemonPid: 4288 })).rejects.toThrow(
+      'owned by a different daemon'
+    )
+
+    expect(originalAdapter.fanoutSyntheticExits).not.toHaveBeenCalled()
+    expect(unbindLocalProviderListenersMock).not.toHaveBeenCalled()
+    expect(recoverRetired).not.toHaveBeenCalled()
   })
 
   it('uses daemon-owned idle retirement after a failed manual-restart adoption', async () => {

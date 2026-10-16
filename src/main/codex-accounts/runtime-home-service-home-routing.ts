@@ -2,6 +2,7 @@ import { posix as pathPosix } from 'node:path'
 import { parseWslUncPath, toLinuxPath, toWindowsWslUncPath } from '../../shared/wsl-paths'
 import { normalizeRuntimePathForComparison } from '../../shared/cross-platform-path'
 import { getDefaultWslDistro, getWslHome } from '../wsl'
+import { isWslDistroRunning } from '../wsl-background-distro-gate'
 import {
   getSystemCodexHomePath,
   resolveOrcaManagedCodexHomePath,
@@ -191,7 +192,14 @@ export abstract class CodexRuntimeHomeRouting extends CodexRuntimeHomeManagedHom
           ? account.wslDistro?.trim() || null
           : selectedDistroKey.trim() || null
       if (distro) {
-        drains.push(this.startLegacyWslAuthDrain({ runtime: 'wsl', wslDistro: distro }))
+        // Why: a stopped distro has no live legacy pane to drain, and the next launch prep drains anyway.
+        drains.push(
+          isWslDistroRunning(distro).then((running) =>
+            running
+              ? this.startLegacyWslAuthDrain({ runtime: 'wsl', wslDistro: distro })
+              : undefined
+          )
+        )
       }
     }
     await Promise.all(drains)

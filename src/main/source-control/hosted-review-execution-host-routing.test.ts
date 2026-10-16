@@ -11,7 +11,6 @@ import type { Repo } from '../../shared/repo-types'
  */
 
 const {
-  getSshGitProviderMock,
   gitExecFileAsyncMock,
   ghExecFileAsyncMock,
   glabExecFileAsyncMock,
@@ -36,7 +35,6 @@ const {
   probeAnyExactRefMock,
   assertRemoteUrlReadableMock
 } = vi.hoisted(() => ({
-  getSshGitProviderMock: vi.fn(),
   gitExecFileAsyncMock: vi.fn(),
   ghExecFileAsyncMock: vi.fn(),
   glabExecFileAsyncMock: vi.fn(),
@@ -60,11 +58,6 @@ const {
   resolveDefaultBaseRefViaExecMock: vi.fn(),
   probeAnyExactRefMock: vi.fn(),
   assertRemoteUrlReadableMock: vi.fn()
-}))
-
-vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock,
-  SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE: 'SSH git provider unavailable'
 }))
 
 vi.mock('../github/gh-utils', () => ({
@@ -230,7 +223,6 @@ beforeEach(() => {
   sshProviders.clear()
   sshProviders.set('ssh-a', makeSshProvider())
   sshProviders.set('ssh-b', makeSshProvider())
-  getSshGitProviderMock.mockImplementation((id: string) => sshProviders.get(id) ?? null)
 
   gitExecFileAsyncMock.mockImplementation(async (argv: string[]) => ({
     stdout: argv[0] === 'status' ? '' : 'feature\n',
@@ -310,7 +302,6 @@ describe('hosted-review lookups route on the resolved execution host', () => {
     await commands.getHostedReviewForBranch({ repoSelector: 'repo-1', branch: 'feature' })
 
     expect(getBitbucketRepoSlugMock).toHaveBeenCalledWith(REPO_PATH, null)
-    expect(getSshGitProviderMock).not.toHaveBeenCalledWith('ssh-b')
   })
 
   it('keeps a runtime row with no nested target on this process (self-addressed stamp)', async () => {

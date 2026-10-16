@@ -38,6 +38,7 @@ import { structuredAgentSessionNextHandover } from './structured-agent-session-o
 import { structuredAgentSessionCommandRunning } from './structured-agent-session-command-turn'
 import type { StructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { holdRestartedStructuredAgentSessionSends } from './structured-agent-session-host-lifetime'
+import type { StructuredAgentSessionCurrentWork } from './structured-agent-session-current-work'
 import { structuredAgentSessionEndedChildFailure } from './structured-agent-session-ended-child-failure'
 
 export type StructuredAgentSessionDeliveryLoopDeps = {
@@ -53,6 +54,11 @@ export type StructuredAgentSessionDeliveryLoopDeps = {
     sessionId: string,
     startedFor: string
   ) => Promise<StructuredAgentSessionResumeOutcome>
+  /** A message's model and effort, applied before its agent starts or it is handed over. */
+  applyMessageOptions: (
+    sessionId: string,
+    options: AgentJournalSubmission['options']
+  ) => Promise<void>
   /** The fence the conversation's own writes carry; see `structuredAgentSessionConversationFence`. */
   conversationFence: (sessionId: string) => number
   /** Settles queued messages as a completed close of the chat does; false when that failed. */
@@ -64,6 +70,8 @@ export type StructuredAgentSessionDeliveryLoopDeps = {
   failureTextContext: (sessionId: string) => AgentSessionFailureWordsContext
   logger: StructuredAgentSessionLogger
   record: (sessionId: string) => AgentSessionRecord | null
+  /** The host's projection of the chat's current work (`hostStructuredAgentSessionCurrentWork`). */
+  currentWork: (sessionId: string) => StructuredAgentSessionCurrentWork | null
   readChildWork: (sessionId: string) => readonly AgentChildWorkView[] | undefined
   /** A person's Stop is still ending the session's work: the status feed's own reading. */
   stopping: (sessionId: string) => boolean
@@ -189,12 +197,16 @@ export class StructuredAgentSessionDeliveryLoop {
     const oldest = oldestQueuedSubmission(session)
     // A running command takes no input while its child carries it; its end is a commit, which
     // wakes the loop again. With no child it is a gone generation's, which the start below settles.
-    if (!oldest || (session.child && structuredAgentSessionCommandRunning(session.journal))) {
+    const work = this.deps.currentWork(sessionId)
+    if (!oldest || (session.child && work && structuredAgentSessionCommandRunning(work))) {
       return this.stop(sessionId)
     }
     const failedStart = startThatFailedWhileQueued(session, oldest)
     if (failedStart) {
       return this.fail(sessionId, failedStart)
+    }
+    if (!session.child) {
+      await this.deps.applyMessageOptions(sessionId, oldest.options)
     }
     const ready = await this.deps.ensureProviderChild(sessionId, oldest.clientMessageId)
     if (!ready.ok && ready.refusal.details?.reason === 'previousExitUnverifiable') {
@@ -257,6 +269,7 @@ export class StructuredAgentSessionDeliveryLoop {
     if (!next) {
       return this.stop(sessionId)
     }
+    await this.deps.applyMessageOptions(sessionId, next.options)
     await handOverSubmission(
       {
         sessionId,

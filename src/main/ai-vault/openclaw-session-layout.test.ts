@@ -44,5 +44,4 @@ describe('OpenClaw session discovery', () => {
 
     expect(relativeToAgents(files)).toEqual(EXPECTED)
   })
-
 })

@@ -1,9 +1,9 @@
-import type { SshConnection } from './ssh-connection'
-import { execCommand } from './ssh-relay-deploy-helpers'
+import type { RemoteInstallTransport } from './remote-install-transport'
+import { execCommand } from './ssh-relay-exec-command'
 import type { RemoteHostPlatform } from './ssh-remote-platform'
 
 export function execHostCommand(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   host: RemoteHostPlatform,
   command: string,
   options?: { signal?: AbortSignal; timeoutMs?: number; onStderr?: (stderr: string) => void }

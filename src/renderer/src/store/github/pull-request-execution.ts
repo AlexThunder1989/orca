@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { AppState } from '../types'
 import type { GitHubSlice } from './slice-types'
 import type { Repo } from '../../../../shared/repo-types'

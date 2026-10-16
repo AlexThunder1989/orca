@@ -1,7 +1,9 @@
 // Opening editor, browser and agent-session tabs: the tab and its content record in one apply.
 
+import type { EditorTabView } from '../editor-tab-view-types'
 import { applied, type Applied } from './workspace-layout-command-steps'
 import type { CommandOf, LayoutContext } from './workspace-layout-command-types'
+import { admitsInitialSurface } from './workspace-layout-initial-surface'
 import type { LayoutContentTab, WorkspaceLayoutModel } from './workspace-layout-model'
 import { withWorkspace } from './workspace-layout-removal'
 import { placeContentTab } from './workspace-layout-tab-commands'
@@ -30,7 +32,7 @@ export function openEditorTab(
     (tab) => tab.entityId === command.fileId && tab.kind === command.contentType
   )
   if (existing) {
-    return applied(model, { tabId: existing.id })
+    return applied(withEditorView(model, key, existing.id, command.view), { tabId: existing.id })
   }
   const tab = contentTab(context, {
     kind: command.contentType,
@@ -45,7 +47,26 @@ export function openEditorTab(
     const files = (workspace.editorFiles ?? []).filter((entry) => entry.filePath !== file.filePath)
     next = withWorkspace(next, key, { ...workspace, editorFiles: [...files, file] })
   }
-  return applied(next, { tabId: tab.id, refused: placed.refused })
+  return applied(withEditorView(next, key, tab.id, command.view), {
+    tabId: tab.id,
+    refused: placed.refused
+  })
+}
+
+function withEditorView(
+  model: WorkspaceLayoutModel,
+  key: string,
+  tabId: string,
+  view: EditorTabView | undefined
+): WorkspaceLayoutModel {
+  if (!view) {
+    return model
+  }
+  const workspace = model.workspaces[key]!
+  return withWorkspace(model, key, {
+    ...workspace,
+    editorViews: { ...workspace.editorViews, [tabId]: view }
+  })
 }
 
 export function openBrowserTab(
@@ -55,8 +76,8 @@ export function openBrowserTab(
 ): Applied {
   const key = command.workspace
   // The tab-bar id and the browser tab record share one id, as the window mints them.
-  const browserTabId = context.mintId()
-  const pageId = context.mintId()
+  const browserTabId = command.pageId ?? context.mintId()
+  const pageId = command.pageId ?? context.mintId()
   const tab = contentTab(context, {
     kind: 'browser',
     id: browserTabId,
@@ -84,7 +105,11 @@ export function openAgentSessionTab(
   command: CommandOf<'openAgentSessionTab'>,
   context: LayoutContext
 ): Applied {
+  if (command.initial && !admitsInitialSurface(model, command.workspace, command.initial)) {
+    return applied(model)
+  }
   const tab = contentTab(context, {
+    ...(command.tabId ? { id: command.tabId } : {}),
     kind: 'agent-session',
     entityId: command.sessionId,
     agentSessionAgent: command.agent

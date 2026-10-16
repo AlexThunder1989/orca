@@ -1,6 +1,7 @@
 // Compatibility entrypoint: reliability gates invoke this path directly; fragments stay side-effect ordered.
 export {}
 
+await import('./rpc/unused-default-rpc-methods.test-fixture')
 await import('./orca-runtime-test-mocks.spec')
 await import('./orca-runtime-test-lifecycle.spec')
 await import('./orca-runtime-test-fixtures.spec')
@@ -110,7 +111,7 @@ await import('./orca-runtime-tests/worktree-setup-and-startup.spec')
 await import('./orca-runtime-tests/worktree-setup-and-startup-part-02.spec')
 await import('./orca-runtime-tests/worktree-setup-and-startup-part-03.spec')
 await import('./orca-runtime-tests/worktree-setup-and-startup-part-04.spec')
-await import('./orca-runtime-tests/worktree-setup-and-startup-part-05.spec')
+await import('./orca-runtime-tests/worktree-setup-single-creator.spec')
 await import('./orca-runtime-tests/gitlab-and-pr-bases.spec')
 await import('./orca-runtime-tests/gitlab-and-pr-bases-part-02.spec')
 await import('./orca-runtime-tests/gitlab-and-pr-bases-part-03.spec')

@@ -1,6 +1,12 @@
 import { randomBytes } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { DeviceEntry, DeviceRegistry } from '../device-registry'
+import { isPendingTokenRow } from '../device-entry'
+import { EPHEMERAL_DEVICE_SWEEP_INTERVAL_MS } from '../ephemeral-device-rows'
+import {
+  INSECURE_WEB_ORIGIN_AUTH_CODE,
+  isInsecureRemoteWebOrigin
+} from '../../../shared/web-origin-security'
 import { devicePrincipalOf } from '../device-principal'
 import type { E2EEKeypair } from '../e2ee-keypair'
 import { E2EEChannel, type E2EEAuthenticatedDevice } from './e2ee-channel'
@@ -11,7 +17,8 @@ import type { RpcBinarySender } from './rpc-binary-sender'
 type MobileSocketPayload = string | Uint8Array<ArrayBufferLike>
 
 export type MobileSocketTransportMetadata =
-  | { transport: 'direct' }
+  // webClient: the Orca web bundle marked its upgrade; webOrigin: that page's origin.
+  | { transport: 'direct'; webOrigin?: string; webClient?: true }
   | {
       transport: 'relay'
       relayHostId: string
@@ -59,6 +66,8 @@ type MobileSocketWiringOptions = {
   onReady?: (socket: AuthenticatedMobileSocket) => void
   // Why: stale keys and missing registry entries both fail before RPC can explain the re-pair action.
   onUnpairedDeviceAuthFailure?: (metadata: MobileSocketTransportMetadata) => void
+  // Operator opt-in for first pairings from a plain-http page on another machine.
+  allowInsecureWebPairing?: () => boolean
 }
 
 function toAuthenticatedDevice(device: DeviceEntry): E2EEAuthenticatedDevice {
@@ -76,6 +85,8 @@ export class MobileSocketWiring {
   private readonly onClose: MobileSocketWiringOptions['onClose']
   private readonly onReady: MobileSocketWiringOptions['onReady']
   private readonly onUnpairedDeviceAuthFailure: MobileSocketWiringOptions['onUnpairedDeviceAuthFailure']
+  private readonly allowInsecureWebPairing: () => boolean
+  private readonly ephemeralSweep: ReturnType<typeof setInterval>
   private readonly channels = new Map<WebSocket, E2EEChannel>()
   private readonly connectionIds = new Map<WebSocket, string>()
   private readonly authenticatedSockets = new Map<WebSocket, AuthenticatedMobileSocket>()
@@ -90,6 +101,39 @@ export class MobileSocketWiring {
     this.onClose = options.onClose
     this.onReady = options.onReady
     this.onUnpairedDeviceAuthFailure = options.onUnpairedDeviceAuthFailure
+    this.allowInsecureWebPairing = options.allowInsecureWebPairing ?? (() => false)
+    this.ephemeralSweep = setInterval(
+      () => this.sweepIdleEphemeralDevices(Date.now()),
+      EPHEMERAL_DEVICE_SWEEP_INTERVAL_MS
+    )
+    // Why: bookkeeping must never hold the process open.
+    this.ephemeralSweep.unref?.()
+  }
+
+  dispose(): void {
+    clearInterval(this.ephemeralSweep)
+  }
+
+  /** Removes idle session-only browser rows and cuts any socket still bound to them. */
+  sweepIdleEphemeralDevices(now: number): string[] {
+    let removed: string[] = []
+    try {
+      removed = this.deviceRegistry.pruneIdleEphemeralDevices(now, (deviceId) =>
+        this.hasAuthenticatedSocket(deviceId)
+      )
+    } catch (error) {
+      console.error('[mobile] Failed to prune idle browser-session devices:', error)
+    }
+    for (const deviceId of removed) {
+      this.terminateDeviceConnections(deviceId)
+    }
+    return removed
+  }
+
+  private hasAuthenticatedSocket(deviceId: string): boolean {
+    return Array.from(this.authenticatedSockets.values()).some(
+      (socket) => socket.device.deviceId === deviceId
+    )
   }
 
   attachTransport(
@@ -155,6 +199,16 @@ export class MobileSocketWiring {
           const device = this.deviceRegistry.validateToken(token)
           if (!device) {
             return null
+          }
+          if (
+            isPendingTokenRow(device) &&
+            metadata.transport === 'direct' &&
+            // Why the marker too: phones send an http Origin as well, and must never be gated.
+            metadata.webClient === true &&
+            isInsecureRemoteWebOrigin(metadata.webOrigin) &&
+            !this.allowInsecureWebPairing()
+          ) {
+            return { refused: INSECURE_WEB_ORIGIN_AUTH_CODE }
           }
           // Why: outer relay authorization cannot choose the local Orca
           // identity; E2EE must resolve the same device before readiness.
@@ -251,6 +305,10 @@ export class MobileSocketWiring {
       Array.from(this.authenticatedSockets.values()).some(
         (candidate) => candidate.device.deviceId === socket.device.deviceId
       )
+    // Why: a session-only row idles from its last disconnect, not from when it connected.
+    if (socket && !hasOtherConnections && socket.device.deviceToken === undefined) {
+      this.deviceRegistry.updateLastSeenDeferred(socket.device.deviceId)
+    }
     this.onClose(socket, hasOtherConnections)
   }
 }

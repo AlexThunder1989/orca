@@ -32,10 +32,8 @@ vi.mock('./web-session-terminal-orphan-recovery', () => ({
 
 import { useAppStore } from '@/store'
 import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
-import {
-  resetWebSessionTabsSnapshotFreshnessForTests,
-  useWebSessionTabsSync
-} from './web-session-tabs-sync'
+import { resetWebSessionTabsSnapshotFreshnessForTests } from './web-session-tabs-sync/tracking-lifecycle'
+import { useWebSessionTabsSync } from './web-session-tabs-sync/use-web-session-tabs-sync'
 
 /**
  * #21928: a paired host mints `headless:` epochs for one worktree between renderer frames, so the

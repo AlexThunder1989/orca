@@ -1,4 +1,4 @@
-import type { SshConnection } from './ssh-connection'
+import type { RemoteInstallTransport } from './remote-install-transport'
 import { execHostCommand } from './ssh-relay-host-exec'
 import { RELAY_DEPLOY_TIMEOUT_MS } from './ssh-relay-deploy-timing'
 import { isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
@@ -58,7 +58,7 @@ async function unlessUnconfirmed<T>(work: Promise<T>, fallback: T): Promise<T> {
 }
 
 export async function isRelayInstallLockStale(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   lockDir: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST
 ): Promise<boolean> {
@@ -78,7 +78,7 @@ export async function isRelayInstallLockStale(
  * one winner while keeping the marker visible to older Windows Orca clients.
  */
 export async function acquireInstallLock(
-  conn: SshConnection,
+  conn: RemoteInstallTransport,
   remoteRelayDir: string,
   host: RemoteHostPlatform = DEFAULT_REMOTE_HOST,
   options?: {

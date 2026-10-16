@@ -1,4 +1,4 @@
-import type { IFilesystemProvider } from './types'
+import type { IFilesystemProvider } from './filesystem-provider-contract'
 import { markdownDocumentsFromRelativePaths } from '../../shared/markdown-document-paths'
 import { FileInventoryBudget } from '../../shared/file-inventory-budget'
 

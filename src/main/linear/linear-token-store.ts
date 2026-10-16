@@ -1,5 +1,5 @@
 import { getSecretStore } from '../../shared/secret-store'
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { unlinkSync, writeFileSync } from 'node:fs'
 import {
   LEGACY_WORKSPACE_ID,
   ensureOrcaDir,
@@ -13,23 +13,15 @@ import {
 } from './linear-legacy-viewer-store'
 import { emptyWorkspaceFile } from './linear-workspace-record'
 import {
-  cacheToken,
-  clearCredentialError,
-  forgetCachedToken,
-  getCachedToken,
   getWorkspaceFile,
   getWorkspaceState,
-  recordCredentialError,
   resetCredentialCaches,
   resetWorkspaceFileCacheToEmpty,
   resolveWorkspaceId,
   upsertWorkspace,
-  writeWorkspaceFile
+  writeWorkspaceFile,
+  workspaceTokenFileCache
 } from './linear-workspace-registry'
-import {
-  CredentialDecryptionError,
-  readStoredCredentialToken
-} from '../integration-credential-file'
 import type { LinearWorkspace } from '../../shared/linear/workspace-types'
 import { readCredentialFileProtection } from '../credential-file-protection'
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
@@ -52,8 +44,7 @@ export function saveWorkspaceToken(workspaceId: string, apiKey: string): void {
   }
   const tokenPath = getWorkspaceTokenPath(workspaceId)
   writeEncryptedToken(tokenPath, apiKey)
-  cacheToken(workspaceId, apiKey)
-  clearCredentialError(workspaceId)
+  workspaceTokenFileCache.forget(workspaceId)
 }
 
 // Backward-compatible export for the legacy single-workspace storage path.
@@ -66,32 +57,7 @@ export function loadToken(options: { force?: boolean; workspaceId?: string } = {
   if (!workspaceId) {
     return null
   }
-  const cached = getCachedToken(workspaceId)
-  if (cached !== undefined) {
-    return cached
-  }
-  if (!options.force) {
-    return null
-  }
-  const tokenPath = getWorkspaceTokenPath(workspaceId)
-  if (!existsSync(tokenPath)) {
-    return null
-  }
-  try {
-    const raw = readFileSync(tokenPath)
-    const token = readStoredCredentialToken('Linear', raw)
-    if (token) {
-      cacheToken(workspaceId, token)
-    }
-    clearCredentialError(workspaceId)
-    return token
-  } catch (error) {
-    if (error instanceof CredentialDecryptionError) {
-      recordCredentialError(workspaceId, error.message)
-      throw error
-    }
-    return null
-  }
+  return workspaceTokenFileCache.read(workspaceId, options.force === true)
 }
 
 /** How a workspace's stored token sits on disk, or null when none is stored. */
@@ -100,7 +66,7 @@ export function getWorkspaceTokenProtection(workspaceId: string): SecretAtRestPr
 }
 
 export function clearTokenFile(workspaceId: string): void {
-  forgetCachedToken(workspaceId)
+  workspaceTokenFileCache.forget(workspaceId)
   try {
     unlinkSync(getWorkspaceTokenPath(workspaceId))
   } catch {

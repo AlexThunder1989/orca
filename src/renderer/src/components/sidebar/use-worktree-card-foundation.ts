@@ -32,6 +32,7 @@ export function useWorktreeCardFoundation({
   const openAutomationsPage = useAppStore((s) => s.openAutomationsPage)
   const setPendingAutomationRunNavigation = useAppStore((s) => s.setPendingAutomationRunNavigation)
   const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
+  const setWorkspaceUnreadByUser = useAppStore((s) => s.setWorkspaceUnreadByUser)
   const deleteFolderWorkspace = useAppStore((s) => s.deleteFolderWorkspace)
   const setActiveWorktree = useAppStore((s) => s.setActiveWorktree)
   const renamingWorktreeId = useAppStore((s) => s.renamingWorktreeId)
@@ -221,6 +222,7 @@ export function useWorktreeCardFoundation({
     openModal,
     openTaskPage,
     updateWorktreeMeta,
+    setWorkspaceUnreadByUser,
     deleteFolderWorkspace,
     setActiveWorktree,
     renamingWorktreeId,

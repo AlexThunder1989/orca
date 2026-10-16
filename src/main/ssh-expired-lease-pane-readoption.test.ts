@@ -6,7 +6,11 @@ import { makePaneKey } from '../shared/stable-pane-id'
 import { resolvePersistedStablePaneOwner } from './ipc/pty/pane/stable-owner'
 import { adoptStablePane } from './ipc/pty/pane/adopt-stable'
 import { PtyHostNotDispatchableError } from './ipc/pty/provider/registry'
-import { testState, createStore, makeTerminalTab } from './persistence-test-harness'
+import {
+  testState,
+  createStoreWithSshRemotePtyLeases,
+  makeTerminalTab
+} from './persistence-test-harness'
 import { TEST_LEAF_1 } from './persistence-session-fixtures'
 
 vi.mock('electron', () => ({
@@ -21,16 +25,19 @@ const WORKTREE = 'repo1::/worktree'
 const TAB = 'tab-1'
 const APP_PTY_ID = 'ssh:ssh-1@@remote-pty'
 
-function storeWithBoundRemotePane(): ReturnType<typeof createStore> {
-  const store = createStore()
-  store.upsertSshRemotePtyLease({
-    targetId: TARGET,
-    ptyId: 'remote-pty',
-    worktreeId: WORKTREE,
-    tabId: TAB,
-    leafId: TEST_LEAF_1,
-    state: 'attached'
-  })
+function storeWithBoundRemotePane(
+  state: 'attached' | 'expired' = 'attached'
+): ReturnType<typeof createStoreWithSshRemotePtyLeases> {
+  const store = createStoreWithSshRemotePtyLeases([
+    {
+      targetId: TARGET,
+      ptyId: 'remote-pty',
+      worktreeId: WORKTREE,
+      tabId: TAB,
+      leafId: TEST_LEAF_1,
+      state
+    }
+  ])
   store.setWorkspaceSession(
     {
       activeRepoId: 'repo1',
@@ -67,10 +74,8 @@ describe('a pane whose SSH lease expired can still be re-adopted', () => {
     rmSync(testState.dir, { recursive: true, force: true })
   })
 
-  it('keeps the persisted owner after the lease expires, so adoption reattaches', () => {
-    const store = storeWithBoundRemotePane()
-
-    store.markSshRemotePtyLease(TARGET, APP_PTY_ID, 'expired')
+  it('keeps the persisted owner of an expired lease, so adoption reattaches', () => {
+    const store = storeWithBoundRemotePane('expired')
 
     expect(
       resolvePersistedStablePaneOwner(store, makePaneKey(TAB, TEST_LEAF_1), WORKTREE, TARGET)
@@ -117,8 +122,7 @@ describe('recovery through createTerminal on an SSH host this process cannot rea
   })
 
   it('fails the adoption with a typed error and keeps the binding', async () => {
-    const store = storeWithBoundRemotePane()
-    store.markSshRemotePtyLease(TARGET, APP_PTY_ID, 'expired')
+    const store = storeWithBoundRemotePane('expired')
 
     await expect(adoptStablePane(undefined, store, ADOPT_ARGS)).rejects.toBeInstanceOf(
       PtyHostNotDispatchableError

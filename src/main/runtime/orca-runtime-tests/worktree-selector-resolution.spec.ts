@@ -4,24 +4,18 @@ import {
   FLOATING_TERMINAL_WORKTREE_ID,
   MOCK_GIT_WORKTREES,
   OrcaRuntimeService,
-  RpcDispatcher,
-  TERMINAL_METHODS,
   addSparseWorktree,
   addWorktree,
   computeWorktreePathMock,
   ensurePathWithinWorkspaceMock,
-  getSshGitProviderMock,
   join,
   listWorktrees,
   mkdir,
   mkdtemp,
-  registerSshFilesystemProvider,
-  registerSshGitProvider,
   tmpdir,
-  unregisterSshFilesystemProvider,
-  unregisterSshGitProvider,
   writeFile
 } from '../orca-runtime-test-mocks.spec'
+import { RpcDispatcher, TERMINAL_METHODS } from '../orca-runtime-test-mocks/terminal-rpc.spec'
 import type { WorktreeMeta } from '../orca-runtime-test-mocks.spec'
 import {
   TEST_FOLDER_WORKSPACE_KEY,
@@ -109,50 +103,26 @@ describe('OrcaRuntimeService', () => {
         badgeColor: 'blue',
         addedAt: 1,
         connectionId: 'ssh-1'
-      })
+      }),
+      // Why: this process serves no SSH git, so the SSH repo resolves from its stored rows.
+      getAllWorktreeMeta: () => ({
+        [`${TEST_REPO_ID}:://Server/Share/Repo`]: makeWorktreeMeta()
+      }),
+      getWorktreeMeta: () => makeWorktreeMeta()
     }
-    const fsProvider = { readDir: vi.fn().mockResolvedValue([]) }
-    const gitProvider = {
-      listWorktrees: vi.fn().mockResolvedValue([
-        {
-          path: '//Server/Share/Repo',
-          head: 'abc',
-          branch: 'feature/foo',
-          isBare: false,
-          isMainWorktree: false
-        }
-      ]),
-      getStatus: vi.fn().mockResolvedValue({
-        branch: 'feature/foo',
-        files: [],
-        ahead: 0,
-        behind: 0,
-        hasConflicts: false
-      })
-    }
-    registerSshFilesystemProvider('ssh-1', fsProvider as never)
-    registerSshGitProvider('ssh-1', gitProvider as never)
     const runtime = new OrcaRuntimeService(remoteStore as never)
 
-    try {
-      await expect(runtime.readFileExplorerDir('path://server/share/repo', 'src')).rejects.toThrow(
-        SshHostNotServedError
-      )
-      await expect(runtime.getRuntimeGitStatus('path://server/share/repo')).rejects.toThrow(
-        SshHostNotServedError
-      )
-      await expect(runtime.showRepo('path://server/share/repo')).resolves.toMatchObject({
-        path: '//Server/Share/Repo'
-      })
-    } finally {
-      unregisterSshFilesystemProvider('ssh-1')
-      unregisterSshGitProvider('ssh-1')
-    }
+    await expect(runtime.readFileExplorerDir('path://server/share/repo', 'src')).rejects.toThrow(
+      SshHostNotServedError
+    )
+    await expect(runtime.getRuntimeGitStatus('path://server/share/repo')).rejects.toThrow(
+      SshHostNotServedError
+    )
+    await expect(runtime.showRepo('path://server/share/repo')).resolves.toMatchObject({
+      path: '//Server/Share/Repo'
+    })
 
     expect(listWorktrees).not.toHaveBeenCalled()
-    expect(gitProvider.listWorktrees).toHaveBeenCalledWith('//Server/Share/Repo')
-    expect(fsProvider.readDir).not.toHaveBeenCalled()
-    expect(gitProvider.getStatus).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -181,44 +151,25 @@ describe('OrcaRuntimeService', () => {
 
   it('refuses SSH folder workspace file explorer reads instead of reading this machine', async () => {
     const folderPath = '/srv/platform'
-    const fsProvider = {
-      stat: vi.fn(async (pathValue: string) => ({
-        size: pathValue.endsWith('/app.ts') ? 8 : 0,
-        type: pathValue.endsWith('/app.ts') ? 'file' : 'directory',
-        mtime: 1
-      })),
-      readDir: vi.fn().mockResolvedValue([
-        {
-          name: 'app.ts',
-          isDirectory: false,
-          isSymlink: false
-        }
-      ]),
-      readFile: vi.fn().mockResolvedValue({ content: 'remote\n', isBinary: false })
-    }
-    const folderWorkspace = makeFolderWorkspace({ folderPath, connectionId: 'ssh-folder' })
+    const folderWorkspace = makeFolderWorkspace({
+      folderPath,
+      connectionId: 'ssh-folder'
+    })
     const projectGroup = makeFolderProjectGroup({ parentPath: folderPath })
     const runtime = new OrcaRuntimeService(
       createFolderWorkspaceRuntimeStore(folderWorkspace, projectGroup) as never
     )
-    registerSshFilesystemProvider('ssh-folder', fsProvider as never)
 
-    try {
-      await expect(
-        runtime.readFileExplorerDir(`id:${TEST_FOLDER_WORKSPACE_KEY}`, 'src')
-      ).rejects.toThrow(SshHostNotServedError)
-      await expect(
-        runtime.readFileExplorerPreview(`id:${TEST_FOLDER_WORKSPACE_KEY}`, 'src/app.ts')
-      ).rejects.toThrow(SshHostNotServedError)
-    } finally {
-      unregisterSshFilesystemProvider('ssh-folder')
-    }
-
-    expect(fsProvider.readDir).not.toHaveBeenCalled()
-    expect(fsProvider.readFile).not.toHaveBeenCalled()
+    // Why: this process serves no SSH filesystem, so the folder path itself is unavailable.
+    await expect(
+      runtime.readFileExplorerDir(`id:${TEST_FOLDER_WORKSPACE_KEY}`, 'src')
+    ).rejects.toThrow('folder_workspace_path_unavailable:/srv/platform')
+    await expect(
+      runtime.readFileExplorerPreview(`id:${TEST_FOLDER_WORKSPACE_KEY}`, 'src/app.ts')
+    ).rejects.toThrow('folder_workspace_path_unavailable:/srv/platform')
   })
 
-  it('lists persisted SSH worktrees while the git provider is unavailable', async () => {
+  it('lists persisted SSH worktrees from stored rows', async () => {
     vi.mocked(listWorktrees).mockClear()
     const remoteRepo = {
       id: 'remote-repo',
@@ -250,7 +201,6 @@ describe('OrcaRuntimeService', () => {
     const listed = await runtime.listManagedWorktrees('id:remote-repo')
 
     expect(listWorktrees).not.toHaveBeenCalled()
-    expect(getSshGitProviderMock).toHaveBeenCalledWith('ssh-missing')
     expect(listed).toMatchObject({
       totalCount: 2,
       truncated: false,
@@ -304,7 +254,7 @@ describe('OrcaRuntimeService', () => {
     expect(listWorktrees).not.toHaveBeenCalled()
   })
 
-  it('guides registered SSH repo ids without probing the provider', async () => {
+  it('guides registered SSH repo ids to the full id shape', async () => {
     const remoteRepo = { ...store.getRepos()[0], connectionId: 'ssh-1' }
     const remoteStore = {
       ...store,
@@ -312,14 +262,12 @@ describe('OrcaRuntimeService', () => {
       getRepo: (id: string) => (id === remoteRepo.id ? remoteRepo : undefined)
     }
     vi.mocked(listWorktrees).mockClear()
-    getSshGitProviderMock.mockClear()
     const runtime = new OrcaRuntimeService(remoteStore)
 
     await expect(runtime.showManagedWorktree(`id:${TEST_REPO_ID}`)).rejects.toMatchObject({
       code: 'worktree_id_requires_full_path'
     })
     expect(listWorktrees).not.toHaveBeenCalled()
-    expect(getSshGitProviderMock).not.toHaveBeenCalled()
   })
 
   it('rejects bare repo ids through terminal list RPC with the structured code', async () => {

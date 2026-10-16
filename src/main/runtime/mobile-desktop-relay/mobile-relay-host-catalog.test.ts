@@ -8,6 +8,10 @@ import {
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { SshConnectionState } from '../../../shared/ssh-types'
+import { getDefaultWorkspaceSession } from '../../../shared/constants'
+import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
+import type { BrowserWorkspace } from '../../../shared/browser-workspace-types'
+import type { Tab } from '../../../shared/tab-types'
 import type { MobileDesktopRelayHosts } from './mobile-desktop-relay-hosts'
 import { MobileRelayHostCatalog } from './mobile-relay-host-catalog'
 
@@ -56,6 +60,7 @@ function fakeHosts(
     snapshot: RuntimeHostStatusSnapshot
     orcadDeployment?: { sshTargetId: string }
     runtimeId?: string | null
+    pairedDeviceId?: string
   }[]
 ) {
   const state = {
@@ -68,13 +73,16 @@ function fakeHosts(
   const call = vi.fn<MobileDesktopRelayHosts['call']>()
   const hosts: MobileDesktopRelayHosts = {
     list: () => ({
-      environments: state.environments.map(({ id, name, orcadDeployment, runtimeId }) => ({
-        id,
-        name,
-        orcadDeployment,
-        pairingRevision: state.pairingRevision,
-        runtimeId: runtimeId === undefined ? 'runtime-a' : runtimeId
-      })),
+      environments: state.environments.map(
+        ({ id, name, orcadDeployment, runtimeId, pairedDeviceId }) => ({
+          id,
+          name,
+          orcadDeployment,
+          pairingRevision: state.pairingRevision,
+          runtimeId: runtimeId === undefined ? 'runtime-a' : runtimeId,
+          pairedDeviceId
+        })
+      ),
       sshTargetLabels: state.sshTargetLabels,
       sshConnectionStates: state.sshConnectionStates,
       statusByEnvironmentId: new Map(
@@ -90,6 +98,7 @@ function fakeHosts(
       pairing: { v: 2, endpoint: 'ws://server', deviceToken: 'desktop', publicKeyB64: 'k' }
     }),
     call,
+    hostsBrowserPage: () => false,
     onEnvironmentRetired: (listener) => {
       state.retire = listener
       return () => {}
@@ -98,8 +107,23 @@ function fakeHosts(
   return { hosts, call, state }
 }
 
-function catalog(hosts: MobileDesktopRelayHosts, labels = new Map()) {
-  return { catalog: new MobileRelayHostCatalog({ hosts, hostLabelOverrides: () => labels }) }
+function catalog(
+  hosts: MobileDesktopRelayHosts,
+  labels = new Map(),
+  desktop: {
+    sessions?: Record<string, Partial<WorkspaceSessionState>>
+  } = {}
+) {
+  return {
+    catalog: new MobileRelayHostCatalog({
+      hosts,
+      hostLabelOverrides: () => labels,
+      getWorkspaceSession: (hostId) => {
+        const session = desktop.sessions?.[hostId]
+        return session ? { ...getDefaultWorkspaceSession(), ...session } : null
+      }
+    })
+  }
 }
 
 describe('mobile relay host catalog', () => {
@@ -394,5 +418,95 @@ describe('mobile relay host catalog', () => {
     const rows = { worktrees: [{ worktreeId: 'w', hostId: 'runtime:env' }] }
     await expect(Promise.all([first, second])).resolves.toEqual([rows, rows])
     expect(call).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("mobile relay host catalog: the desktop sidebar's own view of server rows", () => {
+  // What resolveRpcWorkspaceCreatorProvenance records: a relayed phone records the desktop relaying it.
+  const creators = [
+    { worktreeId: 'mine', creatorProvenance: { kind: 'paired-device', deviceId: 'desktop' } },
+    { worktreeId: 'other', creatorProvenance: { kind: 'paired-device', deviceId: 'laptop' } },
+    { worktreeId: 'server', creatorProvenance: { kind: 'host' } },
+    { worktreeId: 'unknown' }
+  ]
+
+  function serverRows(desktop: Parameters<typeof catalog>[2], pairedDeviceId = 'desktop') {
+    const { hosts, call } = fakeHosts([
+      { id: 'env', name: 'Box', snapshot: snapshot('env', 'live'), pairedDeviceId }
+    ])
+    call.mockResolvedValue(psReply(creators))
+    return catalog(hosts, new Map(), desktop).catalog.worktrees('runtime:env')
+  }
+
+  function marked(rows: Awaited<ReturnType<typeof serverRows>>, field: string): unknown[] {
+    return (rows.worktrees ?? []).filter((row) => row[field] === true).map((row) => row.worktreeId)
+  }
+
+  it('marks rows someone else created, whatever the desktop filter says', async () => {
+    const rows = await serverRows({})
+    expect(marked(rows, 'desktopOtherClient')).toEqual(['other', 'server'])
+    // Marked, never dropped: deep links and lineage still resolve every row.
+    expect(rows.worktrees).toHaveLength(creators.length)
+  })
+
+  it('marks nothing on a server whose pairing the desktop cannot name', async () => {
+    const { hosts, call } = fakeHosts([
+      { id: 'env', name: 'Box', snapshot: snapshot('env', 'live') }
+    ])
+    call.mockResolvedValue(psReply(creators))
+    const rows = await catalog(hosts, new Map()).catalog.worktrees('runtime:env')
+    expect(marked(rows, 'desktopOtherClient')).toEqual([])
+  })
+
+  function browserTab(worktreeId: string): BrowserWorkspace {
+    return {
+      id: `browser-${worktreeId}`,
+      worktreeId,
+      url: 'about:blank',
+      title: '',
+      loading: false,
+      faviconUrl: null,
+      canGoBack: false,
+      canGoForward: false,
+      loadError: null,
+      createdAt: 0
+    }
+  }
+
+  function tab(
+    worktreeId: string,
+    contentType: Tab['contentType'],
+    agent?: Tab['agentSessionAgent']
+  ): Tab {
+    return {
+      id: `${contentType}-${worktreeId}`,
+      entityId: worktreeId,
+      groupId: 'group',
+      worktreeId,
+      contentType,
+      label: '',
+      customLabel: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: 0,
+      ...(agent ? { agentSessionAgent: agent } : {})
+    }
+  }
+
+  it("counts the desktop's saved browser or chat tabs as the row's sidebar activity", async () => {
+    const rows = await serverRows({
+      sessions: {
+        'runtime:env': {
+          browserTabsByWorktree: { mine: [browserTab('mine')], other: [] },
+          unifiedTabs: {
+            'worktree:server': [tab('server', 'agent-session', 'claude')],
+            unknown: [tab('unknown', 'terminal')]
+          }
+        },
+        // Another host's session says nothing about this server's rows.
+        local: { browserTabsByWorktree: { other: [browserTab('other')] } }
+      }
+    })
+    expect(marked(rows, 'hasHostSidebarActivity')).toEqual(['mine', 'server'])
   })
 })

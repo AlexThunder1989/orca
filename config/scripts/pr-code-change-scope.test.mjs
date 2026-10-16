@@ -141,6 +141,7 @@ describe('per-job path classification', () => {
   })
 
   it('runs the Codex index-heal contract only when the heal or its transport changes', () => {
+    expectClassification(['src/main/codex/codex-app-server-session.test.ts'], {})
     expectClassification(['src/main/codex/codex-session-index-heal.ts'], {
       codex_index_heal_contract: true,
       package: true,
@@ -203,10 +204,9 @@ describe('per-job path classification', () => {
   })
 
   it('runs native package jobs only for the platform that ships the changed native', () => {
-    expectClassification(['native/windows-cli-launcher/src/main.rs'], {
-      package_windows: true
-    })
-    expectClassification(['native/computer-use-linux/runtime.py'], {
+    expectClassification(['native/windows-cli-launcher/src/main.rs'], { package_windows: true })
+    expectClassification(['native/computer-use-linux/runtime.py'], { package: true })
+    expectClassification(['native/wayland-clipboard/wayland-clipboard.c'], {
       package: true
     })
     expectClassification(['native/computer-use-macos/Package.swift'], {})
@@ -219,6 +219,7 @@ describe('per-job path classification', () => {
       'config/scripts/process-failure-message.mjs',
       'config/scripts/space-sharing-copy.mjs',
       '.github/actions/prepare-linux-package-fixture/action.yml',
+      '.github/actions/prepare-wayland-clipboard/action.yml',
       'config/docker/cli-launch-contract/Dockerfile',
       'config/docker/cli-launch-contract/run-cli-case.sh',
       'config/docker/headless-pairing/Dockerfile',
@@ -294,7 +295,8 @@ describe('per-job path classification', () => {
     )
     for (const file of [
       'src/main/runtime/structured-session-login-shell-test-harness.ts',
-      'src/main/runtime/structured-session-child-identity-env.ts'
+      'src/main/runtime/structured-session-child-env.ts',
+      'src/main/runtime/structured-session-child-env.test-support.ts'
     ]) {
       expectClassification([file], {
         shell_contracts: true,
@@ -394,7 +396,9 @@ describe('per-job path classification', () => {
       expectClassification([file], {
         'cross-version-wire': true,
         package: true,
-        package_windows: true
+        package_windows: true,
+        // The session-tabs RPC publishes layout, so the layout oracle gates it too.
+        layout_oracle: file === 'src/main/runtime/rpc/methods/session-tabs.ts'
       })
     }
     expectClassification(

@@ -7,9 +7,7 @@ import {
   collectElectronImporters,
   collectStructuredChatEntryPoints,
   defaultEntryPoints,
-  diffAgainstBaseline,
-  main,
-  readBaseline
+  main
 } from './check-runtime-electron-ratchet.mjs'
 
 describe('structured chat coverage', () => {
@@ -240,53 +238,13 @@ describe('the command-line check', () => {
       }
     }
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await main([], { plugins: [addElectron] })).toBe(1)
+    expect(await main({ plugins: [addElectron] })).toBe(1)
     expect(error.mock.calls.join('\n')).toContain('+ src/main/native-chat/transcript-read-cache.ts')
   }, 120_000)
 
   // Why real: the value of this gate is the transitive edges, which a fixture cannot model.
-  it('passes on the tree as it is, matching the checked-in baseline', async () => {
+  it('passes on the tree as it is, with nothing reachable importing electron', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
-    expect(await main([])).toBe(0)
+    expect(await main()).toBe(0)
   }, 120_000)
-})
-
-describe('readBaseline', () => {
-  it('drops comments and blank lines and sorts, so baseline formatting cannot cause a false diff', () => {
-    expect(readBaseline('# header\n\n  b/second.ts \na/first.ts\n')).toEqual([
-      'a/first.ts',
-      'b/second.ts'
-    ])
-  })
-})
-
-describe('diffAgainstBaseline', () => {
-  it('reports a module that started importing electron', () => {
-    expect(diffAgainstBaseline(['a.ts', 'b.ts'], ['a.ts'])).toEqual({
-      added: ['b.ts'],
-      removed: []
-    })
-  })
-
-  it('reports a module that stopped, so the baseline is forced to tighten rather than drift', () => {
-    expect(diffAgainstBaseline(['a.ts'], ['a.ts', 'b.ts'])).toEqual({
-      added: [],
-      removed: ['b.ts']
-    })
-  })
-
-  it('is quiet when the set is unchanged', () => {
-    expect(diffAgainstBaseline(['a.ts'], ['a.ts'])).toEqual({ added: [], removed: [] })
-  })
-})
-
-describe('the checked-in baseline', () => {
-  // Why an exact-empty assertion now: the reachable set reached zero, so "may only
-  // shrink" has no room left and any entry at all is a regression. This is strictly
-  // stronger than the old under-src/ check, which only stopped a node_modules path from
-  // padding a non-empty count.
-  it('stays empty, so nothing reachable from the runtime imports electron', () => {
-    const baseline = readBaseline(readFileSync('config/runtime-electron-baseline.txt', 'utf8'))
-    expect(baseline).toEqual([])
-  })
 })

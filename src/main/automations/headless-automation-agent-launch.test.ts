@@ -65,6 +65,20 @@ function launch(runtime: ReturnType<typeof harness>, overrides: Record<string, u
 }
 
 describe('headless automation agent launch', () => {
+  it('launches Hermes through the ordinary agent contract', async () => {
+    const runtime = harness()
+
+    const launched = await launch(runtime, { agentId: 'hermes' })
+
+    expect(runtime.launchAgentTerminal).toHaveBeenCalledWith('id:wt-1', {
+      agent: 'hermes',
+      prompt: 'fix the flaky test',
+      title: 'Nightly'
+    })
+    expect(runtime.deliverStartupFollowup).not.toHaveBeenCalled()
+    expect(launched.terminalHandle).toBe('term_existing')
+  })
+
   it('starts an argv agent in an existing workspace with the prompt on its command', async () => {
     const runtime = harness()
 

@@ -54,10 +54,10 @@ vi.mock('../ipc/filesystem-auth', async () => {
 import {
   _getRuntimeFileWatcherReleaseCountForTests,
   _resetRuntimeFileWatcherLeasesForTests,
-  awaitRuntimeFileWatcherUnsubscribes,
-  RuntimeFileCommands,
-  WINDOWS_RUNTIME_FILE_WATCH_CLOSE_DEADLINE_MS
-} from './orca-runtime-files'
+  awaitRuntimeFileWatcherUnsubscribes
+} from './files/watch/file-watcher-leases'
+import { RuntimeFileCommands } from './orca-runtime-files'
+import { WINDOWS_RUNTIME_FILE_WATCH_CLOSE_DEADLINE_MS } from './files/watch/windows-file-watch'
 
 function createWindowsWatcher(close: () => void) {
   const watcher = new EventEmitter() as EventEmitter & { close: ReturnType<typeof vi.fn> }

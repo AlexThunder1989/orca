@@ -1,6 +1,17 @@
-import { omitPairingLocalUiFields } from '../../../../shared/pairing-local-ui-fields'
+import { normalizeJiraQuickFilterState } from '../../../../shared/jira-quick-filters'
+import { JiraQuickFilterStateParam } from '../../../../shared/rpc-contract/jira-quick-filter-params'
+import {
+  normalizeJiraSavedFilterState,
+  mutateJiraSavedFilterState
+} from '../../../../shared/jira-saved-filters'
+import { JiraSavedFilterMutationParam } from '../../../../shared/rpc-contract/jira-saved-filter-params'
+import {
+  omitPairingLocalUiFields,
+  type PairedUiState
+} from '../../../../shared/pairing-local-ui-fields'
 import type { PersistedUIState } from '../../../../shared/persisted-ui-state-types'
-import { defineMethod } from '../core'
+import { defineMethod, type RpcContext } from '../core'
+import { isHostOwnPhone } from '../host-own-phone'
 import {
   NativeChatSessionOptionsMutation,
   PRBotAuthorOverrideUpdate,
@@ -11,8 +22,69 @@ import { FeatureInteractionIdParam, UiUpdate } from './client-ui-schemas'
 // the typecheck graph so drift fails the build instead of a paired client.
 
 import { TerminalQuickCommandsUpdate } from '../../../../shared/rpc-contract/terminal-quick-command-params'
+import { AgentLaunchSettingsMutation } from '../../../../shared/rpc-contract/agent-launch-settings-params'
+
+function uiForCaller(
+  state: PersistedUIState,
+  context: Pick<RpcContext, 'clientKind' | 'pairedDeviceParentId'>
+): PairedUiState & Pick<PersistedUIState, 'hideWorkspacesFromOtherDevices'> {
+  const ui = omitPairingLocalUiFields(state)
+  // Why always sent: its presence tells the phone this host shares the filter; an older host omits
+  // it, and the phone then keeps its local value.
+  return isHostOwnPhone(context)
+    ? { ...ui, hideWorkspacesFromOtherDevices: state.hideWorkspacesFromOtherDevices === true }
+    : ui
+}
 
 export const CLIENT_UI_METHODS = [
+  defineMethod({
+    name: 'ui.getJiraQuickFilters',
+    permission: 'workspace',
+    params: null,
+    handler: (_params, { runtime }) =>
+      normalizeJiraQuickFilterState(runtime.getUIState().jiraQuickFilterState)
+  }),
+  defineMethod({
+    name: 'ui.setJiraQuickFilters',
+    permission: 'workspace',
+    params: JiraQuickFilterStateParam,
+    handler: (params, { runtime }) => {
+      const state = normalizeJiraQuickFilterState(params)
+      runtime.updateUIState({ jiraQuickFilterState: state })
+      return state
+    }
+  }),
+  defineMethod({
+    name: 'ui.getJiraSavedFilters',
+    permission: 'workspace',
+    params: null,
+    handler: (_params, { runtime }) =>
+      normalizeJiraSavedFilterState(runtime.getUIState().jiraSavedFilterState)
+  }),
+  defineMethod({
+    name: 'ui.mutateJiraSavedFilters',
+    permission: 'workspace',
+    params: JiraSavedFilterMutationParam,
+    handler: (params, { runtime }) => {
+      const state = mutateJiraSavedFilterState(runtime.getUIState().jiraSavedFilterState, params)
+      runtime.updateUIState({ jiraSavedFilterState: state })
+      return state
+    }
+  }),
+  defineMethod({
+    name: 'settings.getAgentLaunch',
+    permission: 'workspace',
+    params: null,
+    handler: (_params, { runtime }) => ({ settings: runtime.getClientAgentLaunchSettings() })
+  }),
+  defineMethod({
+    name: 'settings.mutateAgentLaunch',
+    permission: 'settings-write',
+    params: AgentLaunchSettingsMutation,
+    handler: async (params, { runtime }) => ({
+      settings: await runtime.mutateClientAgentLaunchSettings(params)
+    })
+  }),
   defineMethod({
     name: 'settings.get',
     permission: 'workspace',
@@ -66,7 +138,7 @@ export const CLIENT_UI_METHODS = [
     name: 'ui.get',
     permission: 'workspace',
     params: null,
-    handler: (_params, { runtime }) => ({ ui: omitPairingLocalUiFields(runtime.getUIState()) })
+    handler: (_params, context) => ({ ui: uiForCaller(context.runtime.getUIState(), context) })
   }),
   defineMethod({
     name: 'ui.set',
@@ -74,18 +146,25 @@ export const CLIENT_UI_METHODS = [
     params: UiUpdate,
     // Why the fields are dropped here rather than removed from the schema: UiUpdate is strict, so
     // an unlisted key would make the dispatcher reject an old client's ENTIRE payload.
-    handler: (params, { runtime }) => ({
-      ui: omitPairingLocalUiFields(
-        runtime.updateUIState(omitPairingLocalUiFields(params) as Partial<PersistedUIState>)
-      )
-    })
+    handler: (params, context) => {
+      const ownPhoneFilter =
+        isHostOwnPhone(context) && params.hideWorkspacesFromOtherDevices !== undefined
+          ? { hideWorkspacesFromOtherDevices: params.hideWorkspacesFromOtherDevices }
+          : {}
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: UiUpdate is checked key-for-key against PersistedUIState (ui-state-schema-parity-checks.ts); only optionality differs.
+      const updates = {
+        ...omitPairingLocalUiFields(params),
+        ...ownPhoneFilter
+      } as Partial<PersistedUIState>
+      return { ui: uiForCaller(context.runtime.updateUIState(updates), context) }
+    }
   }),
   defineMethod({
     name: 'ui.recordFeatureInteraction',
     permission: 'workspace',
     params: FeatureInteractionIdParam,
-    handler: (params, { runtime }) => ({
-      ui: omitPairingLocalUiFields(runtime.recordFeatureInteraction(params))
+    handler: (params, context) => ({
+      ui: uiForCaller(context.runtime.recordFeatureInteraction(params), context)
     })
   })
 ]

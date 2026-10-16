@@ -9,7 +9,7 @@ import {
   openMobileE2EEV2Frame,
   sealMobileE2EEV2Frame
 } from '../../../src/shared/mobile-e2ee-v2-framing'
-import { deriveMobileE2EEV2KeySchedule } from '../../../src/main/runtime/rpc/mobile-e2ee-v2-key-schedule'
+import { deriveMobileE2EEV2KeySchedule } from '../../../src/shared/mobile-e2ee-v2-node-key-schedule'
 import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,

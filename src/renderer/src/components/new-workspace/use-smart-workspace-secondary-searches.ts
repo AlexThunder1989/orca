@@ -7,6 +7,7 @@ import { linearWorkspaceScopeSignature } from '../../../../shared/linear/workspa
 import { getSmartWorkspaceLinearSearchQuery } from '../../../../shared/new-workspace/smart-workspace-linear-intent'
 import type { parseBoundedSmartWorkspaceLinearIssueUrlIntent } from '../../../../shared/new-workspace/smart-workspace-linear-intent'
 import { RESULT_LIMIT } from './smart-workspace-name-field-model'
+import { restrictJiraQueryToProject } from '../../../../shared/jira-project-reference'
 import { getBranchSearchRequest } from '../../../../shared/new-workspace/smart-workspace-source-results'
 import type { useWorkItemSourceFoundation } from './use-work-item-source-foundation'
 
@@ -52,6 +53,7 @@ export function useSmartWorkspaceSecondarySearches({
     setSettledLinearUrlQuery,
     jiraSourceContext,
     jiraConnectionStatus,
+    jiraProject,
     searchJiraIssues,
     setJiraIssues,
     setJiraLoading
@@ -236,13 +238,20 @@ export function useSmartWorkspaceSecondarySearches({
     const controller = new AbortController()
     setJiraLoading(true)
     const siteId =
-      jiraConnectionStatus?.selectedSiteId ?? jiraConnectionStatus?.activeSiteId ?? null
+      jiraProject?.siteId ??
+      jiraConnectionStatus?.selectedSiteId ??
+      jiraConnectionStatus?.activeSiteId ??
+      null
     void searchJiraIssuesByKeyOrText(jiraSearchQuery, (jql) =>
-      searchJiraIssues(jql, RESULT_LIMIT, {
-        sourceContext: jiraSourceContext,
-        siteId,
-        signal: controller.signal
-      })
+      searchJiraIssues(
+        jiraProject ? restrictJiraQueryToProject(jql, jiraProject) : jql,
+        RESULT_LIMIT,
+        {
+          sourceContext: jiraSourceContext,
+          siteId,
+          signal: controller.signal
+        }
+      )
     )
       .then((issues) => {
         if (!stale) {
@@ -267,6 +276,7 @@ export function useSmartWorkspaceSecondarySearches({
     jiraConnectionStatus?.activeSiteId,
     jiraConnectionStatus?.selectedSiteId,
     jiraSearchQuery,
+    jiraProject,
     jiraSourceContext,
     searchJiraIssues,
     setJiraIssues,

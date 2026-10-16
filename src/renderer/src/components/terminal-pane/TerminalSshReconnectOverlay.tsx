@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { Loader2, Server, ServerOff } from 'lucide-react'
 import { toast } from 'sonner'
-import { sshTargetConnectFailureText } from '@/ssh/ssh-connect-failure-text'
+import { sshTargetConnectFailureText } from '@/ssh/ssh-host-server-status-copy'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/store'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'

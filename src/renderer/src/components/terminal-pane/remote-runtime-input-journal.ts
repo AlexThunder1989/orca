@@ -1,6 +1,6 @@
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import type { TerminalInputAckKind } from '../../../../shared/terminal-stream-protocol'
-import type { RemoteRuntimeMultiplexedTerminal } from '../../runtime/remote-runtime-terminal-multiplexer'
+import type { RemoteRuntimeMultiplexedTerminal } from '../../runtime/remote-runtime-terminal-multiplexer-types'
 import {
   isSameRemoteRuntimeInputEndpoint,
   type RemoteRuntimeInputEndpoint

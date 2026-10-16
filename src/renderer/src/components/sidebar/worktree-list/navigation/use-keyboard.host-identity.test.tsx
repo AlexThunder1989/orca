@@ -35,7 +35,6 @@ function localRow(id: string): HostSectionRow & { type: 'item' } {
     repo: repo as never,
     depth: 0,
     groupDepth: 0,
-    lineageTrail: [],
     isLastLineageChild: false,
     lineageChildCount: 0
   }

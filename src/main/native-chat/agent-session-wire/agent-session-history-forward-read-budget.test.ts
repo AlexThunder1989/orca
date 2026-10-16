@@ -119,6 +119,11 @@ describe('forward history SQL read budget', () => {
       Array.from({ length: count }, (_, index) => `item-${index}`)
     )
     expect(batches.at(-1)?.batch.cursor).toEqual(journal.cursor())
+    // Only the last page says the reader is caught up.
+    expect(batches.map((event) => event.hasNewer === true)).toEqual([
+      ...Array<boolean>(9).fill(true),
+      false
+    ])
     expect(returnedRows).toEqual([...Array<number>(9).fill(201), 200])
     expect(parse).toHaveBeenCalledTimes(2_009)
   })

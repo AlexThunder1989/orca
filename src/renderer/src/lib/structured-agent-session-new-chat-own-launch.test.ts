@@ -64,7 +64,7 @@ vi.mock('@/lib/structured-agent-session-launch-admission', async (importOriginal
   ...(await importOriginal<typeof LaunchAdmissionModule>()),
   beginHostAdmittedStructuredLaunch: (args: { openAdmitted: () => unknown }) => args.openAdmitted()
 }))
-vi.mock('@/runtime/local-structured-session-tabs-sync', () => ({
+vi.mock('@/runtime/local-structured-session-tabs-sync/inventory-refresh', () => ({
   refreshLocalStructuredSessionTabs: mocks.refreshTabs
 }))
 vi.mock('@/runtime/structured-agent-session-client', () => ({

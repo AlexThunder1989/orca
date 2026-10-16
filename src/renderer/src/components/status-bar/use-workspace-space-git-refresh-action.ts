@@ -1,11 +1,11 @@
 import { useCallback } from 'react'
 import type { GitStatusResult } from '../../../../shared/git-status-types'
-import { runtimeTargetForOwnerHostId } from '@/runtime/runtime-client-target'
+import { ipcOrRuntimeTargetForHostId } from '@/runtime/runtime-client-target'
 import type { WorkspaceSpaceWorktree } from '../../../../shared/workspace-space-types'
 import { getWorkspaceSpaceWorktreeIdentity } from './workspace-space-delete-selection'
 import { useAppStore } from '../../store'
 import { findRepoForHost } from '../../store/slices/repo-host-identity'
-import { getRuntimeGitStatus } from '@/runtime/runtime-git-client'
+import { getRuntimeGitStatus } from '@/runtime/runtime-git-status-client'
 import type { useWorkspaceSpaceManagerBindings } from './use-workspace-space-manager-bindings'
 
 type WorkspaceSpaceManagerBindings = ReturnType<typeof useWorkspaceSpaceManagerBindings>
@@ -49,7 +49,7 @@ export function useWorkspaceSpaceGitRefreshAction(bindings: WorkspaceSpaceManage
       })
       // Why: a scan row without a host id came from this app's own scan.
       const ownerTarget = worktree.executionHostId
-        ? runtimeTargetForOwnerHostId(worktree.executionHostId)
+        ? ipcOrRuntimeTargetForHostId(worktree.executionHostId)
         : ({ kind: 'local' } as const)
 
       return (

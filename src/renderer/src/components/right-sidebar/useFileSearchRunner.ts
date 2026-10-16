@@ -10,7 +10,7 @@ import {
   createEmptyRuntimeFileSearchResult,
   getRuntimeFileSearchRejectedField
 } from '@/runtime/runtime-file-search-bounds'
-import { searchRuntimeFiles } from '@/runtime/runtime-file-client'
+import { searchRuntimeFiles } from '@/runtime/runtime-file-search-client'
 import { useAppStore } from '@/store'
 import {
   getExecutionHostIdForWorktree,
@@ -150,7 +150,7 @@ export function useFileSearchRunner({
               connectionId
             },
             {
-              query: query.trim(),
+              query,
               rootPath: worktreePath,
               caseSensitive: activeSearchState?.caseSensitive ?? false,
               wholeWord: activeSearchState?.wholeWord ?? false,

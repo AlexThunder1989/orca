@@ -14,6 +14,7 @@ import {
 import { applyPostgresSchema } from './postgres-schema-startup.js'
 import { POSTGRES_STATEMENT_STATS_MIGRATION } from './postgres-statement-stats.js'
 import { reportPostgresQueryFailure } from './postgres-query-failure.js'
+import { noteStickySlotPoolWait, noteStickySlotStatement } from './sticky-slot-statements.js'
 import {
   isPostgresReadTimeout,
   isRelayDatabaseLayerError,
@@ -910,19 +911,25 @@ type PostgresQueryTimeout = () => number | undefined
 
 async function timedQuery(
   client: pg.PoolClient,
+  connectionId: number,
   text: string,
   values: unknown[] | undefined,
   queryTimeout: PostgresQueryTimeout | undefined
 ): Promise<pg.QueryResult> {
-  const timeout = queryTimeout?.()
-  if (timeout === undefined) return values === undefined ? await client.query(text) : await client.query(text, values)
-  // pg@8.22 reads it at client.js:660; @types/pg does not declare it on QueryConfig.
-  const config: pg.QueryConfig & { query_timeout: number } = {
-    text,
-    ...(values === undefined ? {} : { values }),
-    query_timeout: timeout
+  const startedAt = performance.now()
+  try {
+    const timeout = queryTimeout?.()
+    if (timeout === undefined) return values === undefined ? await client.query(text) : await client.query(text, values)
+    // pg@8.22 reads it at client.js:660; @types/pg does not declare it on QueryConfig.
+    const config: pg.QueryConfig & { query_timeout: number } = {
+      text,
+      ...(values === undefined ? {} : { values }),
+      query_timeout: timeout
+    }
+    return await client.query(config)
+  } finally {
+    noteStickySlotStatement(performance.now() - startedAt, connectionId)
   }
-  return await client.query(config)
 }
 
 class PostgresTransaction implements RelayDatabase {
@@ -938,6 +945,7 @@ class PostgresTransaction implements RelayDatabase {
 
   constructor(
     protected readonly client: pg.PoolClient,
+    private readonly connectionId: number,
     private readonly queryTimeout?: PostgresQueryTimeout
   ) {}
 
@@ -966,7 +974,7 @@ class PostgresTransaction implements RelayDatabase {
       `WITH final_write AS (${inlinePostgresParameters(sql, params, this.client)}) ` +
       'SELECT 1 / (SELECT count(*)::int FROM final_write); COMMIT'
     try {
-      await timedQuery(this.client, message, undefined, this.queryTimeout)
+      await timedQuery(this.client, this.connectionId, message, undefined, this.queryTimeout)
     } catch (error) {
       // Simple query stops at the first error, so any server error means COMMIT never ran:
       // retryable codes take the caller's normal rollback-and-retry path. A lost connection
@@ -1017,7 +1025,13 @@ class PostgresTransaction implements RelayDatabase {
     this.assertNotCommitted()
     this.failIfPoisoned()
     try {
-      const result = await timedQuery(this.client, postgresSql(sql), params, this.queryTimeout)
+      const result = await timedQuery(
+        this.client,
+        this.connectionId,
+        postgresSql(sql),
+        params,
+        this.queryTimeout
+      )
       return returnsRows(sql) ? (result.rows as SqlRow[]) : [{ changes: result.rowCount ?? 0 }]
     } catch (error) {
       this.noteFailure(error)
@@ -1177,6 +1191,9 @@ export class PostgresDatabase implements RelayDatabase {
   readonly dialect = 'postgres' as const
   private readonly pressure: PostgresPoolPressure
   private readonly holds = new CellInventoryHoldSamples()
+  // pg-pool hands the same client object back for the same connection.
+  private readonly connectionIds = new WeakMap<pg.PoolClient, number>()
+  private nextConnectionId = 1
 
   consumeHoldCounts(): CellInventoryHoldCounts {
     return this.holds.consumeCounts()
@@ -1207,9 +1224,15 @@ export class PostgresDatabase implements RelayDatabase {
     let client: pg.PoolClient | undefined
     let lostReply: Error | undefined
     try {
-      client = await this.pressure.connect(lane)
+      client = await this.connect(lane)
       phase = 'execute'
-      const result = await timedQuery(client, postgresSql(sql), params, this.queryTimeout)
+      const result = await timedQuery(
+        client,
+        this.idOfConnection(client),
+        postgresSql(sql),
+        params,
+        this.queryTimeout
+      )
       return returnsRows(sql) ? (result.rows as SqlRow[]) : [{ changes: result.rowCount ?? 0 }]
     } catch (error) {
       markRelayDatabaseError(error)
@@ -1257,15 +1280,18 @@ export class PostgresDatabase implements RelayDatabase {
     options: RelayTransactionOptions = {}
   ): Promise<T> {
     for (let attempt = 1; attempt <= POSTGRES_TRANSACTION_ATTEMPTS; attempt++) {
-      const client = await this.pressure.connect()
-      const transaction = new PostgresTransaction(client, this.queryTimeout)
+      const client = await this.connect()
+      const connectionId = this.idOfConnection(client)
+      const transaction = new PostgresTransaction(client, connectionId, this.queryTimeout)
       let lostReply: Error | undefined
       try {
-        await timedQuery(client, 'BEGIN', undefined, this.queryTimeout)
+        await timedQuery(client, connectionId, 'BEGIN', undefined, this.queryTimeout)
         const result = await operation(transaction)
         // Even when the operation caught it: COMMIT must not run after a lost reply.
         if (transaction.poisonedBy) throw transaction.poisonedBy
-        if (transaction.open) await timedQuery(client, 'COMMIT', undefined, this.queryTimeout)
+        if (transaction.open) {
+          await timedQuery(client, connectionId, 'COMMIT', undefined, this.queryTimeout)
+        }
         recordMeasuredHold(this.holds, transaction)
         this.holds.recordUnavailable(transaction.consumeLockUnavailable())
         this.holds.recordLockTimeout(transaction.consumeLockTimeouts())
@@ -1320,6 +1346,24 @@ export class PostgresDatabase implements RelayDatabase {
 
   async close(): Promise<void> {
     await this.pool.end()
+  }
+
+  private async connect(lane?: PostgresPoolLane): Promise<pg.PoolClient> {
+    const startedAt = performance.now()
+    try {
+      return await this.pressure.connect(lane)
+    } finally {
+      noteStickySlotPoolWait(performance.now() - startedAt)
+    }
+  }
+
+  private idOfConnection(client: pg.PoolClient): number {
+    let id = this.connectionIds.get(client)
+    if (id === undefined) {
+      id = this.nextConnectionId++
+      this.connectionIds.set(client, id)
+    }
+    return id
   }
 
   consumePoolPressure(): PostgresPoolPressureCounts {

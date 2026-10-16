@@ -4,10 +4,10 @@ import {
   getExplicitRuntimeEnvironmentIdForWorktree,
   getExecutionHostIdForWorktree,
   getKnownExecutionHostIdForWorktree,
-  getRuntimeEnvironmentIdForWorktree,
-  getRuntimeSessionMirrorEnvironmentIds,
-  type WorktreeRuntimeOwnerState
+  getRuntimeEnvironmentIdForWorktree
 } from './worktree-runtime-owner'
+import { getRuntimeSessionMirrorEnvironmentIds } from './runtime-session-mirror-owners'
+import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner-state'
 
 const state: WorktreeRuntimeOwnerState = {
   settings: { activeRuntimeEnvironmentId: 'focused-env' },

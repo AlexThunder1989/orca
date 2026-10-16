@@ -25,7 +25,7 @@ import {
   buildToolchainProbeCommand,
   parseBuildToolchainProbe,
   toolchainInstallHintLines
-} from '../ssh/build-toolchain-diagnosis'
+} from './build-toolchain-diagnosis'
 import { detectNativeHostAbi, nativeSlotName, type NativeHostAbi } from './native-host-abi'
 import { classifyNodePtyLoaderMessage, firstErrorLine } from './node-pty-loader-diagnosis'
 import { installPrebuiltSlot, type PrebuiltSlotOutcome } from './node-pty-prebuilt-slot'

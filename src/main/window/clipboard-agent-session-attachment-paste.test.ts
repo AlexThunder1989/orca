@@ -26,8 +26,7 @@ vi.mock('../../shared/runtime-environment-store', () => ({
 }))
 vi.mock('./clipboard-remote-file-copy', () => ({
   cleanupExpiredRemoteClipboardFiles: vi.fn(async () => {}),
-  scheduleLegacyRemoteClipboardFileCleanup: vi.fn(),
-  writeRemoteFileToClipboard: vi.fn()
+  scheduleLegacyRemoteClipboardFileCleanup: vi.fn()
 }))
 vi.mock('./dashboard-popout-window', () => ({ isDashboardPopoutRenderer: () => false }))
 

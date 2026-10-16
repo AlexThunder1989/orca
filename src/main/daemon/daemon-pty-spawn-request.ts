@@ -17,7 +17,7 @@ import {
   TERMINAL_HISTORY_INLINE_SEED_CODE_UNITS
 } from './terminal-history-seed-chunks'
 import type { CreateOrAttachResult, GetSnapshotResult } from './types'
-import type { PtySpawnOptions, PtySpawnResult } from '../providers/types'
+import type { PtySpawnOptions, PtySpawnResult } from '../providers/pty-provider-contract'
 
 /** A daemon kept running across an update trusts `interactive` even for a claimed resume. */
 function forwardedSpawnIntent(intent: SpawnIntent, claim: unknown): SpawnIntent {

@@ -11,7 +11,8 @@ import {
   authenticateMobileE2EE,
   decodeMobileE2EEPublicKey,
   describeMobileE2EEAuthFailure,
-  type DeviceKeyResolution
+  type DeviceKeyResolution,
+  type DeviceTokenRefusal
 } from './mobile-e2ee-auth-validation'
 import { isMobileE2EEOutboundItemWithinLimit } from './mobile-e2ee-outbound-admission'
 import { parseRemoteRuntimeJsonText } from '../../../shared/remote-runtime-request-frames'
@@ -36,7 +37,7 @@ const MAX_CONSECUTIVE_DECRYPT_FAILURES = 5
 
 export type E2EEChannelOptions = {
   serverSecretKey: Uint8Array
-  resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | null
+  resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | DeviceTokenRefusal | null
   // Absent: key auth is refused as bad_auth, the same as before device keys existed.
   resolveAuthenticatedDeviceKey?: (deviceId: string) => DeviceKeyResolution<E2EEAuthenticatedDevice>
   onReady: (channel: E2EEChannel, device: E2EEAuthenticatedDevice) => void

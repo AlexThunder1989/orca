@@ -53,7 +53,6 @@ const makeWorktreeRow = (id: string): Extract<Row, { type: 'item' }> => ({
   repo,
   depth: 0,
   groupDepth: 0,
-  lineageTrail: [],
   isLastLineageChild: false,
   lineageChildCount: 0
 })

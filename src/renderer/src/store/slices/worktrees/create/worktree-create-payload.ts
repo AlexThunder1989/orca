@@ -13,6 +13,7 @@ export type CreateWorktreeCallOptions = {
   linkedTaskSourceContext?: TaskSourceContext | null
   /** Lets the owning runtime launch and prefill a task agent without first creating an idle shell. */
   startupDraft?: string
+  setupOnly?: boolean
   /** True only when `name` came from the creature-name generator; gates host-side retirement. */
   nameWasGenerated?: boolean
   displayNameKind?: CreateWorktreeArgs['displayNameKind']
@@ -53,6 +54,7 @@ function sharedCreateFields(
     ...(request.compareBaseRef ? { compareBaseRef: request.compareBaseRef } : {}),
     ...(attempt.branchNameOverride ? { branchNameOverride: attempt.branchNameOverride } : {}),
     setupDecision: request.setupDecision,
+    ...(options?.setupOnly !== undefined ? { setupOnly: options.setupOnly } : {}),
     sparseCheckout: request.sparseCheckout,
     ...(request.displayName ? { displayName: request.displayName } : {}),
     ...((request.displayNameKind ?? options?.displayNameKind)

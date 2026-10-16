@@ -76,14 +76,23 @@ export function useNativeChatRevealLatest(): {
 
 function ignoreFindMatch(): void {}
 
-/** The transcript's side: what a pane's reveal does to this list. */
+/** The transcript's side: what a pane's reveal does to this list. `onSent` hears of it too:
+ *  unlike the reader's own jump to the latest, a reveal is them answering the conversation. */
 export function useNativeChatMessageListHandle(
   ref: React.Ref<NativeChatMessageListHandle> | undefined,
-  revealLatest: () => void,
-  revealFindMatch: NativeChatMessageListHandle['revealFindMatch'] = ignoreFindMatch
+  jumpToLatest: () => void,
+  revealFindMatch: NativeChatMessageListHandle['revealFindMatch'] = ignoreFindMatch,
+  onSent?: () => void
 ): void {
-  useImperativeHandle(ref, () => ({ revealLatest, revealFindMatch }), [
-    revealLatest,
-    revealFindMatch
-  ])
+  useImperativeHandle(
+    ref,
+    () => ({
+      revealLatest: () => {
+        onSent?.()
+        jumpToLatest()
+      },
+      revealFindMatch
+    }),
+    [jumpToLatest, revealFindMatch, onSent]
+  )
 }

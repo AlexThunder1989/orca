@@ -278,16 +278,11 @@ export type WorktreeSlice = {
    * their normal sidebar groups.
    */
   setWorktreesPinnedAndReveal: (worktreeIds: readonly string[], isPinned: boolean) => void
-  markWorktreeUnread: (worktreeId: string) => void
   observeTerminalGitHubPullRequestLink: (
     worktreeId: string,
     link: TerminalGitHubPRLink,
     context?: WorkspaceReferenceTerminalContext
   ) => void
-  /** Clear the worktree's unread dot. Called on user interaction with any
-   *  terminal pane inside the worktree (keystroke, click) — matches
-   *  ghostty's "show until interact" model. Persists isUnread=false. */
-  clearWorktreeUnread: (worktreeId: string) => void
   bumpWorktreeActivity: (worktreeId: string) => void
   /**
    * Monotonic stamp of the focus-recency timestamp for a worktree. No-op if

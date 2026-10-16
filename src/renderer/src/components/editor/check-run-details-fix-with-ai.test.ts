@@ -98,7 +98,7 @@ const storeState = vi.hoisted(() => ({
   hostedReviewCache: {} as Record<string, { data: unknown }>
 }))
 
-vi.mock('@/lib/worktree-git-identity-display', () => ({
+vi.mock('../../../../shared/worktree/git-identity-display', () => ({
   getWorktreeGitIdentityDisplay: () => ({ kind: 'branch', branchName: 'feature' })
 }))
 

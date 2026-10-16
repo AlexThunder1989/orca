@@ -28,6 +28,21 @@ export function composeJournalOperationReceipts(
   }
 }
 
+/** `run`, with `receipt` written in its transaction only when `changed` says it wrote something. */
+export function writeReceiptIfChanged<T>(
+  run: (db: Database.Database) => T,
+  changed: (result: T) => boolean,
+  receipt?: JournalOperationReceipt
+): (db: Database.Database) => T {
+  return (db) => {
+    const result = run(db)
+    if (receipt && changed(result)) {
+      receipt.write(db)
+    }
+    return result
+  }
+}
+
 export type JournalRowWriterDeps = {
   sessionId: string
   now: () => number
@@ -82,18 +97,21 @@ export class JournalRowWriter {
   }
 
   /** Several rows in ONE transaction, in order, planned once the lane is this append's: none is
-   *  durable unless all are, so no reader ever meets some without the rest. */
+   *  durable unless all are, so no reader ever meets some without the rest. `receiptRow` picks the
+   *  row `receipt` names. */
   enqueueRows(
     plan: () => readonly ((seq: number, ts: number) => JournalRow)[],
-    receipt?: JournalOperationReceipt
+    receipt?: JournalOperationReceipt,
+    receiptRow?: (rows: readonly JournalRow[]) => JournalRow | undefined
   ): Promise<JournalRow[]> {
-    return this.deps.serialize(() => this.writeRows(plan, receipt))
+    return this.deps.serialize(() => this.writeRows(plan, receipt, receiptRow))
   }
 
   /** `enqueueRows`' write, for a caller already running at its own turn in the queue. */
   writeRows(
     plan: () => readonly ((seq: number, ts: number) => JournalRow)[],
-    receipt?: JournalOperationReceipt
+    receipt?: JournalOperationReceipt,
+    receiptRow?: (rows: readonly JournalRow[]) => JournalRow | undefined
   ): JournalRow[] {
     assertJournalWritable(this.deps.readOnly(), this.deps.sessionId)
     const first = this.deps.nextSequence()
@@ -111,7 +129,7 @@ export class JournalRowWriter {
           insertJournalRow(db, this.deps.sessionId, row, ts)
           this.runBookkeeping(db, row)
         }
-        receipt?.write(db)
+        receipt?.write(db, receiptRow?.(rows))
       })
     } catch (error) {
       this.deps.rolledBack?.()

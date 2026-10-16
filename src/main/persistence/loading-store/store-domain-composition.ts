@@ -16,14 +16,16 @@ import { MetadataLineageOperations } from './metadata-lineage-operations'
 import { ProjectCollectionOperations } from './project-collection-operations'
 import { AutomationPersistence } from './automation-persistence'
 import { MobileTabSelectionPersistence } from './mobile-tab-selection-persistence'
-import { RemoteLayoutSnapshotPersistence } from './remote-layout-snapshot-persistence'
+import { RemoteLayoutSnapshotPersistence } from '../../remote-layout-snapshot'
 import { SparsePresetPersistence } from './sparse-preset-persistence'
 import { PtyBindingPersistenceOperations } from './pty-binding-persistence'
+import { LayoutCommandPersistence } from '../terminal-topology/layout-command-persistence'
 import { SshProfileOperations } from './ssh-profile-operations'
 import { RetiredWorktreeNamePersistence } from './retired-worktree-name-persistence'
 import { SshLeaseRecoveryOperations } from './ssh-lease-recovery-operations'
 import { OrcadSourceExportPersistence } from '../migrating-orcad-catalog/orcad-source-export'
 import { OrcadCatalogImportPersistence } from '../migrating-orcad-catalog/orcad-catalog-import'
+import { OrcadMigrationBlobInstallPersistence } from '../migrating-orcad-catalog/orcad-migration-blob-install-persistence'
 
 export type StoreDomainOperations = WriteSchedulingOperations &
   PrimaryStateWriteOperations &
@@ -38,11 +40,13 @@ export type StoreDomainOperations = WriteSchedulingOperations &
   SessionHostPartitionOperations &
   SessionSnapshotOperations &
   PtyBindingPersistenceOperations &
+  LayoutCommandPersistence &
   SshProfileOperations &
   RetiredWorktreeNamePersistence &
   SshLeaseRecoveryOperations &
   OrcadSourceExportPersistence &
   OrcadCatalogImportPersistence &
+  OrcadMigrationBlobInstallPersistence &
   WriteFlushBarrierOperations
 
 export type StoreDomains = {
@@ -65,11 +69,13 @@ export type StoreDomains = {
   remoteLayoutSnapshots: RemoteLayoutSnapshotPersistence
   sparsePresets: SparsePresetPersistence
   ptyBindings: PtyBindingPersistenceOperations
+  layoutCommands: LayoutCommandPersistence
   sshProfiles: SshProfileOperations
   retiredWorktreeNames: RetiredWorktreeNamePersistence
   sshLeases: SshLeaseRecoveryOperations
   orcadSourceExport: OrcadSourceExportPersistence
   orcadCatalogImports: OrcadCatalogImportPersistence
+  orcadMigrationBlobInstalls: OrcadMigrationBlobInstallPersistence
 }
 
 export const STORE_DOMAIN_OPERATION_CLASSES = [
@@ -86,11 +92,13 @@ export const STORE_DOMAIN_OPERATION_CLASSES = [
   SessionHostPartitionOperations,
   SessionSnapshotOperations,
   PtyBindingPersistenceOperations,
+  LayoutCommandPersistence,
   SshProfileOperations,
   RetiredWorktreeNamePersistence,
   SshLeaseRecoveryOperations,
   OrcadSourceExportPersistence,
   OrcadCatalogImportPersistence,
+  OrcadMigrationBlobInstallPersistence,
   WriteFlushBarrierOperations
 ] as const
 
@@ -158,11 +166,13 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
     remoteLayoutSnapshots,
     sparsePresets,
     ptyBindings,
+    layoutCommands: new LayoutCommandPersistence(runtime, sessions),
     sshProfiles,
     retiredWorktreeNames,
     sshLeases,
     // Read-only: holds the runtime state and nothing that writes.
     orcadSourceExport: new OrcadSourceExportPersistence(runtime),
-    orcadCatalogImports
+    orcadCatalogImports,
+    orcadMigrationBlobInstalls: new OrcadMigrationBlobInstallPersistence(runtime)
   }
 }

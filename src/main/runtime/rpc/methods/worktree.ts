@@ -8,6 +8,7 @@ import { getExplicitWorktreeIdSelector } from '../../runtime-worktree-selection'
 import { splitWorktreeId } from '../../../../shared/worktree/id'
 import { buildCliWorkspaceProvenance } from '../../../../shared/cli-workspace-provenance'
 import { displayNameUpdatePinsLabel } from '../../../../shared/worktree/display-name-provenance'
+import { getWorkspaceStatusWarning } from '../../../../shared/workspace-status-warning'
 import { createWorktreeWithStartupAgent } from '../../../agent-launch/startup-agent-worktree-create'
 import { defineMethod } from '../core'
 import { buildManagedWorktreeCreateArgs } from './worktree-create-args'
@@ -154,8 +155,8 @@ export const WORKTREE_METHODS = [
     name: 'worktree.set',
     permission: 'workspace',
     params: WorktreeSet,
-    handler: async (params, { runtime }) => ({
-      worktree: await runtime.updateManagedWorktreeMeta(params.worktree, {
+    handler: async (params, { runtime }) => {
+      const worktree = await runtime.updateManagedWorktreeMeta(params.worktree, {
         displayName: params.displayName,
         ...(params.displayName !== undefined
           ? { displayNameIsPinned: displayNameUpdatePinsLabel(params.displayName) }
@@ -204,7 +205,12 @@ export const WORKTREE_METHODS = [
               }
             : undefined
       })
-    })
+      const warning = getWorkspaceStatusWarning(
+        params.workspaceStatus,
+        () => runtime.getUIState().workspaceStatuses
+      )
+      return { worktree, ...(warning ? { warnings: [warning] } : {}) }
+    }
   }),
   defineMethod({
     name: 'worktree.persistSortOrder',

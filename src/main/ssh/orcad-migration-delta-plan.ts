@@ -19,7 +19,8 @@ import { collectOrcadMigrationSourceCatalog } from '../persistence/migrating-orc
 import { listOrcadMigrationCutoverChainForTarget } from './orcad-migration-cutover-journal'
 import {
   createOrcadMigrationManifest,
-  orcadMigrationCatalogIds
+  orcadMigrationCatalogIds,
+  type OrcadMigrationCatalogIds
 } from './orcad-migration-manifest-export'
 import type { OrcadMigrationSnapshotSource } from './orcad-migration-snapshot-coordinator'
 import { collectUntransferredDependentBlockers } from './ssh-target-orcad-dependents'
@@ -54,11 +55,29 @@ export function orcadDeltaSourceStore(
   target: SshTarget,
   moved: readonly OrcadMigrationSourceCutover[]
 ): OrcadDeltaSourceStore {
-  const movedNow = createOrcadMigrationManifest(store, target, {
-    destinationEnvironmentId: moved.at(-1)?.destinationEnvironmentId,
-    onlyCatalog: orcadMigrationCatalogIds(moved.map((cutover) => cutover.manifest.payload))
+  const ids = orcadMigrationCatalogIds(moved.map((cutover) => cutover.manifest.payload))
+  // A linked project is the server's already, so a delta never moves it either.
+  const linked = moved.flatMap((cutover) => cutover.linkedRepositoryIds ?? [])
+  return orcadSourceStoreWithout(
+    store,
+    target,
+    { ...ids, repositoryIds: new Set([...ids.repositoryIds, ...linked]) },
+    moved.at(-1)?.destinationEnvironmentId
+  )
+}
+
+/** The source minus rows the server already owns, and the dormant state that references them. */
+export function orcadSourceStoreWithout(
+  store: Store,
+  target: SshTarget,
+  owned: OrcadMigrationCatalogIds,
+  destinationEnvironmentId: string | undefined
+): OrcadDeltaSourceStore {
+  const ownedNow = createOrcadMigrationManifest(store, target, {
+    destinationEnvironmentId,
+    onlyCatalog: owned
   })
-  const view = store.createOrcadMigrationDeltaView(movedNow)
+  const view = store.createOrcadMigrationDeltaView(ownedNow)
   return {
     ...view,
     getSshTarget: (id) => store.getSshTarget(id),

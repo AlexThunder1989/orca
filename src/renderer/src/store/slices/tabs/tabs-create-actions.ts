@@ -4,10 +4,6 @@ import type { Tab, TabGroup } from '../../../../../shared/tab-types'
 import type { TabsSlice, TabsSliceGet, TabsSliceSet } from './tabs-slice-contract'
 import { buildActiveSurfacePatch } from './tabs-surface'
 import {
-  buildSplitNode,
-  replaceLeaf
-} from '../../../../../shared/workspace-layout/tab-group-layout-tree'
-import {
   ensureGroup,
   findGroupForTab,
   pushRecentTabId,
@@ -21,6 +17,7 @@ import {
   insertTabIdIntoOrder
 } from '../../../../../shared/workspace-layout/tab-order'
 import { resolveUnifiedTabCreatePlacement } from './tabs-create-placement'
+import { emptySplitGroup, insertSplitGroup } from './tabs-group-actions'
 import { folderWorkspaceToWorktree } from '../../../../../shared/folder-workspace-worktree'
 
 export function createTabsCreateActions(
@@ -30,14 +27,27 @@ export function createTabsCreateActions(
   return {
     createUnifiedTab: (worktreeId, contentType, init) => {
       const id = init?.id ?? createBrowserUuid()
+      const splitGroupId = init?.split ? createBrowserUuid() : undefined
       let created!: Tab
-      set((state) => {
+      set((current) => {
+        const state =
+          init?.split && splitGroupId
+            ? {
+                ...current,
+                ...insertSplitGroup(
+                  current,
+                  worktreeId,
+                  init.split,
+                  emptySplitGroup(worktreeId, splitGroupId)
+                )
+              }
+            : current
         const existingTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
         const placement = resolveUnifiedTabCreatePlacement({
           groups: state.groupsByWorktree[worktreeId] ?? [],
           tabs: existingTabs,
           activeGroupId: state.activeGroupIdByWorktree[worktreeId],
-          targetGroupId: init?.targetGroupId,
+          targetGroupId: splitGroupId ?? init?.targetGroupId,
           afterTabId: init?.afterTabId,
           executionHostId: init?.executionHostId,
           lookupWorktrees: () =>
@@ -139,6 +149,9 @@ export function createTabsCreateActions(
       if (init?.recordInteraction !== false) {
         get().recordFeatureInteraction?.('terminal-tabs')
       }
+      if (splitGroupId) {
+        get().recordFeatureInteraction?.('terminal-panes')
+      }
       return created
     },
 
@@ -157,11 +170,7 @@ export function createTabsCreateActions(
           return state
         }
         const existingTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
-        const currentGroups = state.groupsByWorktree[worktreeId] ?? []
         const shouldActivate = init?.activate ?? true
-        const currentLayout =
-          state.layoutByWorktree[worktreeId] ??
-          ({ type: 'leaf', groupId: target.sourceGroupId } as const)
         const createdAt = Date.now()
         const executionHostId =
           init?.executionHostId ?? getActiveExecutionHostIdForWorktree(state, worktreeId)
@@ -197,32 +206,15 @@ export function createTabsCreateActions(
           recentTabIds: shouldActivate ? [id] : []
         }
         created = createdTab
-        const replacement = buildSplitNode(
-          target.sourceGroupId,
-          newGroupId,
-          target.splitDirection === 'left' || target.splitDirection === 'right'
-            ? 'horizontal'
-            : 'vertical',
-          target.splitDirection === 'left' || target.splitDirection === 'up' ? 'first' : 'second'
-        )
         const nextUnifiedTabsByWorktree = {
           ...state.unifiedTabsByWorktree,
           [worktreeId]: [...existingTabs, createdTab]
         }
-        const nextGroupsByWorktree = {
-          ...state.groupsByWorktree,
-          [worktreeId]: [...currentGroups, newGroup]
-        }
-        const nextLayoutByWorktree = {
-          ...state.layoutByWorktree,
-          [worktreeId]: replaceLeaf(currentLayout, target.sourceGroupId, replacement)
-        }
-        const nextActiveGroupIdByWorktree = shouldActivate
-          ? {
-              ...state.activeGroupIdByWorktree,
-              [worktreeId]: newGroupId
-            }
-          : state.activeGroupIdByWorktree
+        const {
+          groupsByWorktree: nextGroupsByWorktree,
+          layoutByWorktree: nextLayoutByWorktree,
+          activeGroupIdByWorktree: nextActiveGroupIdByWorktree
+        } = insertSplitGroup(state, worktreeId, { ...target, activate: shouldActivate }, newGroup)
         moved = true
         return {
           unifiedTabsByWorktree: nextUnifiedTabsByWorktree,

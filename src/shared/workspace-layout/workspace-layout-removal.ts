@@ -97,17 +97,16 @@ export type ExitedSurface = {
 }
 
 /**
- * Today's exit retirement: null when the pane now shows another terminal or incarnation (left
- * alone); else the model without the pane, unchanged when its tab no longer holds it.
+ * Where an exited terminal's pane is: `gone` when no tab holds it any more, `replaced` when it
+ * now shows another terminal or incarnation.
  */
-export function retireExitedSurface(
+export function locateExitedSurface(
   model: WorkspaceLayoutModel,
   surface: ExitedSurface
-): WorkspaceLayoutModel | null {
+): TerminalTabLocation | 'gone' | 'replaced' {
   const location = findTerminalTab(model, surface.terminalTabId)
-  const inTree = Boolean(location && layoutContainsLeafId(location.tab.panes.root, surface.leafId))
-  if (!location || !inTree) {
-    return model
+  if (!location || !layoutContainsLeafId(location.tab.panes.root, surface.leafId)) {
+    return 'gone'
   }
   const leaf = model.workspaces[location.workspaceKey]!.leaves?.[surface.leafId]
   if (
@@ -115,10 +114,22 @@ export function retireExitedSurface(
     leaf?.incarnationId &&
     leaf.incarnationId !== surface.incarnationId
   ) {
-    return null
+    return 'replaced'
   }
-  if (leaf?.ptyId && leaf.ptyId !== surface.ptyId) {
-    return null
+  return leaf?.ptyId && leaf.ptyId !== surface.ptyId ? 'replaced' : location
+}
+
+/**
+ * Today's exit retirement: null when the pane now shows another terminal or incarnation (left
+ * alone); else the model without the pane, unchanged when its tab no longer holds it.
+ */
+export function retireExitedSurface(
+  model: WorkspaceLayoutModel,
+  surface: ExitedSurface
+): WorkspaceLayoutModel | null {
+  const location = locateExitedSurface(model, surface)
+  if (location === 'gone') {
+    return model
   }
-  return retireTerminalPane(model, location, surface.leafId)
+  return location === 'replaced' ? null : retireTerminalPane(model, location, surface.leafId)
 }

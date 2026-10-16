@@ -1,6 +1,6 @@
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { runtimeTargetForWorkspaceOwner } from '@/lib/resolve-owner'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import type { AppState } from '../../../types'
 import { WORKTREE_REMOVAL_AMBIGUOUS_ERROR } from './worktree-slice-constants'
 

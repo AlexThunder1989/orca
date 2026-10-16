@@ -4,7 +4,6 @@ import { TERMINAL_METHODS } from './terminal'
 import { eraseRpcMethods } from '../core'
 import {
   TerminalMultiplexLegacyAckFrame,
-  TerminalMultiplexSourceRangeAckFrame,
   TerminalMultiplexSubscribeFrame
 } from './terminal/stream-schemas'
 
@@ -100,7 +99,7 @@ describe('terminal RPC manifest characterization', () => {
       schemaFor('terminal.updateViewport').parse({
         terminal: 'term',
         client: { id: 'client' },
-        viewport: { cols: 1024, rows: 120 }
+        viewport: { cols: 1024, rows: 500 }
       })
     ).not.toThrow()
     expect(() =>
@@ -122,13 +121,6 @@ describe('terminal RPC manifest characterization', () => {
     expect(TerminalMultiplexLegacyAckFrame.safeParse({ bytes: 1, future: true }).success).toBe(
       false
     )
-    expect(
-      TerminalMultiplexSourceRangeAckFrame.safeParse({
-        streamGeneration: 'generation',
-        ackedEndByte: 1,
-        future: true
-      }).success
-    ).toBe(false)
     expect(
       TerminalMultiplexSubscribeFrame.parse({
         streamId: 1,

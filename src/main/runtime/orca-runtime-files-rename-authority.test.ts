@@ -229,13 +229,4 @@ describe('RuntimeFileCommands', () => {
     ).rejects.toThrow('Workspace host changed')
     expect(renameMock).not.toHaveBeenCalled()
   })
-
-  it('rejects a stale SSH expectation after the worktree becomes HUB-local', async () => {
-    const { commands } = createRuntimeFileCommands()
-
-    await expect(
-      commands.renameFileExplorerPath('id:wt-1', 'old.ts', 'new.ts', 0, 'ssh-1', 'ssh:ssh-1')
-    ).rejects.toThrow('Workspace host changed')
-    expect(renameMock).not.toHaveBeenCalled()
-  })
 })

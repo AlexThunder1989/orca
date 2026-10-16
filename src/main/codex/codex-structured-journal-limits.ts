@@ -11,10 +11,3 @@ export const MAX_CODEX_PENDING_PROMPTS = 128
 export const MAX_CODEX_IDENTITY_ENTRIES = 512
 export const MAX_CODEX_DETAIL_ENTRIES = 512
 export const MAX_CODEX_DETAIL_BYTES = 64 * 1024
-/** Settled spawn-group history budget; live groups remain until their final write succeeds. */
-export const MAX_CODEX_SUBAGENT_GROUPS = 32
-/** Children admitted per spawn-group row. */
-export const MAX_CODEX_SUBAGENTS_PER_GROUP = 64
-/** Threads whose latest token total is retained. Usage frames arrive for
- *  threads that are not yet (or never become) roster children. */
-export const MAX_CODEX_TOKEN_USAGE_THREADS = 256

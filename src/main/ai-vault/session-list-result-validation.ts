@@ -10,7 +10,7 @@ import { normalizeExecutionHostId } from '../../shared/execution-host'
 
 const aiVaultAgentSet = new Set<string>(AI_VAULT_AGENTS)
 
-function isAiVaultAgent(agent: string): agent is AiVaultAgent {
+export function isAiVaultAgent(agent: string): agent is AiVaultAgent {
   return aiVaultAgentSet.has(agent)
 }
 

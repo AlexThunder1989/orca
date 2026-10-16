@@ -76,15 +76,21 @@ export function normalizeLoadedDeviceRow(device: DeviceEntry): DeviceEntry {
 // Why: a malformed keyed row stays keyed (so it never falls back to a token) but cannot authenticate.
 function validDeviceKeyFields(
   device: DeviceEntry
-): Pick<DeviceEntry, 'credentialKind' | 'devicePublicKeyB64' | 'forkedFrom'> {
+): Pick<DeviceEntry, 'credentialKind' | 'devicePublicKeyB64' | 'forkedFrom' | 'ephemeral'> {
   if (device.credentialKind !== 'device-key') {
-    return { credentialKind: undefined, devicePublicKeyB64: undefined, forkedFrom: undefined }
+    return {
+      credentialKind: undefined,
+      devicePublicKeyB64: undefined,
+      forkedFrom: undefined,
+      ephemeral: undefined
+    }
   }
   return {
     credentialKind: 'device-key',
     devicePublicKeyB64: isDevicePublicKeyB64(device.devicePublicKeyB64)
       ? device.devicePublicKeyB64
       : undefined,
-    forkedFrom: typeof device.forkedFrom === 'string' ? device.forkedFrom : undefined
+    forkedFrom: typeof device.forkedFrom === 'string' ? device.forkedFrom : undefined,
+    ephemeral: device.ephemeral === true ? true : undefined
   }
 }

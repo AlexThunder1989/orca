@@ -232,7 +232,6 @@ describe('reconcileOrphanedPrRemotesWithExec', () => {
     )
     expect(reclaimed).toEqual([])
   })
-
 })
 
 describe('reconcileOrphanedPrRemotes rate limiting', () => {

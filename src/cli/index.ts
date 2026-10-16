@@ -37,7 +37,7 @@ function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
     // so routing the other half produced one listing describing two machines at once.
     commandPath.join(' ') === 'host list' ||
     commandPath[0] === 'serve' ||
-    commandPath[0] === 'agent' ||
+    (commandPath[0] === 'agent' && commandPath[1] !== 'launch') ||
     commandPath[0] === 'vm' ||
     commandPath[0] === 'agent-context' ||
     commandPath[0] === 'profile'
@@ -180,7 +180,8 @@ export async function main(
         return client
       },
       cwd,
-      json
+      json,
+      rawArgs: argv
     })
   } catch (error) {
     const worktreeSelector = parsed.flags.get('worktree')

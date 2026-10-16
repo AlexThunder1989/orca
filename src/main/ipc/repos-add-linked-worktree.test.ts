@@ -70,9 +70,6 @@ vi.mock('../worktree-root-preparation', () => ({
   prepareLocalWorktreeRootForRepo: prepareLocalWorktreeRootForRepoMock
 }))
 
-vi.mock('../providers/ssh-git-dispatch', () => ({ getSshGitProvider: vi.fn() }))
-vi.mock('./ssh', () => ({ getActiveMultiplexer: vi.fn() }))
-
 import { registerRepoHandlers } from './repos'
 
 const MAIN_CHECKOUT = '/Users/dev/projects/orca'

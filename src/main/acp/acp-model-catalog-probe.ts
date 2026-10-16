@@ -47,9 +47,12 @@ export function createAcpModelCatalogProbe(
     if (discovery.kind === 'unavailable') {
       throw new Error(discovery.reason)
     }
-    const { command, env, envToDelete } = await resolveAcpLaunchInvocation(spec, accountHome, deps)
     // A listing reads no workspace: the catalog is the account's, whichever chat asks.
     const cwd = deps.homePath ?? homedir()
+    const { command, env, envToDelete } = await resolveAcpLaunchInvocation(spec, accountHome, {
+      ...deps,
+      resolveWorkingDirectory: () => cwd
+    })
     if (
       !(await acpLaunchVersionSupported(
         spec,

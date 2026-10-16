@@ -11,7 +11,7 @@ import type { OrcadDaemonRetirementVerdict } from '../../shared/orcad-stop-reque
 import { removeManagedOrcadEnvironment } from '../../shared/runtime-environment-managed-orcad-store'
 import type {
   KnownRuntimeEnvironment,
-  OrcadDeploymentLink
+  OrcadSshDeploymentLink
 } from '../../shared/runtime-environments'
 import { recoverInterruptedOrcadActivation } from './orcad-activation-recovery'
 import { withStaleOrcadActivationRecoveryLock } from './orcad-activation-lock'
@@ -106,7 +106,7 @@ export function forgetManagedOrcadEnvironment(
 async function stopRemote(
   userDataPath: string,
   environment: KnownRuntimeEnvironment,
-  deployment: OrcadDeploymentLink,
+  deployment: OrcadSshDeploymentLink,
   signal?: AbortSignal,
   retried = false
 ): Promise<Stopped | Refusal> {
@@ -164,7 +164,7 @@ async function stopRemote(
 async function unlinkEnvironmentLocally(
   userDataPath: string,
   environment: KnownRuntimeEnvironment,
-  deployment: OrcadDeploymentLink,
+  deployment: OrcadSshDeploymentLink,
   policy: ManagedOrcadStopPolicy
 ): Promise<void> {
   // Environment first: a crash before the claim is released leaves a hidden target to resume,

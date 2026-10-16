@@ -66,9 +66,6 @@ function emptyState() {
     codexRestartNoticeByPtyId: {},
     deferredSshSessionIdsByTabId: {},
     pendingReconnectPtyIdByTabId: {},
-    directSshPaneRetryByTabId: {},
-    directSshLivePtyBindingByTabId: {},
-    directSshPaneRetryHistoryByTabId: {},
     deferredSshReconnectTargets: [],
     transientClearedAgentStatusConnectionIds: {},
     sshConnectionStates: new Map(),
@@ -209,20 +206,6 @@ for (let iteration = 0; iteration < 3000; iteration++) {
           previousAccountLabel: 'old',
           nextAccountLabel: 'new'
         }
-      }
-      const authority = {
-        targetId: targets[random(3)],
-        providerEpoch: 'epoch',
-        connectionGeneration: 1
-      }
-      if (random(2)) {
-        state.directSshPaneRetryByTabId[id] = { authority, attemptId: id, tabGeneration: 1 }
-      }
-      if (random(2)) {
-        state.directSshLivePtyBindingByTabId[id] = { authority, ptyId, tabGeneration: 1 }
-      }
-      if (random(2)) {
-        state.directSshPaneRetryHistoryByTabId[id] = { authority, attemptedAt: [10] }
       }
       return tab(id, key, ptyId)
     })

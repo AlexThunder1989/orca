@@ -4,14 +4,10 @@ import { makeDeferred } from './pty-ipc-test-constants'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
-import {
-  registerPtyHandlers,
-  deletePtyOwnership,
-  setPtyOwnership,
-  setLocalPtyProvider,
-  rebindLocalProviderListeners,
-  getLocalPtyProvider
-} from './pty'
+import { registerPtyHandlers } from './pty/register-handlers'
+import { deletePtyOwnership, setPtyOwnership } from './pty/provider/ownership-state'
+import { setLocalPtyProvider, getLocalPtyProvider } from './pty/provider/registry'
+import { rebindLocalProviderListeners } from './pty/provider/listener-lifecycle'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))

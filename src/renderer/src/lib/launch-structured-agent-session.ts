@@ -6,7 +6,7 @@ import {
   type StructuredAgentSessionFirstMessage,
   type StructuredAgentSessionResumeSource
 } from '../../../shared/structured-agent-session-create'
-import { resolveStructuredLaunchSeedOptions } from '../../../shared/native-chat-session-option-defaults'
+import { structuredLaunchSeedOptions } from '../../../shared/native-chat-session-option-defaults'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import { useAppStore } from '@/store'
 import {
@@ -19,7 +19,7 @@ import {
   structuredAgentSessionFocusOwner,
   structuredAgentSessionTargetForHost
 } from '@/runtime/structured-agent-session-owner'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import {
@@ -63,7 +63,7 @@ function launchSeedOptions(
 ): { seedOptions?: Readonly<Record<string, string>> } {
   const seedOptions =
     owner.target.kind === 'local'
-      ? resolveStructuredLaunchSeedOptions(state.settings?.nativeChatSessionOptions, agent)
+      ? structuredLaunchSeedOptions(state.settings, agent)
       : hostSeedOptions
   return seedOptions ? { seedOptions } : {}
 }

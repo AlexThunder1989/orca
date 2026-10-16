@@ -12,17 +12,6 @@ import {
   setSshTargetRegistryStore
 } from '../ssh/ssh-target-registry'
 
-// Why re-exported: the registry moved to ../ssh/ssh-target-registry so the runtime can
-// read it without pulling ipcMain in, but many existing importers reference these from
-// here. Re-exporting keeps them working without a repo-wide rename.
-export {
-  connectRegisteredSshTarget,
-  getActiveMultiplexer,
-  getRegisteredSshState,
-  getSshConnectionManager,
-  listRegisteredRemovedSshTargetLabels,
-  listRegisteredSshTargets
-} from '../ssh/ssh-target-registry'
 import { registerSshBrowseHandler } from './ssh-browse'
 import { registerCredentialHandler } from './ssh-passphrase'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -39,6 +28,7 @@ import {
   testingTargets
 } from './ssh-connect-attempt-registry'
 import { createSshConnectionCallbacks } from './ssh-connection-state-callbacks'
+import { resetSshCredentialDeclinesForTests } from '../ssh/ssh-credential-decline'
 import { registerSshConnectionHandlers } from './ssh-connection-handlers'
 import {
   registerPowerMonitorReconnect,
@@ -64,6 +54,7 @@ import { disposeOrcadManagedTunnels } from '../ssh/orcad-managed-tunnel'
 import { reconcileManagedOrcadSshTargets } from '../ssh/orcad-retained-source'
 import { installOrcadMigrationScrollbackRetention } from '../ssh/orcad-migration-scrollback-retention-wiring'
 import { getAppEnvironment } from '../../shared/app-environment'
+import { registerLegacyRelayBridgeIpc } from '../ssh/legacy-relay-bridge/legacy-relay-bridge-ipc'
 
 const SSH_IPC_CHANNELS = [
   'ssh:listTargets',
@@ -134,6 +125,12 @@ export function registerSshHandlers(
   registerSshTargetCrudHandlers()
   registerSshConnectionHandlers()
   registerSshPortForwardHandlers()
+  // COMPAT(legacy-relay-bridge): terminals an older Orca's relay still runs.
+  registerLegacyRelayBridgeIpc({
+    store,
+    getMainWindow: getCurrentMainWindow,
+    connection: (targetId) => connectionManager?.getConnection(targetId) ?? null
+  })
 
   return {
     connectionManager: connectionManager!,
@@ -155,6 +152,7 @@ export async function resetSshHandlerStateForTests(): Promise<void> {
   testingTargets.clear()
   testConnectionProbes.clear()
   credentialRequestedForTarget.clear()
+  resetSshCredentialDeclinesForTests()
   quitTeardownStartGate.resetForTests()
   resetSshShutdownDrain()
 

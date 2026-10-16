@@ -71,7 +71,7 @@ export type StructuredAgentSessionRevisionJournal = Pick<
 /** Rows already journaled and who produced each, read by a producer that has to agree with them. */
 export type StructuredAgentSessionLinkageJournal = Pick<
   AgentSessionJournal,
-  'epoch' | 'visitItemsWithLinkage'
+  'epoch' | 'visitItemsWithLinkage' | 'threadGoal' | 'threadGoalSource'
 >
 
 /** The row a revision rewrites and its whole new body, read from the journal at execution. */
@@ -246,7 +246,9 @@ export function createDeferredStructuredAgentSessionEventSink(deps: {
             settlementId,
             mutations,
             // No row-level linkage: each mutation names its own (see the batch row builder).
-            fence: bound.fence
+            fence: bound.fence,
+            // The provider's own observation: its child's generation produced every item it creates.
+            ownerFence: bound.fence
           })
       },
       { ...options, lifecycle: true }

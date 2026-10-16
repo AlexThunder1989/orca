@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { IPtyProvider } from '../../../providers/types'
+import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import { getCwdFromRuntimeController, resizePtyFromRuntimeController } from '../runtime/operations'
 import { deletePtyOwnership, setPtyOwnership } from './ownership-state'
 import {
@@ -13,11 +13,8 @@ import {
   setLocalPtyProvider,
   tryGetProviderForPty
 } from './registry'
-import {
-  isHostReportedPtyAbsenceError,
-  isObservedPtyExitEvidence,
-  isPtyAlreadyGoneError
-} from './liveness'
+import { isPtyAlreadyGoneError } from './liveness'
+import { SessionNotFoundError } from '../../../daemon/daemon-errors'
 
 function answeringProvider(): IPtyProvider {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the routed calls below only touch these members.
@@ -103,7 +100,7 @@ describe('PTY registry keyed by execution host', () => {
     }
     expect(error).toBeInstanceOf(PtyHostNotDispatchableError)
     expect(isPtyAlreadyGoneError(error)).toBe(false)
-    expect(isHostReportedPtyAbsenceError(error)).toBe(false)
-    expect(isObservedPtyExitEvidence(error)).toBe(false)
+    // Stable-pane adoption certifies an exit only from this class.
+    expect(error).not.toBeInstanceOf(SessionNotFoundError)
   })
 })

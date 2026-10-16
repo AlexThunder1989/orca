@@ -32,10 +32,8 @@ vi.mock('./web-session-terminal-orphan-recovery', () => ({
 
 import { useAppStore } from '@/store'
 import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
-import {
-  resetWebSessionTabsSnapshotFreshnessForTests,
-  useWebSessionTabsSync
-} from './web-session-tabs-sync'
+import { resetWebSessionTabsSnapshotFreshnessForTests } from './web-session-tabs-sync/tracking-lifecycle'
+import { useWebSessionTabsSync } from './web-session-tabs-sync/use-web-session-tabs-sync'
 import { WINDOW_VISIBILITY_SUBSCRIPTION_RETRY_INITIAL_MS } from './window-visibility-subscription-parking'
 
 /**

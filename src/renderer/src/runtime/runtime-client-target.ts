@@ -1,11 +1,15 @@
-import { parseRoutableExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  parseRoutableExecutionHostId,
+  toRuntimeExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host'
 import {
   parseHostAuthorityKey,
   type HostAuthority,
   type HostAuthorityKey
 } from '../../../shared/host-authority'
-
-export type RuntimeClientTarget = { kind: 'local' } | { kind: 'environment'; environmentId: string }
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
 /** Transport to an owner's runtime environment; `null` is this app (local or direct SSH). */
 export function runtimeTargetForOwnerEnvironment(
@@ -15,16 +19,24 @@ export function runtimeTargetForOwnerEnvironment(
   return ownerId ? { kind: 'environment', environmentId: ownerId } : { kind: 'local' }
 }
 
+/** The host id a transport dials: the server's runtime host, or this app. */
+export function getRuntimeTargetHostId(target: RuntimeClientTarget): ExecutionHostId {
+  return target.kind === 'environment'
+    ? toRuntimeExecutionHostId(target.environmentId)
+    : LOCAL_EXECUTION_HOST_ID
+}
+
 /** The server a transport dials, or `null` for this app. */
 export function runtimeTargetEnvironmentId(target: RuntimeClientTarget): string | null {
   return target.kind === 'environment' ? target.environmentId : null
 }
 
 /**
- * Transport to the host that owns a row: a server's own runtime, or this app for local and direct
- * SSH (which ride this app's IPC with a `connectionId`). `null` when the id names no routable host.
+ * Transport to the host that owns a row: a server's own runtime, or this app for local and `ssh:`
+ * rows (this app serves no SSH route, so its IPC refuses those). `null` when the id names no
+ * routable host.
  */
-export function runtimeTargetForOwnerHostId(
+export function ipcOrRuntimeTargetForHostId(
   hostId: ExecutionHostId | null | undefined
 ): RuntimeClientTarget | null {
   const parsed = parseRoutableExecutionHostId(hostId)
@@ -40,7 +52,7 @@ export function runtimeTargetForOwnerHostId(
  * RPC target for a dispatchable host; direct SSH and the unresolved-owner sentinel have none. A
  * nested authority key routes to the server that owns the SSH target.
  */
-export function runtimeTargetForExecutionHostId(
+export function runtimeRpcTargetForAuthorityKey(
   hostId: HostAuthorityKey
 ): RuntimeClientTarget | null {
   const authority = parseHostAuthorityKey(hostId)

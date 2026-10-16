@@ -16,7 +16,7 @@ import { useStructuredNativeChatSubmitReveal } from './use-structured-native-cha
 import { useStructuredPromptResponseHold } from './use-structured-prompt-response-hold'
 import { NativeChatStructuredQuestionCard } from './NativeChatStructuredQuestionCard'
 import { selectNativeChatViewState, structuredChatHistoryPhase } from './native-chat-view-state'
-import { useNativeChatComposerRevealFocus } from './use-native-chat-composer-reveal-focus'
+import { useNativeChatRootInputRouting } from './use-native-chat-root-input-routing'
 import { useNativeChatFontSize } from './use-native-chat-font-size'
 import { useNativeChatFind } from './use-native-chat-find'
 import { NativeChatFindBar } from './NativeChatFindBar'
@@ -31,10 +31,7 @@ import { useStructuredNativeChatPaneCommands } from './use-structured-native-cha
 import type { NativeChatStructuredViewProps } from './native-chat-view-types'
 import { NativeChatStructuredSessionStatus } from './NativeChatStructuredSessionStatus'
 import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-adoption'
-import {
-  NativeChatInterruptedContinue,
-  useNativeChatInterruptedContinuation
-} from './NativeChatInterruptedContinue'
+import { useNativeChatInterruptedContinuation } from './NativeChatInterruptedContinue'
 import { NativeChatOrcaStopContext } from './native-chat-orca-stop-context'
 import { structuredSessionNotices } from './native-chat-structured-session-notices'
 import { NativeChatPromptSlotNotices } from './NativeChatComposerNotices'
@@ -89,6 +86,7 @@ export function NativeChatStructuredSession(
     composerScopeKey: structuredAgentSessionDraftScopeKey(props.sessionId),
     queueFollowUps,
     hostStopping: hostExecution.stopping,
+    hostOptionStamp: hostExecution.optionStamp,
     providerStarting: hostExecution.phase === 'starting',
     providerRunning: hostExecution.phase !== null,
     rewind: rewindHost,
@@ -142,7 +140,7 @@ export function NativeChatStructuredSession(
     journalItems: controller.journalItems,
     submissions: controller.submissions,
     isWorking: controller.isWorking,
-    composer: { clearError: () => reportComposerError(null) }
+    reportComposerError
   })
   const needsFailureFacts =
     submits.queuedMessages.cards.some((card) => card.state === 'returned') ||
@@ -202,9 +200,11 @@ export function NativeChatStructuredSession(
       })
     }
   }
-  useNativeChatComposerRevealFocus({
+  const rootInput = useNativeChatRootInputRouting({
+    tabId: props.tabId,
     rootRef,
     composerRef,
+    questionAnswerInputRef,
     isVisible: props.isVisible,
     isFocusedGroup: props.isFocusedGroup,
     composerReady: composerShown
@@ -220,8 +220,7 @@ export function NativeChatStructuredSession(
     optionPickerRequest,
     setOptionPickerRequest,
     onError: reportComposerError,
-    onSubmitted: revealLatest,
-    queuedMessages: submits.queuedMessages
+    onSubmitted: revealLatest
   })
 
   // Said once: on the pane when the failure took it, else in the composer's notices.
@@ -260,10 +259,14 @@ export function NativeChatStructuredSession(
       data-native-chat-root="true"
       data-native-chat-working={controller.isWorking ? 'true' : 'false'}
       tabIndex={-1}
-      onPointerDownCapture={paneCommands.onPointerDownCapture}
+      onPointerDownCapture={(event) => {
+        paneCommands.onPointerDownCapture(event)
+        rootInput.onPointerDownCapture(event)
+      }}
       onKeyDownCapture={(event) => {
         find.onKeyDownCapture(event)
         paneCommands.onKeyDownCapture(event)
+        rootInput.onKeyDownCapture(event)
       }}
       onContextMenuCapture={paneCommands.onContextMenuCapture}
       className={cn(
@@ -297,6 +300,7 @@ export function NativeChatStructuredSession(
                   journalItems={controller.journalItems}
                   journalSubmissions={controller.submissions}
                   journalLatestTurn={controller.latestTurn}
+                  journalHostWork={controller.hostWork}
                   subagentRoster={controller.subagentRoster}
                   railOutline={controller.railOutline}
                   isVisible={props.isVisible}
@@ -319,7 +323,6 @@ export function NativeChatStructuredSession(
       </div>
       {readFailedFinally ? null : (
         <>
-          <NativeChatInterruptedContinue continuation={continuation} />
           {/* Host-held drafts, never transcript rows. Above the status area, so running shells and agents sit next to the composer. */}
           <NativeChatQueuedMessageList
             controller={submits.queuedMessages}
@@ -341,13 +344,20 @@ export function NativeChatStructuredSession(
               key={props.sessionId}
               goal={controller.threadGoal.goal}
               pending={controller.threadGoal.pending}
+              hostChanges={controller.threadGoal.hostChanges}
+              sendUnavailable={structuredTransport.sendOut || controller.isWorking}
               isVisible={props.isVisible}
               runningTurn={
                 controller.turnId === null
                   ? null
                   : { startedAt: controller.workingStartedAt ?? null }
               }
-              onChange={(change) => void controller.threadGoal?.change(change)}
+              onChange={(change) => {
+                if (change.kind === 'clear' && !controller.threadGoal?.hostChanges) {
+                  structuredTransport.onSubmitted?.()
+                }
+                void controller.threadGoal?.change(change)
+              }}
             />
           ) : null}
           {/* Prompt cards take the composer's slot, below the background-task dock. */}

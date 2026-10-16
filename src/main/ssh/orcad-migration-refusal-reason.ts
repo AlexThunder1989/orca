@@ -30,7 +30,9 @@ function blockerWords(blocker: OrcadMigrationBlocker): string[] {
     case 'orcad_migration_direct_ssh_terminal_leases':
       return ['terminals still running']
     case 'orcad_migration_dependent_state':
-      return blocker.dependencies.map(({ kind }) => DEPENDENCY_WORDS[kind])
+      return blocker.dependencies.map(({ kind, names }) =>
+        names?.length ? `${DEPENDENCY_WORDS[kind]} (${names.join('; ')})` : DEPENDENCY_WORDS[kind]
+      )
     case 'orcad_migration_dependency_unverifiable':
       return ['saved state Orca could not read']
     case 'orcad_migration_direct_ssh_repositories':

@@ -110,3 +110,106 @@ describe('PTY exit subscription demands proof of exit, not loss of connection', 
     expect(listener).toHaveBeenCalledOnce()
   })
 })
+
+const TARGET_LOOKUP_ERROR = new Error('identity_lookup_override')
+
+class IdentityRuntime extends OrcaRuntimeService {
+  readonly identityCalls: [string, number][] = []
+
+  override createPreAllocatedTerminalHandle(): string {
+    this.identityCalls.push(['allocate', arguments.length])
+    return 'term_identity_fixture'
+  }
+
+  protected override invalidatePtyIncarnationHandle(_ptyId: string): void {
+    this.identityCalls.push(['invalidate', arguments.length])
+  }
+
+  protected override getLeavesForPty(_ptyId: string) {
+    this.identityCalls.push(['leaves', arguments.length])
+    return []
+  }
+
+  protected override nextTitleObservationSequence(): number {
+    this.identityCalls.push(['title-sequence', arguments.length])
+    return 41
+  }
+
+  protected override setPtyManagementTitleFromObservedTitle(
+    ...args: Parameters<OrcaRuntimeService['setPtyManagementTitleFromObservedTitle']>
+  ): void {
+    this.identityCalls.push(['management-title', args.length])
+  }
+
+  protected override recordPtyWorktree(
+    ...args: Parameters<OrcaRuntimeService['recordPtyWorktree']>
+  ) {
+    this.identityCalls.push(['record', args.length])
+    return super.recordPtyWorktree(...args)
+  }
+
+  protected override getLivePtyForHandle(_handle: string): never {
+    this.identityCalls.push(['target', arguments.length])
+    throw TARGET_LOOKUP_ERROR
+  }
+
+  recordTitle(ptyId: string, worktreeId: string) {
+    return this.recordPtyWorktree(ptyId, worktreeId, { title: 'Observed title' })
+  }
+
+  resolveRecordedPty(ptyId: string) {
+    return this.getOrCreatePtyWorktreeRecord(ptyId)
+  }
+
+  assertTarget(handle: string, ptyId: string): void {
+    this.assertLiveTerminalHandleTargetsPty(handle, ptyId)
+  }
+}
+
+describe('terminal identity uses runtime overrides', () => {
+  it('reserves the overridden handle and reuses it', () => {
+    const runtime = new IdentityRuntime()
+
+    expect(runtime.preAllocateHandleForPty('pty-1')).toBe('term_identity_fixture')
+    expect(runtime.preAllocateHandleForPty('pty-1')).toBe('term_identity_fixture')
+    expect(runtime.identityCalls).toEqual([['allocate', 0]])
+  })
+
+  it('registers through runtime invalidation and leaf lookup', () => {
+    const runtime = new IdentityRuntime()
+
+    runtime.registerPreAllocatedHandleForPty('pty-1', 'term_registered')
+
+    expect(runtime.identityCalls).toEqual([
+      ['invalidate', 1],
+      ['leaves', 1]
+    ])
+  })
+
+  it('records an observed title through runtime title callbacks', () => {
+    const runtime = new IdentityRuntime()
+    const pty = runtime.recordTitle('pty-1', 'repo::/worktree')
+
+    expect(pty.titleUpdatedAt).toBe(41)
+    expect(runtime.identityCalls).toEqual([
+      ['record', 3],
+      ['title-sequence', 0],
+      ['management-title', 3]
+    ])
+  })
+
+  it('infers a worktree through the runtime record method with two arguments', () => {
+    const runtime = new IdentityRuntime()
+    const pty = runtime.resolveRecordedPty('repo::/worktree@@pty-1')
+
+    expect(pty?.worktreeId).toBe('repo::/worktree')
+    expect(runtime.identityCalls).toEqual([['record', 2]])
+  })
+
+  it('preserves the overridden target lookup error', () => {
+    const runtime = new IdentityRuntime()
+
+    expect(() => runtime.assertTarget('term_target', 'pty-1')).toThrow(TARGET_LOOKUP_ERROR)
+    expect(runtime.identityCalls).toEqual([['target', 1]])
+  })
+})

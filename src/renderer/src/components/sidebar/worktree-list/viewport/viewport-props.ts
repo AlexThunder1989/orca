@@ -1,3 +1,4 @@
+import type { WorktreeOccurrencePlan } from '../../../../../../shared/worktree-occurrence-plan'
 import type React from 'react'
 import type { AppState } from '@/store/types'
 import type { VirtualizedScrollAnchor } from '@/hooks/useVirtualizedScrollAnchor'
@@ -21,11 +22,12 @@ import type { ImportedWorktreeCardActionState } from '../../imported-worktrees-c
 import type { NewExternalWorktreesInboxActionState } from '../../new-external-worktrees-inbox-actions'
 import type { WorktreeDragGroup } from '../../worktree-manual-order'
 import type { WorktreeStatusDropAtIndexArgs } from '../drag/drop-commit-context'
-import type { ProjectGroupingModel } from '../grouping/project-grouping'
+import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
 
 export const EMPTY_PROJECT_GROUPS: readonly ProjectGroup[] = []
 export type VirtualizedWorktreeViewportProps = {
+  occurrencePlan?: WorktreeOccurrencePlan<Worktree>
   rows: HostSectionRow[]
   activeWorktreeId: string | null
   activeWorkspaceExecutionHostId: ExecutionHostId | null

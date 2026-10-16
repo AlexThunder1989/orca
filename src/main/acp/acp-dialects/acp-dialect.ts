@@ -95,6 +95,7 @@ export type AcpDialect = {
   contextWindow?(models: unknown): number | undefined
   /** A model's own effort menu and default, as the agent advertises them per model. */
   modelEfforts?(model: ModelInfo): { efforts: AgentSessionOptionChoice[]; defaultEffort?: string }
+  /** A request shown to the person; a permission request it claims is never auto-answered. */
   request?(method: string, params: unknown): AcpRequestPresentation | undefined
   /** Requests answered at once instead of shown to the person. */
   settleRequest?(method: string, params: unknown): AcpRequestSettlement | undefined

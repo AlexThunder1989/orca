@@ -8,23 +8,22 @@ import {
   type WorkspaceLayoutChangeFrame,
   type WorkspaceLayoutStreamFrame
 } from '../../../shared/workspace-layout/workspace-layout-stream-frames'
-import type { RuntimeClientTarget } from './runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { subscribeRuntimeRpc } from './runtime-rpc-subscribe'
 
-/** `retrying`: waiting to reopen a lost stream. `refused`: the host answered that it will never
- *  serve this stream, so the client stopped. */
+/** `lost`: the stream ended without a refusal and the client stopped. `refused`: the host answered
+ *  that it will never serve this stream, so the client stopped. */
 export type RuntimeLayoutStreamStatus =
-  | { state: 'connecting' | 'live' | 'retrying' | 'closed' }
+  | { state: 'connecting' | 'live' | 'lost' | 'closed' }
   | { state: 'refused'; code: string }
 
-const RETRY_BASE_MS = 250
-const RETRY_MAX_MS = 5000
 // An older host without the method, or a caller scope denied it: a retry gets the same answer.
 const REFUSAL_CODES = ['method_not_found', 'forbidden'] as const
 
 /**
- * Opens the stream and keeps it open: after a lost stream it resubscribes, and the new snapshot
- * replaces the cache. `onFrame` gets a snapshot first, then that stream's changes.
+ * Opens the stream once; `onFrame` gets a snapshot first, then that stream's changes. A local
+ * stream ends only on close, document retirement or a refusal, so nothing reopens it. A remote
+ * stream that drops reports `lost`; reopening it belongs to the connection's reconnect.
  */
 export function subscribeRuntimeLayout(
   target: RuntimeClientTarget,
@@ -35,8 +34,6 @@ export function subscribeRuntimeLayout(
   // Bumped whenever a stream is given up, so its late callbacks change nothing.
   let generation = 0
   let handle: { unsubscribe: () => void } | null = null
-  let retryTimer: ReturnType<typeof setTimeout> | null = null
-  let failures = 0
   let state: RuntimeLayoutStreamStatus['state'] = 'connecting'
 
   const setStatus = (status: RuntimeLayoutStreamStatus): void => {
@@ -52,10 +49,6 @@ export function subscribeRuntimeLayout(
 
   const stop = (status: RuntimeLayoutStreamStatus): void => {
     release()
-    if (retryTimer !== null) {
-      clearTimeout(retryTimer)
-      retryTimer = null
-    }
     setStatus(status)
   }
 
@@ -67,18 +60,7 @@ export function subscribeRuntimeLayout(
       console.warn('[workspace-layout] layout stream lost:', error)
     }
     const refusal = REFUSAL_CODES.find((code) => hasRuntimeRpcErrorCode(error, code))
-    if (refusal) {
-      stop({ state: 'refused', code: refusal })
-      return
-    }
-    release()
-    setStatus({ state: 'retrying' })
-    const delay = Math.min(RETRY_BASE_MS * 2 ** failures, RETRY_MAX_MS)
-    failures += 1
-    retryTimer = setTimeout(() => {
-      retryTimer = null
-      void open()
-    }, delay)
+    stop(refusal ? { state: 'refused', code: refusal } : { state: 'lost' })
   }
 
   const receive = (streamGeneration: number, frame: WorkspaceLayoutStreamFrame | null): void => {
@@ -95,9 +77,6 @@ export function subscribeRuntimeLayout(
     } else if (state !== 'live') {
       // The host sends the snapshot first; a change before it has nothing to replace.
       return
-    } else {
-      // A change after the snapshot proves the stream stays up, unlike a snapshot then a drop.
-      failures = 0
     }
     onFrame(frame)
   }
@@ -124,7 +103,7 @@ export function subscribeRuntimeLayout(
   void open()
   return {
     close: () => {
-      if (state !== 'closed' && state !== 'refused') {
+      if (state === 'connecting' || state === 'live') {
         stop({ state: 'closed' })
       }
     }

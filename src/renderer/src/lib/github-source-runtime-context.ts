@@ -1,10 +1,8 @@
 import type { ParsedExecutionHost } from '../../../shared/execution-host'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
-import {
-  runtimeTargetForOwnerEnvironment,
-  type RuntimeClientTarget
-} from '@/runtime/runtime-client-target'
+import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { taskSourceRuntimeTarget } from './task-source-runtime-target'
 import {
   getExplicitRuntimeOwnerEnvironmentId,

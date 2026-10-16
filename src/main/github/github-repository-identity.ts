@@ -2,7 +2,6 @@ import { runCoalescedProbe, type CoalescedProbes } from '../git/coalesced-probe'
 import { readRemoteUrl } from '../git/remote-url-probe'
 import type { GhAccountBinding } from '../../shared/github/account-binding'
 import type { GitHubOwnerRepo } from '../../shared/github/pull-request-types'
-import { getSshGitProviderGeneration } from '../providers/ssh-git-dispatch'
 import { readLocalGitConfigSignature } from './local-git-config-signature'
 import {
   parseGitHubOwnerRepo,
@@ -138,7 +137,7 @@ export async function getOwnerRepoForRemote(
     requireReachableGitRoute(getConnectionExecutionHostId(context.connectionId))
   }
   const runtimeKey = context.connectionId
-    ? `ssh:${context.connectionId}:${getSshGitProviderGeneration(context.connectionId)}`
+    ? `ssh:${context.connectionId}`
     : `local:${context.wslDistro ?? 'host'}`
   const cacheKey = `${runtimeKey}\0${context.repoPath}\0${remoteName}`
   const now = Date.now()

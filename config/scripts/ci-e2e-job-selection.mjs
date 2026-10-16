@@ -5,67 +5,37 @@ export const NODE_NETWORK_E2E_SPEC =
 export const NATIVE_IME_E2E_SPEC = 'tests/e2e/terminal-ibus-hangul-native.spec.ts'
 // Needs the packaged orcad slot, which only its own job builds.
 export const ORCAD_SERVE_MODE_SWITCH_E2E_SPEC = 'tests/e2e/orcad-serve-mode-switch.spec.ts'
-// Needs the orcad template for its host's target, which only its own job builds.
-export const ORCAD_AUTO_CONVERT_E2E_SPEC = 'tests/e2e/ssh-orcad-auto-convert.spec.ts'
 // Windows-only; its own job runs it on a Windows runner.
 export const WINDOWS_MISSING_APPDATA_E2E_SPEC = 'tests/e2e/windows-missing-appdata-startup.spec.ts'
+// Windows-only; the same Windows job runs it.
+export const WINDOWS_COPY_FILE_E2E_SPEC = 'tests/e2e/file-explorer-copy-file-windows.spec.ts'
 // Needs out/orcad, which only the mode-switch job builds; it runs there beside that spec.
 export const LAYOUT_ORACLE_HEADLESS_E2E_SPEC = 'tests/e2e/workspace-layout-oracle-headless.spec.ts'
-// Runs in the auto-convert job, which builds the template it needs.
-export const ORCAD_IDLE_EXIT_E2E_SPEC = 'tests/e2e/ssh-orcad-idle-exit.spec.ts'
-export const ORCAD_BROWSER_CAPABILITIES_E2E_SPEC =
-  'tests/e2e/ssh-orcad-browser-capabilities.spec.ts'
-export const ORCAD_BROWSER_SERVICE_STATUS_E2E_SPEC =
-  'tests/e2e/ssh-orcad-browser-service-status.spec.ts'
-export const ORCAD_BROWSER_ROUTING_E2E_SPEC = 'tests/e2e/ssh-orcad-browser-routing.spec.ts'
-export const ORCAD_EDITOR_OWNERSHIP_E2E_SPEC = 'tests/e2e/ssh-orcad-editor-ownership.spec.ts'
-export const ORCAD_MARKDOWN_CONVERSION_E2E_SPEC = 'tests/e2e/ssh-orcad-markdown-conversion.spec.ts'
-export const ORCAD_MARKDOWN_LINK_REFRESH_E2E_SPEC =
-  'tests/e2e/ssh-orcad-markdown-link-refresh.spec.ts'
-export const ORCAD_MARKDOWN_LIVE_DOCUMENTS_E2E_SPEC =
-  'tests/e2e/ssh-orcad-markdown-live-documents.spec.ts'
-export const ORCAD_BROWSER_DROP_OWNER_E2E_SPEC = 'tests/e2e/ssh-orcad-browser-drop-owner.spec.ts'
-export const ORCAD_OPEN_IN_OWNER_E2E_SPEC = 'tests/e2e/ssh-orcad-open-in-owner.spec.ts'
-export const ORCAD_EDITOR_WATCH_RECOVERY_E2E_SPEC =
-  'tests/e2e/ssh-orcad-editor-watch-recovery.spec.ts'
-export const ORCAD_EXPLORER_WATCH_RECOVERY_E2E_SPEC =
-  'tests/e2e/ssh-orcad-explorer-watch-recovery.spec.ts'
-export const ORCAD_EXPLORER_SELECTED_HOST_E2E_SPEC =
-  'tests/e2e/ssh-orcad-explorer-selected-host.spec.ts'
-export const ORCAD_TERMINAL_ROOT_OWNER_E2E_SPEC = 'tests/e2e/ssh-orcad-terminal-root-owner.spec.ts'
-// Run in their own job, which builds the template they need.
-export const ORCAD_JOURNEY_E2E_SPECS = [
-  'tests/e2e/ssh-orcad-terminal-journeys.spec.ts',
-  'tests/e2e/ssh-orcad-workspace-tools.spec.ts',
-  'tests/e2e/ssh-orcad-vm-provisioned-root.spec.ts'
-]
+// One Docker job runs every managed-SSH spec; it builds the orcad template they need.
+export const MANAGED_SSH_E2E_SPEC_PREFIX = 'tests/e2e/ssh-orcad-'
 export const DEDICATED_E2E_SPECS = [
   NODE_NETWORK_E2E_SPEC,
   NATIVE_IME_E2E_SPEC,
   ORCAD_SERVE_MODE_SWITCH_E2E_SPEC,
   LAYOUT_ORACLE_HEADLESS_E2E_SPEC,
-  ORCAD_AUTO_CONVERT_E2E_SPEC,
   WINDOWS_MISSING_APPDATA_E2E_SPEC,
-  ORCAD_IDLE_EXIT_E2E_SPEC,
-  ORCAD_BROWSER_CAPABILITIES_E2E_SPEC,
-  ORCAD_BROWSER_SERVICE_STATUS_E2E_SPEC,
-  ORCAD_BROWSER_ROUTING_E2E_SPEC,
-  ORCAD_EDITOR_OWNERSHIP_E2E_SPEC,
-  ORCAD_MARKDOWN_CONVERSION_E2E_SPEC,
-  ORCAD_MARKDOWN_LINK_REFRESH_E2E_SPEC,
-  ORCAD_MARKDOWN_LIVE_DOCUMENTS_E2E_SPEC,
-  ORCAD_OPEN_IN_OWNER_E2E_SPEC,
-  ORCAD_EDITOR_WATCH_RECOVERY_E2E_SPEC,
-  ORCAD_EXPLORER_WATCH_RECOVERY_E2E_SPEC,
-  ORCAD_EXPLORER_SELECTED_HOST_E2E_SPEC,
-  ORCAD_BROWSER_DROP_OWNER_E2E_SPEC,
-  ORCAD_TERMINAL_ROOT_OWNER_E2E_SPEC,
-  ...ORCAD_JOURNEY_E2E_SPECS
+  WINDOWS_COPY_FILE_E2E_SPEC
 ]
 const dedicatedSpecs = new Set(DEDICATED_E2E_SPECS)
+// Their jobs build their own app or none, so they never need the shared e2e build.
+const OWN_BUILD_E2E_SPECS = new Set([
+  NODE_NETWORK_E2E_SPEC,
+  NATIVE_IME_E2E_SPEC,
+  WINDOWS_MISSING_APPDATA_E2E_SPEC,
+  WINDOWS_COPY_FILE_E2E_SPEC
+])
+
+export function isDedicatedE2eSpec(spec) {
+  return dedicatedSpecs.has(spec) || spec.startsWith(MANAGED_SSH_E2E_SPEC_PREFIX)
+}
 
 export function selectGeneralE2eSpecs(specs) {
-  return specs.filter((spec) => !dedicatedSpecs.has(spec))
+  return specs.filter((spec) => !isDedicatedE2eSpec(spec))
 }
 
 function parseSpecs(input) {
@@ -88,32 +58,9 @@ export function classifyE2eJobs(input) {
   if (specs.length === 0) {
     return conservative
   }
-  const runChanged = selectGeneralE2eSpecs(specs).length > 0
   return {
-    e2e_run_changed: runChanged,
-    e2e_needs_build:
-      runChanged ||
-      specs.some(
-        (spec) =>
-          spec === ORCAD_SERVE_MODE_SWITCH_E2E_SPEC ||
-          spec === LAYOUT_ORACLE_HEADLESS_E2E_SPEC ||
-          spec === ORCAD_AUTO_CONVERT_E2E_SPEC ||
-          spec === ORCAD_IDLE_EXIT_E2E_SPEC ||
-          spec === ORCAD_BROWSER_CAPABILITIES_E2E_SPEC ||
-          spec === ORCAD_BROWSER_SERVICE_STATUS_E2E_SPEC ||
-          spec === ORCAD_BROWSER_ROUTING_E2E_SPEC ||
-          spec === ORCAD_EDITOR_OWNERSHIP_E2E_SPEC ||
-          spec === ORCAD_MARKDOWN_CONVERSION_E2E_SPEC ||
-          spec === ORCAD_MARKDOWN_LINK_REFRESH_E2E_SPEC ||
-          spec === ORCAD_MARKDOWN_LIVE_DOCUMENTS_E2E_SPEC ||
-          spec === ORCAD_OPEN_IN_OWNER_E2E_SPEC ||
-          spec === ORCAD_EDITOR_WATCH_RECOVERY_E2E_SPEC ||
-          spec === ORCAD_EXPLORER_WATCH_RECOVERY_E2E_SPEC ||
-          spec === ORCAD_EXPLORER_SELECTED_HOST_E2E_SPEC ||
-          spec === ORCAD_BROWSER_DROP_OWNER_E2E_SPEC ||
-          spec === ORCAD_TERMINAL_ROOT_OWNER_E2E_SPEC ||
-          ORCAD_JOURNEY_E2E_SPECS.includes(spec)
-      )
+    e2e_run_changed: selectGeneralE2eSpecs(specs).length > 0,
+    e2e_needs_build: specs.some((spec) => !OWN_BUILD_E2E_SPECS.has(spec))
   }
 }
 

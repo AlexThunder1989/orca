@@ -1,19 +1,24 @@
 import { EventEmitter } from 'node:events'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ServeOrcadLaunch from './serve-orcad-launch'
 
-const { spawnMock, resolveLocalServeRuntimeMock, serveWithOrcadMock } = vi.hoisted(() => ({
-  spawnMock: vi.fn(),
-  resolveLocalServeRuntimeMock: vi.fn(),
-  serveWithOrcadMock: vi.fn()
-}))
+const { spawnMock, resolveLocalServeRuntimeMock, serveWithOrcadMock, refuseIfProfileServedMock } =
+  vi.hoisted(() => ({
+    spawnMock: vi.fn(),
+    resolveLocalServeRuntimeMock: vi.fn(),
+    serveWithOrcadMock: vi.fn(),
+    refuseIfProfileServedMock: vi.fn()
+  }))
 
 vi.mock('child_process', () => ({ spawn: spawnMock, spawnSync: vi.fn() }))
 // Why: these cover host selection; the pre-exec profile check would read this machine's own profile.
 vi.mock('./serve-electron-preflight', () => ({
   preflightElectronServe: () => null,
-  recordElectronServeStartupAbort: vi.fn()
+  recordElectronServeStartupAbort: vi.fn(),
+  refuseIfProfileServed: refuseIfProfileServedMock
 }))
 vi.mock('./serve-orcad-launch', async (importOriginal) => ({
   ...(await importOriginal<typeof ServeOrcadLaunch>()),
@@ -61,6 +66,33 @@ describe('orca serve host selection', () => {
     delete process.env.ORCA_USER_DATA_PATH
     delete process.env.ORCA_DEV_USER_DATA_PATH
     delete process.env.ORCA_APP_EXECUTABLE_NEEDS_APP_ROOT
+  })
+
+  it('checks for a live peer before orcad only when supervised, so the brake never counts it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-serve-orcad-supervise-'))
+    try {
+      process.env.ORCA_APP_EXECUTABLE = join(root, 'orca')
+      await writeFile(process.env.ORCA_APP_EXECUTABLE, '')
+      process.env.ORCA_USER_DATA_PATH = join(root, 'profile')
+      const selection = { kind: 'orcad', runtime: '/node', entry: '/slot/orcad.js', version: '1' }
+      resolveLocalServeRuntimeMock.mockResolvedValue(selection)
+      serveWithOrcadMock.mockResolvedValue(0)
+
+      refuseIfProfileServedMock.mockReturnValue(null)
+      await expect(serveOrcaApp({})).resolves.toBe(0)
+      expect(refuseIfProfileServedMock).not.toHaveBeenCalled()
+
+      refuseIfProfileServedMock.mockImplementation(async () => {
+        setTimeout(() => process.emit('SIGTERM', 'SIGTERM'), 20)
+        return 3
+      })
+      serveWithOrcadMock.mockClear()
+      await expect(serveOrcaApp({ supervise: true })).resolves.toBe(0)
+      expect(serveWithOrcadMock).not.toHaveBeenCalled()
+      expect(stderr.join('')).toContain('Another Orca serves this profile')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('serves on orcad by default', async () => {

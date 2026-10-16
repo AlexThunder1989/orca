@@ -3,7 +3,8 @@ import { ensureWorktreeHasInitialTerminal } from './worktree-initial-terminal-se
 import {
   createMockStore,
   registerWorktreeActivationReset,
-  setSetupScriptLaunchMode
+  setSetupScriptLaunchMode,
+  createdTabStartups
 } from './worktree-activation-test-harness'
 
 registerWorktreeActivationReset()
@@ -67,7 +68,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
       }
     )
 
-    expect(store.queueTabStartupCommand).not.toHaveBeenCalled()
+    expect(createdTabStartups(store)).toEqual({})
     expect(store.queueTabSetupSplit).toHaveBeenCalledWith('tab-1', {
       command: 'bash /tmp/repo/.git/orca/setup-runner.sh',
       env: { ORCA_ROOT_PATH: '/tmp/repo' },
@@ -84,7 +85,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
 
     ensureWorktreeHasInitialTerminal(store, 'wt-1')
 
-    expect(store.queueTabStartupCommand).not.toHaveBeenCalled()
+    expect(createdTabStartups(store)).toEqual({})
     expect(store.queueTabIssueCommandSplit).not.toHaveBeenCalled()
   })
 })

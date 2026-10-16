@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   deleteRuntimePath,
-  getRuntimeFileReadScope,
   readRuntimeDirectory,
-  readRuntimeFileContent,
-  readRuntimeFilePreview,
   renameRuntimePath,
-  writeRuntimeFile,
-  type RuntimeReadableFileContent
-} from './runtime-file-client'
+  writeRuntimeFile
+} from './runtime-file-mutation-client'
+import { getRuntimeFileReadScope } from './runtime-file-routing'
+import { readRuntimeFileContent, readRuntimeFilePreview } from './runtime-file-read-client'
+import type { RuntimeReadableFileContent } from './runtime-file-client-types'
 import {
   fsReadFile,
   fsWriteFile,

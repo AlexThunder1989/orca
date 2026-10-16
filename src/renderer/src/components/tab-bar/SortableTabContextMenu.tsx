@@ -22,6 +22,7 @@ import { formatShortcutLabel, useOptionalShortcutLabel } from '@/hooks/useShortc
 import { translate } from '@/i18n/i18n'
 import { TerminalTabSplitMenuSection } from './TerminalTabSplitMenuSection'
 import { TabSessionSurfaceSwitchMenuItems } from './TabSessionSurfaceSwitchMenuItems'
+import type { NativeChatTabSession } from './tab-session-history-switch'
 import { TAB_CONTEXT_MENU_CONTENT_CLASS } from './tab-context-menu-sizing'
 import { CopyTabIdMenuItem } from './CopyTabIdMenuItem'
 
@@ -89,7 +90,7 @@ const TAB_COLORS = [
 ] as const
 
 type SortableTabContextMenuProps = {
-  tab: TerminalTab
+  tab: Pick<TerminalTab, 'id' | 'worktreeId' | 'color'>
   unifiedTabId: string
   groupId: string
   isActive: boolean
@@ -100,6 +101,8 @@ type SortableTabContextMenuProps = {
   hasTabsToLeft: boolean
   isPinned: boolean
   onOpenChange: (open: boolean) => void
+  onSessionSwitchComplete?: () => void
+  sessionSwitchOpening?: number | null
   onActivate: (tabId: string) => void
   onClose: (tabId: string) => void
   onCloseOthers: (tabId: string) => void
@@ -118,8 +121,8 @@ type SortableTabContextMenuProps = {
   /** Toggle the tab between terminal and native chat view. */
   onToggleViewMode?: () => void
   canSplitTerminal?: boolean
-  /** Set only for a native chat tab: the chat session it shows. */
-  structuredSessionId?: string
+  /** Set only for a native chat tab. */
+  nativeChat?: NativeChatTabSession
 }
 
 export function SortableTabContextMenu({
@@ -134,6 +137,8 @@ export function SortableTabContextMenu({
   hasTabsToLeft,
   isPinned,
   onOpenChange,
+  onSessionSwitchComplete,
+  sessionSwitchOpening,
   onActivate,
   onClose,
   onCloseOthers,
@@ -146,7 +151,7 @@ export function SortableTabContextMenu({
   isChatView = false,
   onToggleViewMode,
   canSplitTerminal = true,
-  structuredSessionId
+  nativeChat
 }: SortableTabContextMenuProps): React.JSX.Element {
   const keybindings = useAppStore((state) => state.keybindings)
   const splitRightShortcut = formatShortcutLabel('terminal.splitRight', keybindings)
@@ -192,8 +197,10 @@ export function SortableTabContextMenu({
           </>
         ) : null}
         <TabSessionSurfaceSwitchMenuItems
+          key={sessionSwitchOpening}
+          onComplete={onSessionSwitchComplete}
           tab={tab}
-          structuredSessionId={structuredSessionId}
+          nativeChat={nativeChat}
           leadingSeparator={!showTerminalViewSwitch}
         />
         <DropdownMenuSeparator />

@@ -25,6 +25,11 @@ import { bundledRipgrepUnavailableError } from './bundled-ripgrep-path'
 import { spawnBundledRipgrep } from './bundled-ripgrep-spawn'
 import { stopBundledRipgrep } from './bundled-ripgrep-stop'
 
+// Why: names a POSIX writer can leave on NTFS that Windows rg cannot open -- reserved device names
+// such as `nul` (1), names Win32 trims (2), and WSL symlinks/FIFOs/sockets (1920), which WSL's rg
+// skips unfollowed anyway. One of them must not fail or truncate the whole search.
+const WINDOWS_UNOPENABLE_PATH_OS_ERRORS: ReadonlySet<number> = new Set([1, 2, 1920])
+
 export function runBundledRipgrepTextSearch({
   options,
   rootPath,
@@ -52,7 +57,11 @@ export function runBundledRipgrepTextSearch({
 
     const acc = createAccumulator()
     const lines = new SearchSubprocessLineAccumulator()
-    const diagnostics = new RipgrepSearchDiagnostics()
+    const diagnostics = new RipgrepSearchDiagnostics(
+      process.platform === 'win32' && !wslDistroForOutput
+        ? WINDOWS_UNOPENABLE_PATH_OS_ERRORS
+        : undefined
+    )
     let resolved = false
     let processErrorObserved = false
     let unavailableExitObserved = false

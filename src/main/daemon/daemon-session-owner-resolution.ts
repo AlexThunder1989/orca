@@ -3,7 +3,7 @@ import type {
   PtyProcessInfo,
   PtySpawnOptions,
   PtySpawnResult
-} from '../providers/types'
+} from '../providers/pty-provider-contract'
 import { SessionNotFoundError, TerminalSessionOwnerUnverifiedError } from './daemon-errors'
 
 export type DaemonSessionOwnerResolution<T extends IPtyProvider> =

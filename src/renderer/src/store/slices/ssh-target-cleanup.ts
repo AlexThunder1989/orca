@@ -2,7 +2,8 @@ import type { AppState } from '../types'
 import type { SshTarget, SshTargetSummary } from '../../../../shared/ssh-types'
 import { parseAppSshPtyId } from '../../../../shared/ssh-pty-id'
 import { sanitizeSshTargetGeneration } from '../../../../shared/ssh-target-generation'
-import { resolveDirectSshTargetScope } from '../../lib/direct-ssh-target-scope'
+import { resolveDirectSshTargetWorktreeIds } from '../../lib/direct-ssh-target-scope'
+import { unbindTerminalTabPtys } from './tabs/worktree-layout-lifecycle'
 
 export function sshTargetLabelsEqual(
   labels: Map<string, string>,
@@ -43,14 +44,13 @@ export function sshTargetGenerationsEqual(
 }
 
 function collectSshTargetTerminalTabIds(state: AppState, targetId: string): Set<string> {
-  const targetWorktreeIds = resolveDirectSshTargetScope({
+  const targetWorktreeIds = resolveDirectSshTargetWorktreeIds({
     targetId,
-    catalogRevision: 0,
     repos: state.repos,
     worktreesByRepo: state.worktreesByRepo,
     detectedWorktreesByRepo: state.detectedWorktreesByRepo,
     restoredRuntimeHostIdByWorkspaceSessionKey: state.restoredRuntimeHostIdByWorkspaceSessionKey
-  }).gitWorktreeIds
+  })
   const tabIds = new Set<string>()
   for (const worktrees of Object.values(state.worktreesByRepo)) {
     for (const worktree of worktrees) {
@@ -122,17 +122,6 @@ function omitRemovedSshTargetTabSessions(
   )
 }
 
-function omitRemovedSshTargetRecovery<T extends { authority: { targetId: string } }>(
-  entries: Record<string, T>,
-  targetId: string,
-  targetTabIds: ReadonlySet<string>
-): Record<string, T> | undefined {
-  return filterRecordIfChanged(
-    entries,
-    (tabId, entry) => !targetTabIds.has(tabId) && entry.authority.targetId !== targetId
-  )
-}
-
 function clearSshTargetTabPtyState(
   state: AppState,
   targetId: string,
@@ -145,8 +134,7 @@ function clearSshTargetTabPtyState(
   | 'pendingCodexPaneRestartIds'
   | 'codexRestartNoticeByPtyId'
 > & { changed: boolean } {
-  let nextTabsByWorktree = state.tabsByWorktree
-  const nextPtyIdsByTabId = { ...state.ptyIdsByTabId }
+  const unboundTabIds = new Set<string>()
   const nextLastKnownRelayPtyIdByTabId = {
     ...state.lastKnownRelayPtyIdByTabId
   }
@@ -154,11 +142,9 @@ function clearSshTargetTabPtyState(
     ...state.pendingCodexPaneRestartIds
   }
   const nextCodexRestartNoticeByPtyId = { ...state.codexRestartNoticeByPtyId }
-  let changed = false
 
-  for (const [worktreeId, tabs] of Object.entries(state.tabsByWorktree)) {
-    let nextTabs = tabs
-    for (const [index, tab] of tabs.entries()) {
+  for (const tabs of Object.values(state.tabsByWorktree)) {
+    for (const tab of tabs) {
       const lastKnownPtyId = state.lastKnownRelayPtyIdByTabId[tab.id]
       const ptyIds = [
         ...new Set([
@@ -175,32 +161,18 @@ function clearSshTargetTabPtyState(
       if (!tab.ptyId && ptyIds.length === 0 && nextLastKnownRelayPtyIdByTabId[tab.id] == null) {
         continue
       }
-      changed = true
-      if (nextTabs === tabs) {
-        nextTabs = [...tabs]
-      }
-      const { pendingActivationSpawn: _pendingActivationSpawn, ...tabWithoutActivationSpawn } = tab
-      void _pendingActivationSpawn
-      nextTabs[index] = { ...tabWithoutActivationSpawn, ptyId: null }
-      nextPtyIdsByTabId[tab.id] = []
+      unboundTabIds.add(tab.id)
       delete nextLastKnownRelayPtyIdByTabId[tab.id]
       for (const ptyId of ptyIds) {
         delete nextPendingCodexPaneRestartIds[ptyId]
         delete nextCodexRestartNoticeByPtyId[ptyId]
       }
     }
-    if (nextTabs !== tabs) {
-      if (nextTabsByWorktree === state.tabsByWorktree) {
-        nextTabsByWorktree = { ...nextTabsByWorktree }
-      }
-      nextTabsByWorktree[worktreeId] = nextTabs
-    }
   }
 
   return {
-    changed,
-    tabsByWorktree: nextTabsByWorktree,
-    ptyIdsByTabId: nextPtyIdsByTabId,
+    changed: unboundTabIds.size > 0,
+    ...unbindTerminalTabPtys(state, unboundTabIds),
     lastKnownRelayPtyIdByTabId: nextLastKnownRelayPtyIdByTabId,
     pendingCodexPaneRestartIds: nextPendingCodexPaneRestartIds,
     codexRestartNoticeByPtyId: nextCodexRestartNoticeByPtyId
@@ -233,18 +205,6 @@ export function buildRemovedSshTargetCleanupPatch(
   assign(
     'pendingReconnectPtyIdByTabId',
     omitRemovedSshTargetTabSessions(state.pendingReconnectPtyIdByTabId, targetId, targetTabIds)
-  )
-  assign(
-    'directSshPaneRetryByTabId',
-    omitRemovedSshTargetRecovery(state.directSshPaneRetryByTabId, targetId, targetTabIds)
-  )
-  assign(
-    'directSshLivePtyBindingByTabId',
-    omitRemovedSshTargetRecovery(state.directSshLivePtyBindingByTabId, targetId, targetTabIds)
-  )
-  assign(
-    'directSshPaneRetryHistoryByTabId',
-    omitRemovedSshTargetRecovery(state.directSshPaneRetryHistoryByTabId, targetId, targetTabIds)
   )
   assign(
     'deferredSshReconnectTargets',

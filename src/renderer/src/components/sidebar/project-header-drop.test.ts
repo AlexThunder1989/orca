@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
+import { getLogicalRepoOrderRankById } from '../../../../shared/project-section-order'
 
 import {
   applyAllRepoInsertAt,
   computeProjectHeaderDropPreview,
-  getLogicalRepoOrderRankById,
   getProjectGroupOrderForSidebarDrop,
   getProjectHeaderDragBucketKey,
   getSidebarOrderedRepoHeaderIdsByBucket,

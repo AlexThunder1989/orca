@@ -3,7 +3,7 @@ import { fixture, admitRuntimeSpawnPane } from './profile-state-delayed-authorit
 import { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import { commitPtyIpcSpawn } from '../../ipc/pty/ipc/spawn-commit'
 import { createPtyIpcSpawnState } from '../../ipc/pty/ipc/spawn-state'
-import type { PtySpawnResult } from '../../providers/types'
+import type { PtySpawnResult } from '../../providers/pty-provider-contract'
 import { commitRuntimePtySpawn } from '../../ipc/pty/runtime/spawn-commit'
 import { createRuntimePtySpawnState } from '../../ipc/pty/runtime/spawn-state'
 import { createPtySpawnCommitDependencies } from './pty-spawn-commit-dependencies-fixture'

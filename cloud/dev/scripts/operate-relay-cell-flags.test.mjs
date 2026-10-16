@@ -329,7 +329,7 @@ test('fails the read-back when the cell ignores a switch the object names', asyn
     return Response.json(body)
   }
   await assert.rejects(
-    run(parseCellFlagsRequest(values({ set: 'admitMode=reserve', ...RESERVE })), fake).result,
+    run(parseCellFlagsRequest(values({ set: 'readinessLocal=true,admitMode=reserve', ...RESERVE })), fake).result,
     /ignores admitMode/
   )
 })
@@ -378,7 +378,7 @@ test('admitMode=reserve needs a typed confirmation, and Postgres records reserve
   assert.throws(() => parseCellFlagsRequest(values({ set: 'admitMode=db' })), /--director-origin/)
   const fake = fakeGoogleAndCell()
   const request = parseCellFlagsRequest(
-    values({ ...DIRECTOR, set: 'admitMode=reserve', 'confirm-reserve': `RESERVE ${CELL}` })
+    values({ ...DIRECTOR, set: 'readinessLocal=true,admitMode=reserve', 'confirm-reserve': `RESERVE ${CELL}` })
   )
   assert.equal((await run(request, fake).result).written, true)
   // Recorded, re-checked after every director's cache has expired, then the file.
@@ -392,7 +392,7 @@ test('a refused file write after Postgres says reserve puts Postgres back to db'
     if (new URL(url).pathname.startsWith('/upload/')) return new Response(null, { status: 403 })
     return await inner(url, init)
   }
-  const request = parseCellFlagsRequest(values({ set: 'admitMode=reserve', ...RESERVE }))
+  const request = parseCellFlagsRequest(values({ set: 'readinessLocal=true,admitMode=reserve', ...RESERVE }))
   await assert.rejects(run(request, fake).result, /returned 403/)
   assert.deepEqual(fake.state.order, ['director:reserve', 'director:reserve', 'director:db'])
 })
@@ -460,9 +460,48 @@ test('a tripped cell takes no write that keeps reserve, only one that also says 
   assert.deepEqual(fake.state.writes[0].object.flags, { admitMode: 'db', reregisterInFlight: 4 })
 })
 
+test('reserve requires readinessLocal=true, already written or in the same write', async () => {
+  const refused = fakeGoogleAndCell()
+  await assert.rejects(
+    run(parseCellFlagsRequest(values({ set: 'admitMode=reserve', ...RESERVE })), refused).result,
+    /admitMode=reserve requires readinessLocal=true/
+  )
+  assert.deepEqual(refused.state.order, [])
+  assert.deepEqual(refused.state.writes, [])
+
+  // Already written by an earlier run: reserve alone is enough.
+  const stored = { generation: '7', object: { v: 1, cellId: CELL, flags: { readinessLocal: true } } }
+  const ready = fakeGoogleAndCell({ stored })
+  const request = parseCellFlagsRequest(
+    values({ set: 'admitMode=reserve', 'expected-generation': '7', ...RESERVE })
+  )
+  assert.equal((await run(request, ready).result).written, true)
+  assert.deepEqual(ready.state.writes[0].object.flags, { readinessLocal: true, admitMode: 'reserve' })
+})
+
+test('a reserve cell refuses readinessLocal=false, but takes it together with the flip back', async () => {
+  const stored = {
+    generation: '7',
+    object: { v: 1, cellId: CELL, flags: { readinessLocal: true, admitMode: 'reserve' } }
+  }
+  for (const set of ['readinessLocal=false', 'readinessLocal=default']) {
+    const fake = fakeGoogleAndCell({ stored })
+    const request = parseCellFlagsRequest(values({ set, 'expected-generation': '7' }))
+    await assert.rejects(run(request, fake).result, /readinessLocal must stay true while the cell is reserve/)
+    assert.deepEqual(fake.state.writes, [])
+  }
+  const fake = fakeGoogleAndCell({ stored })
+  fake.state.directorAdmitMode = 'reserve'
+  const request = parseCellFlagsRequest(
+    values({ ...DIRECTOR, set: 'admitMode=db,readinessLocal=false', 'expected-generation': '7' })
+  )
+  assert.equal((await run(request, fake).result).written, true)
+  assert.deepEqual(fake.state.writes[0].object.flags, { readinessLocal: false, admitMode: 'db' })
+})
+
 test('a migration opened during the cache wait puts Postgres back to db', async () => {
   const fake = fakeGoogleAndCell({ refuseReservePost: { post: 2, error: 'cell_has_open_migration' } })
-  const request = parseCellFlagsRequest(values({ ...RESERVE, set: 'admitMode=reserve' }))
+  const request = parseCellFlagsRequest(values({ ...RESERVE, set: 'readinessLocal=true,admitMode=reserve' }))
   await assert.rejects(run(request, fake).result, /cell_has_open_migration/)
   assert.deepEqual(fake.state.order, ['director:reserve', 'director:db'])
   assert.deepEqual(fake.state.writes, [])

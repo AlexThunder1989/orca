@@ -117,7 +117,6 @@ export function disposeClosedEditorTabCaches(
       case 'conflict-review':
         break
       case 'check-details':
-      case 'chat-visual':
         break
     }
   }

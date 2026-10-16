@@ -32,7 +32,9 @@ export type OrcadMigrationPreflightStore = OrcadMigrationExportStore &
 export function preflightOrcadMigrationExport(
   store: OrcadMigrationPreflightStore,
   targetId: string,
-  owner?: { environmentId: string; recorded: boolean }
+  owner?: { environmentId: string; recorded: boolean },
+  /** COMPAT(legacy-relay-bridge): leases a bridged proof left running for the bridge. */
+  bridgedPtyIds: readonly string[] = []
 ): OrcadMigrationPreflight {
   const resolved = resolveOrcadPreflightTarget(store, targetId, owner)
   if ('result' in resolved) {
@@ -42,7 +44,7 @@ export function preflightOrcadMigrationExport(
   const blockers: OrcadMigrationBlocker[] = [...collectTargetCatalogBlockers(store, target)]
   const terminalLeases = store
     .getSshRemotePtyLeases(targetId)
-    .filter(isLiveSshPtyLease)
+    .filter((lease) => isLiveSshPtyLease(lease) && !bridgedPtyIds.includes(lease.ptyId))
     .map(({ ptyId, worktreeId, tabId, leafId, state, updatedAt }) => ({
       ptyId,
       worktreeId,

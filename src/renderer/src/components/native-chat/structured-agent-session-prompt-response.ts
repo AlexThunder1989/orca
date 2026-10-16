@@ -1,4 +1,4 @@
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { supportsStructuredAgentSessionQuestionAnswers } from '@/runtime/structured-agent-session-client'
 import {
   legacyAgentSessionSelectedOptionId,

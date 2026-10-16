@@ -80,7 +80,6 @@ function item(id: string, project: Repo): Extract<Row, { type: 'item' }> {
     repo: project,
     depth: 0,
     groupDepth: 0,
-    lineageTrail: [],
     isLastLineageChild: true,
     lineageChildCount: 0
   }

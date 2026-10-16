@@ -3,6 +3,7 @@ import { findReusableRightSplitGroupId } from './emulator-right-split-target'
 import { cancelPendingSimulatorPaneShutdown } from './simulator-pane-shutdown-scheduler'
 import { shouldShutdownSimulatorForPaneUnmountFromTabs } from './simulator-tab-shutdown'
 import { translate } from '@/i18n/i18n'
+import { createBrowserUuid } from './browser-uuid'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/execution-host'
 import {
   findAmbiguousWorktreeIds,
@@ -126,16 +127,16 @@ export function ensureSimulatorTab(
       sourceGroupId
     )
     if (reusableRightGroupId) {
-      const tab = store.createUnifiedTab(worktreeId, 'simulator', {
+      const tabId = createBrowserUuid()
+      store.createUnifiedTab(worktreeId, 'simulator', {
+        id: tabId,
         label: translate('auto.lib.ensure.simulator.tab.372d21d428', 'Mobile Emulator'),
         targetGroupId: reusableRightGroupId,
         activate: true,
         ...(executionHostId ? { executionHostId } : {})
       })
-      store.activateTab(tab.id)
-      store.setActiveTabType('simulator', worktreeId)
-      store.focusGroup(worktreeId, tab.groupId)
-      return tab.id
+      surfaceCreatedSimulatorTab(worktreeId, tabId)
+      return tabId
     }
 
     // Why: publish the simulator directly in its split group. A two-step
@@ -158,18 +159,29 @@ export function ensureSimulatorTab(
     }
   }
 
-  const tab = store.createUnifiedTab(worktreeId, 'simulator', {
+  const tabId = createBrowserUuid()
+  store.createUnifiedTab(worktreeId, 'simulator', {
+    id: tabId,
     label: translate('auto.lib.ensure.simulator.tab.372d21d428', 'Mobile Emulator'),
     targetGroupId: sourceGroupId,
     activate: shouldSurface,
     ...(executionHostId ? { executionHostId } : {})
   })
   if (shouldSurface) {
-    store.activateTab(tab.id)
-    store.setActiveTabType('simulator', worktreeId)
-    store.focusGroup(worktreeId, tab.groupId)
+    surfaceCreatedSimulatorTab(worktreeId, tabId)
   }
-  return tab.id
+  return tabId
+}
+
+function surfaceCreatedSimulatorTab(worktreeId: string, tabId: string): void {
+  const store = useAppStore.getState()
+  store.activateTab(tabId)
+  store.setActiveTabType('simulator', worktreeId)
+  // Why read by id: placement falls back to the active group when the requested one is gone.
+  const groupId = store.getTab(tabId)?.groupId
+  if (groupId) {
+    store.focusGroup(worktreeId, groupId)
+  }
 }
 
 export { shouldShutdownSimulatorForPaneUnmountFromTabs }

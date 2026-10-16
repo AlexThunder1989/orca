@@ -10,6 +10,7 @@ export type StructuredAgentSessionPendingSend = {
   previewUris: readonly string[]
   queuedAt: number
   delivery?: 'queue-if-active'
+  options?: Readonly<Record<string, string>>
   /**
    * `sending`: on its way, its one request out or about to be; the chat takes no other send meanwhile.
    * `recorded`: the host holds it; an open chat draws it until the host's row or card arrives.

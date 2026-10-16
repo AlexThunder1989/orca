@@ -9,7 +9,6 @@ import { OrchestrationDb } from './orchestration/db'
 import {
   checkBoundMailbox,
   createBoundRun,
-  createDatabase,
   createRuntime,
   driveToLiveIdle,
   insertDirectRunMessage,
@@ -52,7 +51,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('never points direct Run A mail after the pane is rebound to Run B', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-consistency-')
+    const db = new OrchestrationDb(':memory:')
     const first = createRuntime(db)
     const runA = createBoundRun(db, 'Run A')
     const staleDirectMessage = insertDirectRunMessage(db, runA.id, 'Run A completion')
@@ -78,7 +77,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('does not point unbound direct mail that a later Run binding would hide', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-unbound-bind-race-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const runA = createBoundRun(db, 'Unbound Run A')
     const message = insertDirectRunMessage(db, runA.id, 'Run A before later binding')
@@ -151,7 +150,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('pages a large persisted mismatch and coalesces each mailbox wake', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-paged-reconciliation-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const runA = createBoundRun(db, 'Backlog Run A')
     const messages = Array.from({ length: 151 }, (_, index) =>
@@ -188,7 +187,7 @@ describe('orchestration notification mailbox consistency', () => {
   })
 
   it('uses composite indexes for direct ownership reconciliation', () => {
-    const db = createDatabase('orca-mailbox-routing-indexes-')
+    const db = new OrchestrationDb(':memory:')
     const sqlite = sqliteFor(db)
     const plan = (sql: string, ...params: string[]): string =>
       (sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as { detail: string }[])
@@ -239,7 +238,7 @@ describe('orchestration notification mailbox consistency', () => {
   })
 
   it('finds owned mail without scanning an older unowned direct backlog', () => {
-    const db = createDatabase('orca-mailbox-owned-routing-plan-')
+    const db = new OrchestrationDb(':memory:')
     const detachedHandle = 'term_backlogged_detached'
     const ownedRun = db.createRun({
       objective: 'Owned after backlog',
@@ -388,7 +387,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('fences the pointed mailbox instead of checking a rebound empty Run', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-post-submit-rebind-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const runA = createBoundRun(db, 'Run A')
     insertDirectRunMessage(db, runA.id, 'Run A completion')
@@ -434,7 +433,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('releases a staged pointer when its Run moves to another live pane', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-live-rebind-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const runA = createBoundRun(db, 'Run A')
     const message = insertDirectRunMessage(db, runA.id, 'Run A completion')
@@ -474,7 +473,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('serializes equivalent panes while newer mail arrives during Enter delay', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-equivalent-pane-flight-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const run = createBoundRun(db, 'Equivalent pane Run')
     const first = insertDirectRunMessage(db, run.id, 'First status')
@@ -520,7 +519,7 @@ describe('orchestration notification mailbox consistency', () => {
     'submits a staged pointer after %s becomes working without duplicating it',
     async (_provider, workingTitle, idleTitle) => {
       vi.useFakeTimers()
-      const db = createDatabase('orca-mailbox-working-before-enter-')
+      const db = new OrchestrationDb(':memory:')
       const harness = createRuntime(db)
       const run = createBoundRun(db, 'Working-before-Enter Run')
       const message = insertDirectRunMessage(db, run.id, 'Actionable status')
@@ -546,7 +545,7 @@ describe('orchestration notification mailbox consistency', () => {
     'does not submit a staged pointer after %s enters a permission state',
     async (_provider, permissionTitle) => {
       vi.useFakeTimers()
-      const db = createDatabase('orca-mailbox-permission-before-enter-')
+      const db = new OrchestrationDb(':memory:')
       const harness = createRuntime(db)
       const run = createBoundRun(db, 'Permission-before-Enter Run')
       const message = insertDirectRunMessage(db, run.id, 'Actionable status')
@@ -563,7 +562,7 @@ describe('orchestration notification mailbox consistency', () => {
   )
   it('submits a staged pointer once when a live PTY is cold-parked before Enter', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-cold-park-submit-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const run = createBoundRun(db, 'Cold-park Run')
     const message = insertDirectRunMessage(db, run.id, 'Submit while parked')
@@ -582,7 +581,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('keeps a staged Enter deferred when a parked watcher republishes the leaf beside a decoy', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-cold-park-published-leaf-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const run = createBoundRun(db, 'Cold-park published leaf Run')
     insertDirectRunMessage(db, run.id, 'Keep Enter deferred')
@@ -662,7 +661,7 @@ describe('orchestration notification mailbox consistency', () => {
     'handles a cold-parked pointer after the agent becomes %s',
     async (state, title, idleTitle) => {
       vi.useFakeTimers()
-      const db = createDatabase('orca-mailbox-cold-park-transition-')
+      const db = new OrchestrationDb(':memory:')
       const harness = createRuntime(db)
       const run = createBoundRun(db, 'Cold-park transition Run')
       const message = insertDirectRunMessage(db, run.id, 'Do not submit while unavailable')
@@ -692,7 +691,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('releases staged pointer state when an explicit check owns the batch', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-explicit-check-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const run = createBoundRun(db, 'Explicit-check Run')
     insertDirectRunMessage(db, run.id, 'Checked before Enter')
@@ -712,7 +711,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('routes same-Run direct mail through the bound check and acknowledgment path', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-current-run-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const run = createBoundRun(db, 'Current Run')
     const messages = Array.from({ length: 51 }, (_, index) =>
@@ -804,7 +803,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('does not replay a visible pointer when the provider rejects Enter', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-provider-refusal-')
+    const db = new OrchestrationDb(':memory:')
     const first = createRuntime(db)
     const recordWrite = first.write as unknown as (id: string, payload: string) => unknown
     const write = vi.fn((ptyId: string, data: string) => {
@@ -835,7 +834,7 @@ describe('orchestration notification mailbox consistency', () => {
 
   it('does not point newer Run mail behind an outstanding Delivery', async () => {
     vi.useFakeTimers()
-    const db = createDatabase('orca-mailbox-outstanding-')
+    const db = new OrchestrationDb(':memory:')
     const harness = createRuntime(db)
     const run = createBoundRun(db, 'Outstanding Delivery Run')
     const firstMessage = db.insertMessage({

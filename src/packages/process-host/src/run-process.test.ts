@@ -83,6 +83,29 @@ describe('resolveSpawn', () => {
 })
 
 describe('runProcessSync', () => {
+  it.each([false, true])('accepts string stdin with byte capture %s', (captureStdoutAsBytes) => {
+    const input = 'nonsecret-probe-λ'
+    const result = runProcessSync({
+      program: process.execPath,
+      args: [
+        '-e',
+        'process.stdin.pipe(process.stdout, { end: false }); process.stdin.on("end", () => { process.stdout.write(Buffer.from([0,255])); process.stderr.write("diagnostic λ") })'
+      ],
+      input,
+      captureStdoutAsBytes
+    })
+    expect(result).toMatchObject({
+      code: 0,
+      stdout: captureStdoutAsBytes ? '' : `${input}\u0000�`,
+      stderr: 'diagnostic λ',
+      timedOut: false,
+      outputTruncated: false
+    })
+    expect(result.stdoutBytes).toEqual(
+      captureStdoutAsBytes ? Buffer.concat([Buffer.from(input), Buffer.from([0, 255])]) : undefined
+    )
+  })
+
   it('reports a timeout as timedOut', () => {
     const result = runProcessSync({
       program: process.execPath,

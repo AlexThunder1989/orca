@@ -49,7 +49,7 @@ export function connectUnservedSshPaneTarget(
       return
     }
     try {
-      await trackSshConnect(targetId, window.api.ssh.connect({ targetId }))
+      await trackSshConnect(targetId, window.api.ssh.connect({ targetId, automatic: true }))
     } catch (err) {
       console.warn(`[pty-connection] SSH connect failed for ${targetId}:`, err)
       session.reportError(

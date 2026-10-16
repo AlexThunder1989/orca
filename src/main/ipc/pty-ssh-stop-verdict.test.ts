@@ -1,12 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { SSH_PROVIDER_UNREGISTERED_REASON } from '../../shared/pty-liveness-verdict'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
-import {
-  registerPtyHandlers,
-  deletePtyOwnership,
-  setPtyOwnership,
-  getLocalPtyProvider
-} from './pty'
+import { registerPtyHandlers } from './pty/register-handlers'
+import { deletePtyOwnership, setPtyOwnership } from './pty/provider/ownership-state'
+import { getLocalPtyProvider } from './pty/provider/registry'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))

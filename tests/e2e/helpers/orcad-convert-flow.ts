@@ -6,6 +6,7 @@ import type { Page } from '@stablyai/playwright-test'
 import { expect } from './orca-app'
 import { readPersistedProfileState } from './persisted-profile-state'
 import { findOrcadMigrationSourceCutoverForTarget } from '../../../src/main/ssh/orcad-migration-cutover-journal'
+import { RuntimeClient } from '../../../src/cli/runtime/client'
 
 const CONVERT_TIMEOUT_MS = 8 * 60_000
 
@@ -188,6 +189,45 @@ export async function convertAndRetain(
       return repos.filter((repo) => repo.connectionId === id).length
     }, host.targetId)
     expect(listed, 'retained source rows stay hidden').toBe(0)
+    // The CLI, the phone and paired clients list through this desktop's runtime, not the renderer.
+    const persisted = readPersistedProfileState(userData).repos
+    const sourceRepoIds = new Set(
+      (Array.isArray(persisted) ? persisted : [])
+        .filter((repo) => repo?.connectionId === host.targetId)
+        .map((repo) => repo.id)
+    )
+    const runtime = new RuntimeClient(userData, 30_000, null, null)
+    const repos = (await runtime.call<{ repos: { id: string }[] }>('repo.list')).result.repos
+    const folders = (
+      await runtime.call<{ folderWorkspaces: { connectionId?: string | null }[] }>(
+        'folderWorkspace.list'
+      )
+    ).result.folderWorkspaces
+    const ps = (
+      await runtime.call<{
+        worktrees: { repoId: string }[]
+        hostScope?: { hostIds: string[]; omittedHostIds: string[] }
+      }>('worktree.ps')
+    ).result
+    const worktrees = ps.worktrees
+    // The old code named the converted host as "not covered", sending a user to a hidden host.
+    expect(ps.hostScope, 'runtime worktree.ps reports its host scope').toBeTruthy()
+    expect(
+      [...ps.hostScope!.hostIds, ...ps.hostScope!.omittedHostIds],
+      'runtime worktree.ps never names the converted host'
+    ).not.toContain(`ssh:${encodeURIComponent(host.targetId)}`)
+    expect(
+      repos.filter((repo) => sourceRepoIds.has(repo.id)),
+      'runtime repo.list'
+    ).toEqual([])
+    expect(
+      folders.filter((folder) => folder.connectionId === host.targetId),
+      'runtime folderWorkspace.list'
+    ).toEqual([])
+    expect(
+      worktrees.filter((worktree) => sourceRepoIds.has(worktree.repoId)),
+      'runtime worktree.ps'
+    ).toEqual([])
   }
   await expectRetained()
   await reconnect(page, host.targetId)

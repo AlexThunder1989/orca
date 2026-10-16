@@ -7,6 +7,7 @@ import type { WorkspaceSessionState } from '../../../shared/workspace-session-st
 import { locatePane } from '../../../shared/workspace-layout/workspace-layout-command-steps'
 import type {
   CommandOf,
+  LayoutApplyOutcome,
   LayoutCommand,
   LayoutRefusalCode
 } from '../../../shared/workspace-layout/workspace-layout-command-types'
@@ -16,6 +17,8 @@ import type { LoadedWorkspaceLayout } from '../../../shared/workspace-layout/wor
 import { nameBasedLoadContext } from '../../../shared/workspace-layout/workspace-layout-minted-ids'
 import { paneKeyOf } from '../../../shared/workspace-layout/workspace-layout-model'
 import { saveWorkspaceLayout } from '../../../shared/workspace-layout/workspace-layout-save'
+import { patchStoredSession } from '../../../shared/workspace-layout/workspace-layout-record-patch'
+import { followRemoteSessionAfterPaneClose } from './pane-close-remote-session'
 
 /** A new tab, or a split of an existing pane, with the ids its terminal will run under. */
 export type TerminalPaneAdmission =
@@ -39,7 +42,8 @@ export function admitPaneToSession(
   if (workspace && locatePane(workspace, paneKeyOf(admission.tabId, leafId))) {
     return { value: 'exists', session: null }
   }
-  return applyToSession(loaded, admission, 'admitted')
+  const change = applyToSession(loaded, admission)
+  return { ...change, value: change.value.ok ? 'admitted' : change.value.code }
 }
 
 export function withdrawPaneFromSession(
@@ -47,20 +51,40 @@ export function withdrawPaneFromSession(
   session: WorkspaceSessionState,
   pane: CommandOf<'closePane'>
 ): PaneLayoutChange<LayoutRefusalCode | null> {
-  return applyToSession(loadWorkspaceLayout(hostId, session, nameBasedLoadContext()), pane, null)
+  const change = applyToSession(loadWorkspaceLayout(hostId, session, nameBasedLoadContext()), pane)
+  return { ...change, value: change.value.ok ? null : change.value.code }
 }
 
-function applyToSession<T>(
+/**
+ * A client's layout command (`layout.apply`), with main minting every new id. Only the records the
+ * command changed are written; the rest of the partition stays as stored, normalized or not.
+ */
+export function applyCommandToSession(
+  hostId: ExecutionHostId,
+  session: WorkspaceSessionState,
+  command: LayoutCommand
+): PaneLayoutChange<LayoutApplyOutcome> {
+  const loaded = loadWorkspaceLayout(hostId, session, nameBasedLoadContext())
+  return applyToSession(loaded, command, (after) => {
+    const patched = patchStoredSession(session, saveWorkspaceLayout(loaded), after)
+    return patched === session ? null : followRemoteSessionAfterPaneClose(command, session, patched)
+  })
+}
+
+function applyToSession(
   loaded: LoadedWorkspaceLayout,
   command: LayoutCommand,
-  committed: T
-): PaneLayoutChange<T | LayoutRefusalCode> {
+  write: (after: WorkspaceSessionState) => WorkspaceSessionState | null = (after) => after
+): PaneLayoutChange<LayoutApplyOutcome> {
   const applied = applyLayoutCommand(loaded.layout, command, {
     mintId: randomUUID,
     mintLeafId: randomUUID,
     now: Date.now
   })
   return applied.ok
-    ? { value: committed, session: saveWorkspaceLayout({ ...loaded, layout: applied.model }) }
-    : { value: applied.code, session: null }
+    ? {
+        value: { ok: true, result: applied.result },
+        session: write(saveWorkspaceLayout({ ...loaded, layout: applied.model }))
+      }
+    : { value: { ok: false, code: applied.code }, session: null }
 }

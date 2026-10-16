@@ -35,6 +35,8 @@ export type DeviceEntry = {
   devicePublicKeyB64?: string
   // The token row this installation migrated from; that row stays for its other holders.
   forkedFrom?: string
+  // Session-only browser key (memory only); the row is dropped on host restart and after idling.
+  ephemeral?: true
 }
 
 /** A row that authenticates by bearer token: every pairing offer and delegated child. */

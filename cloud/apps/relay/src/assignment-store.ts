@@ -73,6 +73,7 @@ import {
 } from './database.js'
 import type { RelayCellConfig } from './config.js'
 import type { CellLockHoldSite } from './cell-inventory-hold-samples.js'
+import type { DeadCellVerdict } from './cell-poll-reachability.js'
 import { isPostgresPoolConnectFailure } from './postgres-pool-pressure.js'
 import { isPostgresReadTimeout } from './relay-database-rejection-fence.js'
 import type {
@@ -136,6 +137,15 @@ type RelayAssignmentStoreOptions = {
   // Absent keeps the strict least-loaded pick (tests that assert exact cells).
   placementLoadBand?: PlacementLoadBand
   recordControlRenewal?: (durationMs: number, outcome: ControlRenewalOutcome) => void
+  // This director's seat-feed polls to the cell (see cell-poll-reachability); null while answered.
+  deadCellVerdict?: (cellId: string, now: number) => DeadCellVerdict | null
+}
+
+// Step 5 inputs, plus whether the host itself asked: only its own request may leave a dead cell.
+export type AssignOptions = {
+  epochFloor?: number
+  placeFresh?: () => Promise<RelayAssignment | null>
+  hostRequested?: boolean
 }
 
 export type { ControlRenewalOutcome, ControlRenewalRequest }
@@ -617,6 +627,7 @@ export class RelayAssignmentStore {
     { failures: number; until: number }
   >()
   private readonly recordControlRenewal?: RelayAssignmentStoreOptions['recordControlRenewal']
+  private readonly deadCellVerdict?: RelayAssignmentStoreOptions['deadCellVerdict']
   private reserveModeRead: {
     cells: ReadonlySet<string>
     admitsDatabase: ReadonlySet<string>
@@ -654,6 +665,7 @@ export class RelayAssignmentStore {
     this.regionalRehomeDirectorRegion = options.regionalRehomeDirectorRegion
     this.requireLiveCells = options.requireLiveCells ?? false
     this.heartbeatTtlMs = options.heartbeatTtlMs ?? 45_000
+    this.deadCellVerdict = options.deadCellVerdict
     this.recordControlRenewal = options.recordControlRenewal
     this.placementLoadBand = options.placementLoadBand
     this.admissionSelector = new RelayCellAdmissionSelector(database, now)
@@ -988,7 +1000,7 @@ export class RelayAssignmentStore {
     lockMode: CellInventoryLockMode = 'request',
     // Step 5: a fresh placement may first be booked on a reserve-mode cell, outside any
     // transaction; and a database mint stays above every epoch the director's map knew.
-    step5: { epochFloor?: number; placeFresh?: () => Promise<RelayAssignment | null> } = {}
+    step5: AssignOptions = {}
   ): Promise<RelayAssignment> {
     const sticky = await this.assignStickyWithLockRetry(identity, lockMode, preferredRegion)
     if (sticky) return sticky
@@ -1003,7 +1015,9 @@ export class RelayAssignmentStore {
           lockMode,
           preferredRegion,
           placementRegion,
-          step5.epochFloor ?? 0
+          step5.epochFloor ?? 0,
+          // Only through the step-5 plan: its floor holds every epoch the map knows for the host.
+          step5.hostRequested === true && step5.epochFloor !== undefined
         )
     )
   }
@@ -1024,7 +1038,8 @@ export class RelayAssignmentStore {
     lockMode: CellInventoryLockMode,
     preferredRegion?: RelayRegion,
     placementRegion: RelayRegion = preferredRegion ?? RELAY_DEFAULT_REGION,
-    epochFloor = 0
+    epochFloor = 0,
+    hostRequested = false
   ): Promise<RelayAssignment> {
     const deadline = Date.now() + ASSIGNMENT_LOCK_RETRY_DEADLINE_MS
     let inventoryScope: AssignmentInventoryScope = 'none'
@@ -1036,7 +1051,8 @@ export class RelayAssignmentStore {
           lockMode,
           preferredRegion,
           placementRegion,
-          epochFloor
+          epochFloor,
+          hostRequested
         )
       } catch (error) {
         if (error instanceof AssignmentInventoryScopeChanged) {
@@ -1303,7 +1319,8 @@ export class RelayAssignmentStore {
     lockMode: CellInventoryLockMode,
     preferredRegion?: RelayRegion,
     placementRegion: RelayRegion = preferredRegion ?? RELAY_DEFAULT_REGION,
-    epochFloor = 0
+    epochFloor = 0,
+    hostRequested = false
   ): Promise<RelayAssignment> {
     const now = this.now()
     // An isolated retry takes its tier's rows before anything reassigns this,
@@ -1366,6 +1383,7 @@ export class RelayAssignmentStore {
       let strandedReassignment = false
       let isolatedIncumbent: CellRow | undefined
       let isolatedTarget: CellRow | undefined
+      let deadReserveSource: { cell: CellRow; verdict: DeadCellVerdict } | undefined
       // Set when only the target rows are locked. The old cell's row is never
       // written then, so the host must hold no units that no lease backs.
       // Counters below the leases (drift the old reset left) are fine: the
@@ -1529,19 +1547,29 @@ export class RelayAssignmentStore {
         // when the cell is live, so a cell that stopped heartbeating while still
         // holding sockets still takes this branch.
         if (!strandedReassignment && !connectionHeadroomReassignment && !isolatedIncumbent) {
+          const fence = await this.deadCellFenceRequirement(
+            transaction,
+            identity,
+            current.cellId,
+            integer(existing, 'assignment_epoch')
+          )
           if (
-            (await this.deadCellRequiresCommittedFence(
-              transaction,
-              identity,
-              current.cellId,
-              integer(existing, 'assignment_epoch')
-            )) &&
+            (fence.capped || fence.pinned) &&
             !(await this.cellHasCommittedFence(transaction, current.cellId, now))
           ) {
-            throw new RelayHomeCellUnavailableError(
-              current.cellId,
-              await this.homeCellUnavailableCause(transaction, current.cellId, now)
-            )
+            const cause = await this.homeCellUnavailableCause(transaction, current.cellId, now)
+            // A host that lost its control may leave a reserve cell this director proves dead
+            // without a fence: nothing re-places a host that did not ask, and a migration's epochs
+            // stay fenced. Capped db cells keep the fence: autoheal returns them with their hosts.
+            const verdict =
+              hostRequested &&
+              !fence.pinned &&
+              cause === 'unheard' &&
+              (await this.reserveModeCells(transaction))?.has(current.cellId) === true
+                ? this.deadCellVerdict?.(current.cellId, now)
+                : undefined
+            if (!verdict?.dead) throw new RelayHomeCellUnavailableError(current.cellId, cause)
+            deadReserveSource = { cell: current, verdict }
           }
           forcedDeadReassignment = true
         }
@@ -1556,6 +1584,20 @@ export class RelayAssignmentStore {
         isolatedTarget ??
         (await this.leastLoadedCell(transaction, lockedCells, placementRegion))
       if (!target) throw new Error('relay_capacity_exhausted')
+      if (deadReserveSource) {
+        events.push(
+          JSON.stringify({
+            event: 'orca_relay_dead_reserve_cell_host_replaced',
+            fromCellId: deadReserveSource.cell.cellId,
+            toCellId: target.cellId,
+            region: target.region,
+            fleetFailing: deadReserveSource.verdict.fleetFailing,
+            fleetPolled: deadReserveSource.verdict.fleetPolled,
+            regionFailing: deadReserveSource.verdict.regionFailing,
+            regionPolled: deadReserveSource.verdict.regionPolled
+          })
+        )
+      }
       if (isolatedIncumbent) {
         // The canary's proof that the fix fired: count these against the
         // drained cell's host count.
@@ -8244,6 +8286,7 @@ export class RelayAssignmentStore {
           optionalText(row, 'admission_state') === 'general' &&
           optionalInteger(row, 'roll_isolated_at') === undefined &&
           integer(row, 'capacity_requests') > 0,
+        capacityRequests: integer(row, 'capacity_requests'),
         ...incarnationField(optionalText(row, 'cell_incarnation'))
       }
     })
@@ -8560,12 +8603,12 @@ export class RelayAssignmentStore {
     return rows.length === 1
   }
 
-  private async deadCellRequiresCommittedFence(
+  private async deadCellFenceRequirement(
     database: RelayDatabase,
     identity: AssignmentIdentity,
     cellId: string,
     assignmentEpoch: number
-  ): Promise<boolean> {
+  ): Promise<{ capped: boolean; pinned: boolean }> {
     const row = (
       await database.query(
         `SELECT
@@ -8588,8 +8631,8 @@ export class RelayAssignmentStore {
         [cellId, identity.userId, identity.relayHostId, assignmentEpoch, cellId]
       )
     )[0]
-    if (!row) return false
-    return integer(row, 'capped') === 1 || integer(row, 'pinned') === 1
+    if (!row) return { capped: false, pinned: false }
+    return { capped: integer(row, 'capped') === 1, pinned: integer(row, 'pinned') === 1 }
   }
 
   private async assertDrainCellGeneration(

@@ -7,16 +7,10 @@ const mocks = await vi.hoisted(async () => {
 
 vi.mock('../ssh/ssh-config-host-picker', () => mocks.sshConfigHostPicker)
 vi.mock('electron', () => mocks.electron)
-vi.mock('../ipc/ssh-pty-output-intake-registry', () => mocks.sshPtyOutputIntakeRegistry)
 vi.mock('../ssh/ssh-connection-store', () => mocks.sshConnectionStore)
 vi.mock('../ipc/ssh-host-server-connect', () => mocks.hostServerConnect)
 vi.mock('../ssh/ssh-connection-manager', () => mocks.sshConnectionManager)
 vi.mock('../ssh/ssh-channel-multiplexer', () => mocks.sshChannelMultiplexer)
-vi.mock('../providers/ssh-filesystem-provider', () => mocks.sshFilesystemProvider)
-vi.mock('../ipc/pty', () => mocks.pty)
-vi.mock('../providers/ssh-filesystem-dispatch', () => mocks.sshFilesystemDispatch)
-vi.mock('../providers/ssh-git-provider', () => mocks.sshGitProvider)
-vi.mock('../providers/ssh-git-dispatch', () => mocks.sshGitDispatch)
 vi.mock('../ssh/ssh-port-forward', () => mocks.sshPortForward)
 vi.mock('../ssh/ssh-port-scanner', () => mocks.sshPortScanner)
 

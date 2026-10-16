@@ -3,13 +3,13 @@ import { toast } from 'sonner'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import { useAppStore } from '../store'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
-import {
-  createWebRuntimeSessionBrowserTab,
-  createWebRuntimeSessionTerminal,
-  isWebRuntimeSessionActive
-} from '@/runtime/web-runtime-session'
+import { createBrowserUuid } from '@/lib/browser-uuid'
+import { createWebRuntimeSessionBrowserTab } from '@/runtime/web-runtime-browser-creation'
+import { createWebRuntimeSessionTerminal } from '@/runtime/web-runtime-terminal-creation'
+import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session-environment'
 import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { persistAgentLaunchTabOrder } from '@/lib/launch-agent-tab-order'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { buildDuplicatedBrowserTabOptions } from '@/lib/duplicate-browser-tab-options'
 import { browserWorkspaceHasRemoteOwner } from '@/runtime/remote-browser-tab-ownership'
@@ -28,8 +28,7 @@ export function useTerminalCreateActions(controller: TerminalColdActivationContr
     openNewBrowserTabInActiveWorkspace,
     openNewMarkdownInActiveWorkspace,
     openNewTerminalTabInActiveWorkspace,
-    setActiveTabType,
-    setTabBarOrder
+    setActiveTabType
   } = controller
   const handleNewTab = useCallback(
     (shellOverride?: string) => {
@@ -54,37 +53,13 @@ export function useTerminalCreateActions(controller: TerminalColdActivationContr
         void openNewTerminalTabInActiveWorkspace(targetGroupId)
         return
       }
-      const newTab = createTab(activeWorktreeId, undefined, shellOverride)
+      const tabId = createBrowserUuid()
+      createTab(activeWorktreeId, undefined, shellOverride, { id: tabId })
       setActiveTabType('terminal', activeWorktreeId)
-      const state = useAppStore.getState()
-      const currentTerminals = state.tabsByWorktree[activeWorktreeId] ?? []
-      const currentEditors = state.openFiles.filter((file) => file.worktreeId === activeWorktreeId)
-      const currentBrowsers = state.browserTabsByWorktree[activeWorktreeId] ?? []
-      const stored = state.tabBarOrderByWorktree[activeWorktreeId]
-      const termIds = currentTerminals.map((tab) => tab.id)
-      const editorIds = currentEditors.map((file) => file.id)
-      const browserIds = currentBrowsers.map((tab) => tab.id)
-      const validIds = new Set([...termIds, ...editorIds, ...browserIds])
-      const base = (stored ?? []).filter((id) => validIds.has(id))
-      const inBase = new Set(base)
-      for (const id of [...termIds, ...editorIds, ...browserIds]) {
-        if (!inBase.has(id)) {
-          base.push(id)
-          inBase.add(id)
-        }
-      }
-      const order = base.filter((id) => id !== newTab.id)
-      order.push(newTab.id)
-      setTabBarOrder(activeWorktreeId, order)
-      focusTerminalTabSurface(newTab.id)
+      persistAgentLaunchTabOrder(activeWorktreeId, tabId)
+      focusTerminalTabSurface(tabId)
     },
-    [
-      activeWorktreeId,
-      createTab,
-      openNewTerminalTabInActiveWorkspace,
-      setActiveTabType,
-      setTabBarOrder
-    ]
+    [activeWorktreeId, createTab, openNewTerminalTabInActiveWorkspace, setActiveTabType]
   )
 
   const handleNewAgentTab = useCallback(
@@ -101,8 +76,7 @@ export function useTerminalCreateActions(controller: TerminalColdActivationContr
         agent,
         worktreeId: activeWorktreeId,
         groupId: targetGroupId,
-        launchSource: 'shortcut',
-        freshNewTab: true
+        launchSource: 'shortcut'
       })
       if (!result) {
         toast.error(

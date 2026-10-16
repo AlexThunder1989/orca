@@ -17,6 +17,7 @@ import {
   type WorkspaceLayout,
   type WorkspaceLayoutModel
 } from './workspace-layout-model'
+import type { PaneOutcomeChanges } from './workspace-layout-pane-outcomes'
 import { withWorkspace } from './workspace-layout-removal'
 
 export type Applied = LayoutApplyResult<WorkspaceLayoutModel>
@@ -26,13 +27,15 @@ export const refuse = (code: LayoutRefusalCode): Applied => ({ ok: false, code }
 export function applied(
   model: WorkspaceLayoutModel,
   result: LayoutCommandResult = {},
-  effects: Partial<LayoutEffects> = {}
+  effects: Partial<LayoutEffects> = {},
+  outcomes?: PaneOutcomeChanges
 ): Applied {
   return {
     ok: true,
     model,
     result,
-    effects: { stopPtyIds: effects.stopPtyIds ?? [], startPaneKeys: effects.startPaneKeys ?? [] }
+    effects: { stopPtyIds: effects.stopPtyIds ?? [], startPaneKeys: effects.startPaneKeys ?? [] },
+    ...(outcomes ? { outcomes } : {})
   }
 }
 

@@ -8,7 +8,12 @@ import { nativeChatPendingAttachmentSnapshot } from './native-chat-pending-attac
 export function useNativeChatPasteLifetime(args: {
   targetKey?: string
   attachmentScopeKey?: string
-  beginPendingImageAttachment: (previewUrl?: string, pendingName?: string) => string | null
+  /** `serverOwned`: an image the paste saved on the remote target's own server, not a client file. */
+  beginPendingImageAttachment: (
+    previewUrl?: string,
+    pendingName?: string,
+    serverOwned?: boolean
+  ) => string | null
   /** Files the result into the composer's scope even once this instance is unmounted. */
   resolvePendingImageAttachment: (id: string, path: string, connectionId?: string | null) => void
   revealPendingImageAttachment?: (id: string, previewUrl?: string) => void
@@ -83,7 +88,7 @@ export function useNativeChatPasteLifetime(args: {
       options: { deferPreview: boolean; canShow: () => boolean }
     ): { id: string | null; reveal: () => void } => {
       if (options.deferPreview) {
-        const id = beginPendingImageAttachment()
+        const id = beginPendingImageAttachment(undefined, undefined, owner.kind === 'remote')
         if (id) {
           track(id, '', owner)
         }
@@ -110,7 +115,7 @@ export function useNativeChatPasteLifetime(args: {
         return { id: null, reveal: () => {} }
       }
       const previewUrl = URL.createObjectURL(imageFile)
-      const id = beginPendingImageAttachment(previewUrl)
+      const id = beginPendingImageAttachment(previewUrl, undefined, owner.kind === 'remote')
       if (id) {
         track(id, previewUrl, owner)
       } else {
@@ -143,11 +148,7 @@ export function useNativeChatPasteLifetime(args: {
       }
       lifetime.uploads.delete(pendingId)
       if (saved.status === 'saved' && saved.tempPath) {
-        resolvePendingImageAttachment(
-          pendingId,
-          saved.tempPath,
-          owner?.kind === 'ssh' ? owner.connectionId : null
-        )
+        resolvePendingImageAttachment(pendingId, saved.tempPath, null)
       } else {
         dropPendingImageAttachment(pendingId)
       }

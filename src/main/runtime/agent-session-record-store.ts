@@ -1,6 +1,7 @@
 /** Durable single-writer session records and their operation ledger, as rows in the host's chat
  *  journal database. */
 
+import { backfillAgentSessionPermissionModes } from './agent-session-permission-backfill'
 import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import { createAgentSessionConversationReceipts } from './agent-session-conversation-receipts'
 import { commitConversationCommandRecord } from './agent-session-conversation-command-record'
@@ -69,6 +70,7 @@ import {
   showAgentSessionTabs
 } from './agent-session-tab-table'
 import type { JournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database'
+import type { JournalOperationReceipt } from '../native-chat/agent-session-journal/journal-row-writer'
 import { agentSessionOperationOutcomeReceipt } from './agent-session-operation-receipt'
 import { loadAgentSessionStoreRows } from './agent-session-record-rows'
 import { AgentSessionStoreTransactions } from './agent-session-store-transactions'
@@ -113,6 +115,9 @@ export class AgentSessionRecordStore {
   get readOnly(): boolean {
     return this.transactions.readOnly
   }
+
+  backfillChatPermissionModes = (ranWithFullAccess: (provider: string) => boolean): Promise<void> =>
+    backfillAgentSessionPermissionModes(this.transactions, ranWithFullAccess)
 
   getRecord = (sessionId: string): AgentSessionRecord | null =>
     this.state.records.get(sessionId) ?? null
@@ -310,6 +315,9 @@ export class AgentSessionRecordStore {
    *  makes it true. It changes only the ledger, so no record listener is owed. */
   operationOutcomeReceipt = (args: Parameters<typeof agentSessionOperationOutcomeReceipt>[1]) =>
     agentSessionOperationOutcomeReceipt(this.transactions, args)
+
+  commitOperationReceipt = (receipt: JournalOperationReceipt) =>
+    this.transactions.commitReceipt(receipt)
 
   readCommandReceipt = (...args: Parameters<AgentSessionStoreTransactions['readCommandReceipt']>) =>
     this.transactions.readCommandReceipt(...args)

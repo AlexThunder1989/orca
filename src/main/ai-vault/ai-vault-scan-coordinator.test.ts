@@ -1,9 +1,60 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AiVaultScanCoordinator } from './ai-vault-scan-coordinator'
+import {
+  localAiVaultScanProgress,
+  onLocalAiVaultScanProgress,
+  resetLocalAiVaultScanProgressForTests,
+  startLocalAiVaultScanProgress,
+  type LocalAiVaultScanProgressHandle
+} from './ai-vault-local-scan-progress'
+import { AiVaultServiceDeadlineError } from './session-scanner-service-request-deadline'
 
 const EMPTY_RESULT = { sessions: [], issues: [], scannedAt: '2026-07-27T00:00:00.000Z' }
 
 describe('AiVaultScanCoordinator', () => {
+  it('keeps the replacement finding while the old scan aborts before root preparation ends', async () => {
+    const coordinator = new AiVaultScanCoordinator()
+    const stages: (string | null)[] = []
+    onLocalAiVaultScanProgress(({ progress }) => stages.push(progress?.stage ?? null))
+    try {
+      const stopped = startLocalAiVaultScanProgress('scope', 'stopped', () => 500)
+      stopped.sent(1)
+      stopped.fail(new AiVaultServiceDeadlineError('scan timed out', 'scan', 1))
+      let old: LocalAiVaultScanProgressHandle | null = null
+      const first = coordinator.run({
+        key: 'scope',
+        onCreate: (id) => {
+          old = startLocalAiVaultScanProgress('scope', id, () => 1_000)
+        },
+        onError: (error) => old?.fail(error),
+        start: (signal) =>
+          new Promise<typeof EMPTY_RESULT>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })
+          })
+      })
+      await Promise.resolve()
+      let finishPreparation: ((result: typeof EMPTY_RESULT) => void) | undefined
+      const replacement = coordinator.run({
+        key: 'scope',
+        force: true,
+        onCreate: (id) => {
+          startLocalAiVaultScanProgress('scope', id, () => 2_000)
+        },
+        start: () =>
+          new Promise<typeof EMPTY_RESULT>((resolve) => {
+            finishPreparation = resolve
+          })
+      })
+      await Promise.resolve()
+      expect(localAiVaultScanProgress('scope')).toBeNull()
+      expect(stages.at(-1)).toBeNull()
+      finishPreparation?.(EMPTY_RESULT)
+      await expect(Promise.all([first, replacement])).resolves.toEqual([EMPTY_RESULT, EMPTY_RESULT])
+    } finally {
+      resetLocalAiVaultScanProgressForTests()
+    }
+  })
+
   it('keeps a shared scan alive when only one caller cancels', async () => {
     const coordinator = new AiVaultScanCoordinator()
     let resolveScan: ((result: typeof EMPTY_RESULT) => void) | undefined

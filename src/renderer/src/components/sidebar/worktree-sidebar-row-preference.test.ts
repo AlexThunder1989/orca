@@ -45,7 +45,6 @@ function item(workspace: Worktree, sectionKey: string): HostSectionRow {
     repo,
     depth: 0,
     groupDepth: 0,
-    lineageTrail: [],
     isLastLineageChild: false,
     lineageChildCount: 0
   }

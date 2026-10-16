@@ -706,9 +706,9 @@ describe('OrcaRuntimeService', () => {
       })
     })
 
-    await expect(
-      runtime.createTerminal(undefined, { startupAgent: 'cursor', rendererBacked: true })
-    ).rejects.toThrow(/requires a workspace selector/)
+    await expect(runtime.createTerminal(undefined, { startupAgent: 'cursor' })).rejects.toThrow(
+      /requires a workspace selector/
+    )
   })
 
   // Why: folder workspaces have no repo, so command sniffing skipped them entirely

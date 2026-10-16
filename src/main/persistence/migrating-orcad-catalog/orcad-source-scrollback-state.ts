@@ -17,7 +17,7 @@ import { compareKeys } from './orcad-source-key-order'
 export type ProjectedOrcadMigrationScrollback = {
   session: WorkspaceSessionState
   snapshots: OrcadMigrationTerminalScrollbackSnapshot[]
-  blockedCount: number
+  blockedItems: string[]
 }
 
 export function hasDuplicateOrcadMigrationScrollbackDescriptors(
@@ -42,7 +42,7 @@ export function projectOrcadMigrationSessionScrollback(
 ): ProjectedOrcadMigrationScrollback {
   const projected = structuredClone(session)
   const snapshots: OrcadMigrationTerminalScrollbackSnapshot[] = []
-  let blockedCount = 0
+  const blockedItems: string[] = []
   let totalBytes = 0
   for (const [tabId, layout] of Object.entries(projected.terminalLayoutsByTabId ?? {})) {
     const sourceLayout = session.terminalLayoutsByTabId[tabId]
@@ -66,7 +66,7 @@ export function projectOrcadMigrationSessionScrollback(
         bytes.length === 0 ||
         bytes.length > TERMINAL_SCROLLBACK_STORE_BYTE_LIMIT
       ) {
-        blockedCount += 1
+        blockedItems.push(`saved terminal history Orca could not read for tab ${tabId}`)
         continue
       }
       totalBytes += bytes.length
@@ -90,12 +90,12 @@ export function projectOrcadMigrationSessionScrollback(
     snapshots.length > MAX_ORCAD_MIGRATION_SCROLLBACK_SNAPSHOTS ||
     totalBytes > MAX_ORCAD_MIGRATION_SCROLLBACK_TOTAL_BYTES
   ) {
-    blockedCount += 1
+    blockedItems.push('more saved terminal history than one move carries: close some terminal tabs')
   }
   snapshots.sort((left, right) =>
     compareKeys(`${left.tabId}\0${left.leafId}`, `${right.tabId}\0${right.leafId}`)
   )
-  return { session: projected, snapshots, blockedCount }
+  return { session: projected, snapshots, blockedItems }
 }
 
 export function readOrcadMigrationSourceScrollbackChunk(args: {

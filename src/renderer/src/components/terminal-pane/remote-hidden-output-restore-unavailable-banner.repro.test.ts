@@ -335,12 +335,7 @@ function createDeps(overrides: Record<string, unknown> = {}) {
             : [...current, ptyId]
       mockStoreState.ptyIdsByTabId = { ...byTab, [tabId]: next }
     }),
-    markWorktreeUnread: vi.fn(),
-    markTerminalTabUnread: vi.fn(),
-    markTerminalPaneUnread: vi.fn(),
-    clearWorktreeUnread: vi.fn(),
-    clearTerminalTabUnread: vi.fn(),
-    clearTerminalPaneUnread: vi.fn(),
+    markTerminalBell: vi.fn(),
     dispatchNotification: vi.fn(),
     onShowSessionRestoredBanner: vi.fn(),
     setCacheTimerStartedAt: vi.fn(),
@@ -536,7 +531,6 @@ describe('remote hidden-output restore abandonment (issue2-hidden-output-skip)',
       }),
       registerAgentLaunchConfig: vi.fn(),
       clearAgentLaunchConfig: vi.fn(),
-      markWorktreeUnread: vi.fn(),
       observeTerminalGitHubPullRequestLink: vi.fn(),
       recordTerminalInput: vi.fn(),
       setAgentStatus: vi.fn(),
@@ -549,9 +543,8 @@ describe('remote hidden-output restore abandonment (issue2-hidden-output-skip)',
       clearPaneForegroundAgent: vi.fn((paneKey: string) => {
         delete (mockStoreState.paneForegroundAgentByPaneKey as Record<string, unknown>)[paneKey]
       }),
-      markTerminalTabUnread: vi.fn(),
-      markTerminalPaneUnread: vi.fn(),
-      markAgentCompletionPaneUnread: vi.fn()
+      markTerminalBell: vi.fn(),
+      markAgentAttentionUnread: vi.fn()
     }
     ;(globalThis as unknown as { window: unknown }).window = {
       api: {

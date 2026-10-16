@@ -10,7 +10,6 @@ import {
 import { isFolderRepo } from '../shared/repo-kind'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../shared/execution-host'
 import { resolveGitRouteForHost } from './providers/execution-host-provider-dispatch'
-import { getSshGitProvider } from './providers/ssh-git-dispatch'
 import { areWorktreePathsEqual } from './ipc/worktree-logic'
 import { WorktreeCatalogUnavailableError } from '../shared/worktree/worktree-catalog-availability'
 
@@ -85,16 +84,11 @@ async function listRoutedRepoWorktrees(
     )
   }
   if (route.kind === 'ssh') {
-    // Why: runtime worktree resolution can run before SSH providers have reattached during startup.
-    // Never fall back to local git against a server path, and never report the unreachable host as an
+    // Never fall back to local git against a server path, and never report the unserved host as an
     // empty catalog (#14004) — callers treat a resolved listing as authoritative.
-    const provider = getSshGitProvider(route.connectionId)
-    if (!provider) {
-      throw new WorktreeCatalogUnavailableError(
-        `Worktree catalog unavailable for ${repo.path}: SSH connection "${route.connectionId}" is not connected.`
-      )
-    }
-    return await provider.listWorktrees(repo.path)
+    throw new WorktreeCatalogUnavailableError(
+      `Worktree catalog unavailable for ${repo.path}: SSH connection "${route.connectionId}" is not connected.`
+    )
   }
   const worktrees = hasLocalRepoWorktreeListOptions(options)
     ? await listLocal(repo.path, options)
@@ -120,12 +114,8 @@ export async function listRepoWorktreeGraph(
   // An unreachable remote host answers `[]` here, unlike listRepoWorktrees above, which throws.
   // Preserved as-is: this call site's callers treat the graph as best-effort. The inconsistency is
   // real but is a separate behavior decision from resolving the host correctly.
-  if (route.kind === 'runtime') {
+  if (route.kind !== 'local') {
     return []
-  }
-  if (route.kind === 'ssh') {
-    const provider = getSshGitProvider(route.connectionId)
-    return provider ? await provider.listWorktrees(repo.path) : []
   }
   const worktrees = hasLocalRepoWorktreeListOptions(options)
     ? await listWorktreeGraph(repo.path, options)

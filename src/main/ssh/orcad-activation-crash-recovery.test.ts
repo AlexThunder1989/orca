@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type * as DeployHelpers from './ssh-relay-deploy-helpers'
+import type * as ExecCommandModule from './ssh-relay-exec-command'
 import type * as RecordFile from './orcad-remote-record-file'
 import type * as InstallLock from './ssh-relay-install-lock'
-import type * as VersionedInstall from './ssh-relay-versioned-install'
+import type * as VersionedInstall from './remote-versioned-install'
 import type * as Crypto from 'node:crypto'
 
 const uuid = vi.hoisted((): { fixed: string | null } => ({ fixed: null }))
@@ -11,8 +11,8 @@ vi.mock('node:crypto', async (importOriginal) => {
   return { ...actual, randomUUID: () => uuid.fixed ?? actual.randomUUID() }
 })
 
-vi.mock('./ssh-relay-deploy-helpers', async (importOriginal) => ({
-  ...(await importOriginal<typeof DeployHelpers>()),
+vi.mock('./ssh-relay-exec-command', async (importOriginal) => ({
+  ...(await importOriginal<typeof ExecCommandModule>()),
   execCommand: vi.fn()
 }))
 vi.mock('./ssh-connection-utils', () => ({
@@ -26,7 +26,7 @@ vi.mock('./orcad-remote-record-file', async (importOriginal) => ({
   ...(await importOriginal<typeof RecordFile>()),
   writeAtomicOrcadRemoteRecord: vi.fn()
 }))
-vi.mock('./ssh-relay-versioned-install', async (importOriginal) => ({
+vi.mock('./remote-versioned-install', async (importOriginal) => ({
   ...(await importOriginal<typeof VersionedInstall>()),
   readLocalFullVersion: () => '0.2.0+bb01'
 }))
@@ -38,7 +38,7 @@ vi.mock('./orcad-local-build-hash', () => ({
   computeLocalOrcadBuildHash: () => 'abc123def4567890'
 }))
 
-import { execCommand } from './ssh-relay-deploy-helpers'
+import { execCommand } from './ssh-relay-exec-command'
 import { acquireInstallLock } from './ssh-relay-install-lock'
 import { writeAtomicOrcadRemoteRecord } from './orcad-remote-record-file'
 import { deployOrcad } from './orcad-remote-deploy'
@@ -48,7 +48,7 @@ import { wakeStoppedManagedOrcad } from './orcad-managed-wake'
 import { planManagedOrcadAutoUpdate } from './orcad-managed-auto-update'
 import { parseOrcadActivationRecord } from './orcad-activation-record'
 import { getRemoteHostPlatform } from './ssh-remote-platform'
-import type { SshConnection } from './ssh-connection'
+import type { OrcadHostTransport } from './orcad-host-transport'
 import {
   BUILD_HASH,
   FakeOrcadHost,
@@ -60,7 +60,7 @@ import {
 let host = new FakeOrcadHost()
 
 const slot = {
-  conn: {} as SshConnection,
+  conn: Object.create(null),
   host: getRemoteHostPlatform('linux-x64'),
   remoteHome: '/home/u',
   nodePath: '/usr/bin/node',
@@ -403,7 +403,7 @@ describe('a wake over an update its client abandoned', () => {
   const wakeSlot = {
     ...slot,
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: execCommand is mocked; the wake reads only the target id.
-    conn: { getTarget: () => ({ id: 'ssh-1' }) } as unknown as SshConnection
+    conn: { getTarget: () => ({ id: 'ssh-1' }) } as unknown as OrcadHostTransport
   }
 
   async function abandonedAfterCandidateLaunch(

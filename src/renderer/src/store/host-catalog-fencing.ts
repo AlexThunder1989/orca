@@ -1,5 +1,6 @@
 import type { AppState } from './types'
-import type { HostRoute, RuntimeClientTarget } from '../runtime/runtime-client-target'
+import type { HostRoute } from '../runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import {
   getRuntimeEnvironmentRevision,
@@ -12,7 +13,7 @@ import {
 } from './slices/runtime-environment-ssh'
 import { getLocalSshTargetConnectionGeneration } from './slices/ssh'
 import { getRuntimeEnvironmentConnectionGeneration } from './slices/runtime-status'
-import { getRuntimeTargetHostId } from './runtime-target-host'
+import { getRuntimeTargetHostId } from '../runtime/runtime-client-target'
 
 /**
  * Who answered: pairing, runtime incarnation (connection generation) and, for an SSH place, that
@@ -118,5 +119,39 @@ export function isHostCatalogFenceCurrent(
     ) &&
     getEnvironmentSshStateGeneration(fence.target.environmentId) === fence.sshStateGeneration &&
     isHostIdentityFenceCurrent(fence.identity)
+  )
+}
+
+async function listRuntimeEnvironmentsForAllHostLoad(): Promise<{ id: string }[]> {
+  try {
+    return (await window.api.runtimeEnvironments.list()) ?? []
+  } catch (err) {
+    console.warn('Failed to list runtime environments for all-host load:', err)
+    return []
+  }
+}
+
+/**
+ * Remote half of an all-host catalog load: claims each runtime's fence, then loads it. Settlement
+ * stays with the caller; a load that stops being current while listing claims no fence.
+ */
+export async function loadRuntimeHostCatalogs(
+  get: CatalogFenceStore,
+  kind: HostCatalogKind,
+  load: (
+    target: Extract<RuntimeClientTarget, { kind: 'environment' }>,
+    fence: HostCatalogFence
+  ) => Promise<void>,
+  isCurrentLoad: () => boolean = () => true
+): Promise<void> {
+  const environments = await listRuntimeEnvironmentsForAllHostLoad()
+  if (!isCurrentLoad()) {
+    return
+  }
+  await Promise.all(
+    environments.map((environment) => {
+      const target = { kind: 'environment' as const, environmentId: environment.id }
+      return load(target, claimHostCatalogFence(get, kind, target))
+    })
   )
 }

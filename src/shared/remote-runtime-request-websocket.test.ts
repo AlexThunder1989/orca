@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from './paired-runtime-connection'
 import type { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 import { generateKeyPair, publicKeyToBase64 } from './e2ee-crypto'
@@ -9,12 +10,12 @@ describe('openRemoteRuntimeWebSocket', () => {
   it('detaches Orca callback listeners when cleaned up', () => {
     const keyPair = generateKeyPair()
     const opened = openRemoteRuntimeWebSocket(
-      {
+      pairedRuntimeConnectionFromOffer({
         v: 2,
         endpoint: 'ws://127.0.0.1:1',
         deviceToken: 'device-token',
         publicKeyB64: publicKeyToBase64(keyPair.publicKey)
-      },
+      }),
       {
         onClose: vi.fn(),
         onError: vi.fn(),
@@ -54,12 +55,12 @@ describe('openRemoteRuntimeWebSocket', () => {
     const onBinaryFrame = vi.fn()
     const closed = new Promise<void>((resolve) => {
       const opened = openRemoteRuntimeWebSocket(
-        {
+        pairedRuntimeConnectionFromOffer({
           v: 2,
           endpoint: `ws://127.0.0.1:${port}`,
           deviceToken: 'device-token',
           publicKeyB64: publicKeyToBase64(generateKeyPair().publicKey)
-        },
+        }),
         {
           onClose: () => resolve(),
           onError,

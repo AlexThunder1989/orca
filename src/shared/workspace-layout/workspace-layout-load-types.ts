@@ -43,4 +43,6 @@ export type WorkspaceLoadArgs = {
   facts: LayoutContentFacts
   /** Terminal tab id → its stored pane layout (a legacy row's built one). */
   layouts: Map<string, TerminalLayoutSnapshot>
+  /** A dropped row's id → the tab-bar terminal that holds its terminals. */
+  canonicalTabIdBySubsumedTabId: Map<string, string>
 }

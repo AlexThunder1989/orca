@@ -1,7 +1,7 @@
 import type { Store } from '../persistence'
 import { resolveGitStatusUpstreamRef } from '../git/status-upstream-ref'
 import { gitExecFileAsync } from '../git/runner'
-import { getSshGitProviderGeneration } from '../providers/ssh-git-dispatch'
+import { abortSignalWithTimeout } from '../lib/abort-signal-with-timeout'
 import { resolveRegisteredWorktreePath } from './registered-worktree-roots-cache'
 import {
   getLocalGitOptionsForRepo,
@@ -12,49 +12,36 @@ import type { GitStatusRefBindingRequest } from './worktree-git-status-ref-watch
 import { requireReachableGitRoute } from '../providers/execution-host-provider-dispatch'
 import { getConnectionExecutionHostId } from '../../shared/execution-host'
 
-export type GitStatusUpstreamRefWatchRequest = Omit<
-  GitStatusRefBindingRequest,
-  'providerGeneration'
->
+export type GitStatusUpstreamRefWatchRequest = GitStatusRefBindingRequest
 
 const UPSTREAM_REF_RESOLUTION_TIMEOUT_MS = 15_000
-
-function boundedSignal(signal: AbortSignal): AbortSignal {
-  return AbortSignal.any([signal, AbortSignal.timeout(UPSTREAM_REF_RESOLUTION_TIMEOUT_MS)])
-}
 
 export function applyGitStatusUpstreamRefWatchRequest(
   store: Store,
   args: GitStatusUpstreamRefWatchRequest
 ): Promise<void> {
-  const providerGeneration = args.connectionId
-    ? getSshGitProviderGeneration(args.connectionId)
-    : undefined
-  return setWorktreeGitStatusRefWatch(
-    { ...args, ...(providerGeneration !== undefined ? { providerGeneration } : {}) },
-    async (bindingSignal) => {
-      if (!args.branch || !args.upstreamName) {
-        return undefined
-      }
-      const signal = boundedSignal(bindingSignal)
-      requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
-
-      const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const repo = getLocalRepoForRegisteredWorktree(store, args.worktreePath, worktreePath)
-      const gitOptions = getLocalGitOptionsForRepo(store, repo)
-      return resolveGitStatusUpstreamRef(
-        (gitArgs, cwd, requestSignal) =>
-          gitExecFileAsync(gitArgs, {
-            cwd,
-            signal: requestSignal,
-            timeout: UPSTREAM_REF_RESOLUTION_TIMEOUT_MS,
-            ...(gitOptions.wslDistro ? { wslDistro: gitOptions.wslDistro } : {})
-          }),
-        worktreePath,
-        args.branch,
-        args.upstreamName,
-        signal
-      )
+  return setWorktreeGitStatusRefWatch(args, async (bindingSignal) => {
+    if (!args.branch || !args.upstreamName) {
+      return undefined
     }
-  )
+    const signal = abortSignalWithTimeout(bindingSignal, UPSTREAM_REF_RESOLUTION_TIMEOUT_MS)
+    requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
+
+    const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
+    const repo = getLocalRepoForRegisteredWorktree(store, args.worktreePath, worktreePath)
+    const gitOptions = getLocalGitOptionsForRepo(store, repo)
+    return resolveGitStatusUpstreamRef(
+      (gitArgs, cwd, requestSignal) =>
+        gitExecFileAsync(gitArgs, {
+          cwd,
+          signal: requestSignal,
+          timeout: UPSTREAM_REF_RESOLUTION_TIMEOUT_MS,
+          ...(gitOptions.wslDistro ? { wslDistro: gitOptions.wslDistro } : {})
+        }),
+      worktreePath,
+      args.branch,
+      args.upstreamName,
+      signal
+    )
+  })
 }

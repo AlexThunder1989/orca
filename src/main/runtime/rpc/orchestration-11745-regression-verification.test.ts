@@ -1,3 +1,4 @@
+import './unused-default-rpc-methods.test-fixture'
 // Why: independent adversarial verification of every #11745 fix. Each case reproduces the ORIGINAL
 // defect and asserts it is closed by observing state, not just the response envelope — a refusal
 // that still mutated the graph is a failure, and so is a fix that fences a legitimate coordinator.

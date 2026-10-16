@@ -9,20 +9,16 @@ import {
   type ProjectHostSetupProjection
 } from '../../../../shared/project-host-setup-projection'
 import {
-  normalizeProjectHostSetupRows,
-  normalizeProjectRows
-} from '../../../../shared/project-catalog-row-normalization'
-import {
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
 import { parseExecutionHostId } from '../../../../shared/execution-host'
 import {
   assertRuntimeEnvironmentCapability,
-  callRuntimeRpc,
-  type RuntimeClientTarget
+  callRuntimeRpc
 } from '../../runtime/runtime-rpc-client'
-import { adoptFromEndpoint } from '../adopt-from-endpoint'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import { adoptEndpointProjectCatalog } from '../../../../shared/endpoint-catalog-adoption'
 
 export function getProjectSetupRuntimeTarget(
   hostId: ProjectHostSetupExistingFolderArgs['hostId']
@@ -31,15 +27,6 @@ export function getProjectSetupRuntimeTarget(
   return parsedHost?.kind === 'runtime'
     ? { kind: 'environment', environmentId: parsedHost.environmentId }
     : { kind: 'local' }
-}
-
-function normalizeProjectCatalogProjection(
-  projection: ProjectHostSetupProjection
-): ProjectHostSetupProjection {
-  return {
-    projects: normalizeProjectRows([...projection.projects]),
-    setups: normalizeProjectHostSetupRows([...projection.setups])
-  }
 }
 
 async function assertProjectHostSetupRuntimeCapability(target: RuntimeClientTarget): Promise<void> {
@@ -71,10 +58,11 @@ export async function fetchProjectHostSetupCompatibility(
       if (!projectsApi?.list || !projectsApi.listHostSetups) {
         throw new Error('projects_api_unavailable')
       }
-      return normalizeProjectCatalogProjection({
-        projects: await projectsApi.list(),
-        setups: await projectsApi.listHostSetups()
-      })
+      return adoptEndpointProjectCatalog(
+        target,
+        await projectsApi.list(),
+        await projectsApi.listHostSetups()
+      )
     }
     await assertProjectHostSetupRuntimeCapability(target)
     const [projectResponse, setupResponse] = await Promise.all([
@@ -85,14 +73,7 @@ export async function fetchProjectHostSetupCompatibility(
         timeoutMs: 15_000
       })
     ])
-    return {
-      // Why projects too: the same wire response carries them, and a remote host on another
-      // Orca version can publish a row whose declared field types do not hold.
-      projects: normalizeProjectRows([...projectResponse.projects]),
-      setups: setupResponse.setups.map((setup) =>
-        adoptFromEndpoint(target, { kind: 'projectHostSetup', row: setup })
-      )
-    }
+    return adoptEndpointProjectCatalog(target, projectResponse.projects, setupResponse.setups)
   } catch {
     // Why: newer clients must hydrate against older runtimes that only know repo.list; derive the transitional model locally.
     return projectHostSetupProjectionFromRepos(repos)

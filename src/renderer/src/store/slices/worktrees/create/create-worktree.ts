@@ -1,4 +1,4 @@
-import { runtimeTargetForExecutionHostId } from '@/runtime/runtime-client-target'
+import { runtimeRpcTargetForAuthorityKey } from '@/runtime/runtime-client-target'
 import { repoHostId } from '../listing/worktree-host-ownership'
 import {
   isUnresolvedOwnerHostId,
@@ -16,9 +16,9 @@ import {
 } from '../../../../../../shared/new-workspace/worktree-create-retry-policy'
 import {
   assertRuntimeEnvironmentCapability,
-  callRuntimeRpc,
-  type RuntimeClientTarget
+  callRuntimeRpc
 } from '../../../../runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { runtimeTargetForRepoOwner } from '@/lib/repo-runtime-owner'
 import { WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY } from '../../../../../../shared/protocol-version'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/local-base-ref-suggestion-toast'
@@ -169,8 +169,26 @@ export function createCreateWorktree(
       options
     }
     try {
+      // Why: manual sort is user-authored order; stamp new workspaces at the top rather than relying on sortOrder fallback.
+      const manualOrder = get().sortBy === 'manual' ? Date.now() : undefined
+      if (isUnresolvedOwnerHostId(options?.executionHostId)) {
+        // Why: the direct-SSH fallback below would otherwise create it on this machine.
+        throw new Error('The workspace host is unresolved. Choose a host and retry.')
+      }
+      // Direct SSH still uses desktop IPC; paired runtimes use their captured environment.
+      const target = options?.executionHostId
+        ? (runtimeRpcTargetForAuthorityKey(options.executionHostId) ?? { kind: 'local' as const })
+        : runtimeTargetForRepoOwner(get(), repoId)
+      if (!target) {
+        throw new Error('The project host is unresolved. Choose a host and retry.')
+      }
+      const creationHostId = adoptFromEndpoint(target, {
+        kind: 'createdWorktree',
+        requestedHostId: options?.executionHostId,
+        resolveOwnHostId: () => repoHostId(get(), repoId)
+      })
       // Why outside the retry loop: a branch-name conflict retry must not re-warn about the same dropped pick.
-      const parent = resolveWorktreeCreateParent(get(), repoId, options?.parentWorktreeId)
+      const parent = resolveWorktreeCreateParent(get(), options?.parentWorktreeId, creationHostId)
       let warnedParentDropped = false
       const warnParentDroppedOnce = (): void => {
         if (warnedParentDropped) {
@@ -182,24 +200,6 @@ export function createCreateWorktree(
       if (parent.staleBeforeCreate) {
         warnParentDroppedOnce()
       }
-      // Why: manual sort is user-authored order; stamp new workspaces at the top rather than relying on sortOrder fallback.
-      const manualOrder = get().sortBy === 'manual' ? Date.now() : undefined
-      if (isUnresolvedOwnerHostId(options?.executionHostId)) {
-        // Why: the direct-SSH fallback below would otherwise create it on this machine.
-        throw new Error('The workspace host is unresolved. Choose a host and retry.')
-      }
-      // Direct SSH still uses desktop IPC; paired runtimes use their captured environment.
-      const target = options?.executionHostId
-        ? (runtimeTargetForExecutionHostId(options.executionHostId) ?? { kind: 'local' as const })
-        : runtimeTargetForRepoOwner(get(), repoId)
-      if (!target) {
-        throw new Error('The project host is unresolved. Choose a host and retry.')
-      }
-      const creationHostId = adoptFromEndpoint(target, {
-        kind: 'createdWorktree',
-        requestedHostId: options?.executionHostId,
-        resolveOwnHostId: () => repoHostId(get(), repoId)
-      })
       if (
         target.kind === 'environment' &&
         (options?.linkedWorkItem?.provider === 'jira' ||

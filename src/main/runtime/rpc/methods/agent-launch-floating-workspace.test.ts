@@ -33,9 +33,7 @@ afterEach(() => {
 })
 
 describe('floating workspace resolved-worktree minting', () => {
-  // Regression: this mixin file is @ts-nocheck, so a missing module import there is invisible to
-  // `pnpm tc` and only fails at call time (shipped once as a ReferenceError from the structured
-  // createSupport path). Calling the real method pins the import wiring.
+  // A missing resolver import previously broke structured-session creation at call time.
   it('mints the synthetic floating row through the shared module', () => {
     class FloatingResolverProbe extends OrcaRuntimeService {
       mintFloatingResolvedWorktree(path: string): ResolvedWorktree {
@@ -72,8 +70,7 @@ describe('agent.launch with the real floating workspace resolver', () => {
     })
   })
 
-  // Why here: the runtime resolvers this crosses are @ts-nocheck, so only a call that runs them
-  // proves the floating workspace resolves to a location a structured session can be filed under.
+  // Floating workspaces still need a local path for structured-session records.
   it.each(selectors)('supports a structured session for %s on the local host', async (selector) => {
     const runtime = new OrcaRuntimeService()
 

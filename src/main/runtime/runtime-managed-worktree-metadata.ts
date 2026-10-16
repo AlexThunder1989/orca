@@ -6,6 +6,12 @@ import { planWorktreeSortOrderUpdates } from '../../shared/worktree/sort-order-u
 import { stripOrcaProvenanceMetaUpdates } from '../worktree-removal-safety'
 import { isRemovedFolderWorkspaceInstance } from '../folder-workspace-meta-presence'
 import type { RuntimeStore } from './runtime-store-contract'
+import {
+  isWslMoveSourceHost,
+  isWslMoveWorkspaceBlocked,
+  shouldDropWslMoveProjectUpdate,
+  wslMoveProjectRefForWorkspace
+} from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
 import { RuntimeLineageError } from './runtime-worktree-lineage-resolution'
 import type { ResolvedWorktree } from './runtime-worktree-path-identity'
 
@@ -31,6 +37,21 @@ export async function updateRuntimeManagedWorktreeMetadata(args: {
 }): Promise<Worktree> {
   const worktree = await args.ports.resolveWorktree(args.selector)
   const { lineage, ...metaUpdates } = args.updates
+  const previousParentRepoId = lineage
+    ? splitWorktreeId(args.store.getWorktreeLineage?.(worktree.id)?.parentWorktreeId ?? '')?.repoId
+    : undefined
+  let nextParentRepoId: string | undefined
+  const executionHostId = worktree.identity?.executionHostId ?? worktree.hostId
+  if (
+    isWslMoveSourceHost(executionHostId) &&
+    shouldDropWslMoveProjectUpdate(
+      args.store,
+      wslMoveProjectRefForWorkspace(worktree.id),
+      lineage ? args.updates : metaUpdates
+    )
+  ) {
+    return worktree
+  }
   if (lineage?.parentWorktree) {
     args.ports.invalidateResolved()
     args.ports.invalidateScan(worktree.repoId)
@@ -58,6 +79,7 @@ export async function updateRuntimeManagedWorktreeMetadata(args: {
   } else if (lineage?.parentWorktree) {
     const parent = await args.ports.resolveWorktree(lineage.parentWorktree)
     args.ports.validateParent(worktree, parent)
+    nextParentRepoId = parent.repoId
     if (!worktree.instanceId || !parent.instanceId) {
       throw new RuntimeLineageError(
         'LINEAGE_PARENT_CONTEXT_MISSING',
@@ -91,7 +113,6 @@ export async function updateRuntimeManagedWorktreeMetadata(args: {
     })
   }
   const metadataUpdates = stripOrcaProvenanceMetaUpdates(persisted)
-  const executionHostId = worktree.identity?.executionHostId ?? worktree.hostId
   // Why: a resolution snapshot taken before a removal still returns the workspace (#22712).
   if (isRemovedFolderWorkspaceInstance(args.store, worktree.id, executionHostId)) {
     throw new Error('selector_not_found')
@@ -104,6 +125,13 @@ export async function updateRuntimeManagedWorktreeMetadata(args: {
   // Why: CLI callers need an explicit push for metadata changed outside the renderer's optimistic update path.
   args.ports.invalidateResolved()
   args.ports.notifyChanged(worktree.repoId)
+  if (lineage) {
+    for (const repoId of new Set([previousParentRepoId, nextParentRepoId])) {
+      if (repoId && repoId !== worktree.repoId) {
+        args.ports.notifyChanged(repoId)
+      }
+    }
+  }
   return args.ports.showWorktree(`id:${worktree.id}`)
 }
 
@@ -113,11 +141,12 @@ export function persistRuntimeManagedWorktreeSortOrder(args: {
   invalidateResolved: () => void
   notifyChanged: (repoId: string) => void
 }): { updated: number } {
+  // A moving project keeps its old order; the rest of the batch still lands.
   const updates = planWorktreeSortOrderUpdates(
     args.orderedIds,
     (worktreeId) => args.store.getWorktreeMeta(worktreeId),
     Date.now()
-  )
+  ).filter((update) => !isWslMoveWorkspaceBlocked(args.store, update.worktreeId))
   for (const update of updates) {
     args.store.setWorktreeMeta(update.worktreeId, { sortOrder: update.sortOrder })
   }

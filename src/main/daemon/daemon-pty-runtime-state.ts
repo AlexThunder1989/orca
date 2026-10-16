@@ -28,7 +28,7 @@ import {
   type HistoryRecoveryFreeze
 } from './history-manager'
 import { HistoryReader } from './history-reader'
-import type { PtyBackgroundStreamEvent } from '../providers/types'
+import type { PtyBackgroundStreamEvent } from '../providers/pty-provider-contract'
 import type { DaemonPtyRouterDataEvent, DaemonPtyRouterExitEvent } from './daemon-pty-router-events'
 
 export type PendingDaemonSpawnOperation = {

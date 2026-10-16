@@ -14,14 +14,9 @@ import {
   type StructuredAgentSessionAcquireInput
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import { providerTimelineSink } from '../native-chat/agent-session-timeline/provider-timeline-plan'
-import {
-  providerSpawnedProcessIdentity,
-  PROVIDER_SPAWN_TOKEN_ENV
-} from '../provider-process/provider-spawned-process-identity'
-import { structuredSessionChildIdentityEnv } from '../runtime/structured-session-child-identity-env'
+import { providerSpawnedProcessIdentity } from '../provider-process/provider-spawned-process-identity'
 import { AcpAgentError } from './acp-errors'
 import { acpAuthenticationRequired, acpSignInRequiredRefusal } from './acp-turn-failures'
-import { ACP_CHILD_ENV_TO_DELETE } from './acp-launch-specs'
 import {
   ACP_REOPEN_FAILED,
   acpReopenTakeover,
@@ -32,7 +27,7 @@ import type { AcpStructuredConnection } from './acp-structured-connection'
 import { ACP_HANDLE_TRANSPORT, acpAgentName } from './acp-structured-agent-definitions'
 import { AcpStructuredLane, acpLaneChildWorkDelivery } from './acp-structured-lane'
 import { NO_ACP_CHILD_STOPS, probeAcpChildStops } from './acp-structured-child-stop'
-import type { AcpStructuredLaunch } from './acp-structured-launch-resolution'
+import { prepareAcpStructuredLaunch } from './acp-structured-launch-preparation'
 import { AcpStructuredOptions, restoreAcpSessionOptions } from './acp-structured-options'
 import { AcpStructuredPrompts } from './acp-structured-prompts'
 import {
@@ -82,12 +77,7 @@ export async function acquireAcpStructuredSession(input: {
     }
   }
   closedBeforeSpawn()
-  const launch: AcpStructuredLaunch = await deps
-    .resolveLaunch({ identity: acquire.identity })
-    .catch((error: unknown) => {
-      throw new AgentSessionPreSpawnError(error)
-    })
-  closedBeforeSpawn()
+  const launch = await prepareAcpStructuredLaunch(deps, acquire, closedBeforeSpawn)
   let session: AcpStructuredSession | null = null
   // A slot rather than a `let`: closures read it, and control-flow narrowing cannot see them write.
   const slot: { lane: AcpStructuredLane | null; reattaching: boolean } = {
@@ -118,11 +108,8 @@ export async function acquireAcpStructuredSession(input: {
       command: launch.command,
       args: launch.args,
       cwd: launch.cwd,
-      env: {
-        ...structuredSessionChildIdentityEnv(sessionId, launch.env),
-        [PROVIDER_SPAWN_TOKEN_ENV]: acquire.spawnToken
-      },
-      envToDelete: [...ACP_CHILD_ENV_TO_DELETE, ...launch.envToDelete]
+      env: launch.env,
+      envToDelete: launch.envToDelete
     },
     {
       clientInfo: { name: 'orca', version: '1' },
@@ -133,7 +120,8 @@ export async function acquireAcpStructuredSession(input: {
           // is cutting it short: nobody is there to ask.
           return { outcome: { outcome: 'cancelled' } }
         }
-        if (launch.fullAccess) {
+        // A request the dialect claims is a question for the person, which full access never answers.
+        if (launch.fullAccess && !spec.dialect.request?.('session/request_permission', request)) {
           // Full access: Orca answers yes for the person, as the agent's own bypass flag would.
           const allow = request.options.find((option) => option.kind === 'allow_once')
           if (allow) {

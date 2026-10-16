@@ -206,6 +206,7 @@ describe('a worker result reaches the structured chat that coordinates it', () =
   })
 
   it('leaves a pointer the person stopped while its agent was starting stopped', async () => {
+    observationClock.start()
     await openChat(COORDINATOR)
     const { runId, taskId } = await coordinatorRunAndTask()
     await host.close(COORDINATOR, 'evict')
@@ -214,7 +215,7 @@ describe('a worker result reaches the structured chat that coordinates it', () =
     await finishWorker(taskId)
     await vi.waitFor(() => expect(providerFaults.starts).toBe(before + 1), WAIT)
     // The person presses Stop while the agent is still starting.
-    const cancelled = await host.cancel(
+    const cancelling = host.cancel(
       { callerKey: 'test-surface' },
       {
         envelope: {
@@ -230,6 +231,8 @@ describe('a worker result reaches the structured chat that coordinates it', () =
         turnId: 'turn-x'
       }
     )
+    await observationClock.observe(400)
+    const cancelled = await cancelling
     expect(cancelled).toMatchObject({ ok: true })
     providerFaults.startDelayMs = 0
     // A fixed window, not a poll: a re-point would start the agent again in it.
@@ -256,6 +259,7 @@ describe('a worker result reaches the structured chat that coordinates it', () =
     // provider still dies, so exactly one start proves it is pointed once, not in a loop.
     restartRuntime()
     const before = providerFaults.starts
+    await observationClock.observe(2_000)
     await vi.waitFor(() => expect(providerFaults.turnStarts).toBe(2), WAIT)
     await observationClock.observe(1_500)
     await edgesAnswered()
@@ -521,6 +525,7 @@ describe('a /clear keeps the chat its orchestration address', () => {
   })
 
   it('points mail the earlier context never took at the fresh context, without a user message', async () => {
+    observationClock.start()
     const chat = await openChat(COORDINATOR)
     const { runId, taskId } = await coordinatorRunAndTask()
     await finishWorker(taskId)
@@ -534,6 +539,7 @@ describe('a /clear keeps the chat its orchestration address', () => {
 
     const cleared = await clearChat(COORDINATOR)
     expect(cleared).toBe(COORDINATOR)
+    await observationClock.observe(2_000)
     await vi.waitFor(() => expect(connectionFor(cleared).turns[0]?.text).toMatch(POINTER), WAIT)
     await settleTurn(cleared, 0)
     await vi.waitFor(

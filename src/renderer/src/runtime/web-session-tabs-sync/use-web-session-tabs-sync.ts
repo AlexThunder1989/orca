@@ -10,6 +10,10 @@ import {
   type GlobalSubscriptionRefs
 } from './global-session-subscription'
 import { installActiveSessionTabsSubscription } from './active-session-subscription'
+import {
+  createWarmWorktreeSessionSubscriptions,
+  type WarmWorktreeSessionSubscriptions
+} from './warm-worktree-subscriptions'
 
 /** Mount the paired-runtime tab mirrors and the selected-worktree stream. */
 export function useWebSessionTabsSync(): void {
@@ -28,6 +32,10 @@ export function useWebSessionTabsSync(): void {
   const visibilitySnapshotAcceptedRef = useRef<
     GlobalSubscriptionRefs['snapshotAccepted']['current']
   >(() => {})
+  const globalSubscriptionsRef = useRef<ReturnType<
+    typeof installGlobalSessionTabsSubscriptions
+  > | null>(null)
+  const worktreeSubscriptionsRef = useRef<WarmWorktreeSessionSubscriptions | null>(null)
 
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
   const workspaceSessionReady = useAppStore((state) => state.workspaceSessionReady)
@@ -53,8 +61,8 @@ export function useWebSessionTabsSync(): void {
       ? (state.runtimeStatusByEnvironmentId.get(environmentId)?.connectionGeneration ?? 0)
       : 0
   })
-  // Restart trigger only, deliberately not passed to the installer: the scoped stream died with
-  // the transport, but the frames it will resend still belong to the same connection generation.
+  // Restart trigger only, deliberately not passed to the installer: the scoped stream may have
+  // ended during the outage, but the frames it will resend still belong to the same connection.
   const activeWorktreeRuntimeHostContactEpoch = useAppStore((state) => {
     const environmentId = getExplicitRuntimeEnvironmentIdForWorktree(state, state.activeWorktreeId)
     return environmentId
@@ -90,7 +98,7 @@ export function useWebSessionTabsSync(): void {
   )
 
   useEffect(() => {
-    return installGlobalSessionTabsSubscriptions({
+    const subscriptions = installGlobalSessionTabsSubscriptions({
       runtimeSessionMirrorEnvironmentKey,
       workspaceSessionReady,
       refs: {
@@ -103,28 +111,58 @@ export function useWebSessionTabsSync(): void {
         ownerRevisions: ownerRevisionsRef
       }
     })
-    // `resubscribeSignal` is a dependency and never an argument: a regained host needs its streams
-    // reinstalled, but the mirror state they refill is stamped with the key, which has not moved.
-  }, [runtimeSessionMirrorEnvironmentKey, resubscribeSignal, workspaceSessionReady])
+    globalSubscriptionsRef.current = subscriptions ?? null
+    return () => {
+      globalSubscriptionsRef.current = null
+      subscriptions?.()
+    }
+  }, [runtimeSessionMirrorEnvironmentKey, workspaceSessionReady])
+
+  // A regained host revives the streams that ended during the outage. Live ones are left alone:
+  // the mirror state they refill is stamped with the key, which has not moved, and a probe flap
+  // with no real outage must not cost a resubscribe.
+  useEffect(() => {
+    globalSubscriptionsRef.current?.restartEnded()
+  }, [resubscribeSignal])
 
   useEffect(() => {
-    return installActiveSessionTabsSubscription({
-      activeWorktreeId,
-      activeWorktreeRuntimeEnvironmentId,
-      activeWorktreeRuntimeConnectionGeneration,
-      activeWorktreeRuntimePairingRevision,
-      workspaceSessionReady,
-      visibilitySnapshotReceipt: visibilitySnapshotReceiptRef,
-      visibilitySnapshotApply: visibilitySnapshotApplyRef,
-      visibilitySnapshotAccepted: visibilitySnapshotAcceptedRef
-    })
+    const subscriptions = createWarmWorktreeSessionSubscriptions(
+      installActiveSessionTabsSubscription
+    )
+    worktreeSubscriptionsRef.current = subscriptions
+    return () => {
+      worktreeSubscriptionsRef.current = null
+      subscriptions.dispose()
+    }
+  }, [])
+
+  useEffect(() => {
+    worktreeSubscriptionsRef.current?.select(
+      {
+        activeWorktreeId,
+        activeWorktreeRuntimeEnvironmentId,
+        activeWorktreeRuntimeConnectionGeneration,
+        activeWorktreeRuntimePairingRevision,
+        workspaceSessionReady,
+        visibilitySnapshotReceipt: visibilitySnapshotReceiptRef,
+        visibilitySnapshotApply: visibilitySnapshotApplyRef,
+        visibilitySnapshotAccepted: visibilitySnapshotAcceptedRef
+      },
+      activeWorktreeRuntimeId
+    )
   }, [
     activeWorktreeId,
     activeWorktreeRuntimeEnvironmentId,
     activeWorktreeRuntimeConnectionGeneration,
-    activeWorktreeRuntimeHostContactEpoch,
     activeWorktreeRuntimePairingRevision,
     activeWorktreeRuntimeId,
     workspaceSessionReady
   ])
+
+  useEffect(() => {
+    const environmentId = activeWorktreeRuntimeEnvironmentId?.trim()
+    if (environmentId) {
+      worktreeSubscriptionsRef.current?.restartEnded(environmentId)
+    }
+  }, [activeWorktreeRuntimeEnvironmentId, activeWorktreeRuntimeHostContactEpoch])
 }

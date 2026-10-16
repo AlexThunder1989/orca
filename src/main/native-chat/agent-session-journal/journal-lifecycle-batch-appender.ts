@@ -75,12 +75,22 @@ export class JournalLifecycleBatchAppender {
   }
 
   private planMutations(
-    input: Pick<JournalLifecycleBatchInput, 'settlementId' | 'fence' | 'recovered'>,
-    mutations: readonly JournalLifecycleMutationInput[]
+    input: Pick<JournalLifecycleBatchInput, 'settlementId' | 'fence' | 'recovered' | 'ownerFence'>,
+    stated: readonly JournalLifecycleMutationInput[]
   ): ((seq: number, ts: number) => JournalRow)[] {
     if (this.wasApplied(input.settlementId)) {
       return []
     }
+    // A provider's batch states its generation on every item it creates.
+    const { ownerFence } = input
+    const mutations =
+      ownerFence === undefined
+        ? stated
+        : stated.map((mutation) =>
+            mutation.kind === 'item' && mutation.ownerFence === undefined
+              ? { ...mutation, ownerFence }
+              : mutation
+          )
     const current = this.deps.state()
     const options = { ...input, epoch: current.epoch }
     // Every row in this transaction must advance past the rows planned before it.
@@ -141,6 +151,7 @@ export class JournalLifecycleBatchAppender {
                     ...only.linkage,
                     turnScope: only.turnScope,
                     fence: input.fence,
+                    ownerFence: only.ownerFence,
                     recovered: input.recovered
                   },
                   revisions

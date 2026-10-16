@@ -1,3 +1,4 @@
+import type * as ExecCommandModule from './ssh-relay-exec-command'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,7 +15,10 @@ import { ORCAD_WINDOWS_HOST_SCRIPT } from './orcad-windows-host-script'
 import { getRemoteHostPlatform } from './ssh-remote-platform'
 
 const execCommand = vi.hoisted(() => vi.fn())
-vi.mock('./ssh-relay-deploy-helpers', () => ({ execCommand }))
+vi.mock('./ssh-relay-exec-command', async (importOriginal) => ({
+  ...(await importOriginal<typeof ExecCommandModule>()),
+  execCommand
+}))
 
 const linux = getRemoteHostPlatform('linux-x64')
 const windows = getRemoteHostPlatform('win32-x64')

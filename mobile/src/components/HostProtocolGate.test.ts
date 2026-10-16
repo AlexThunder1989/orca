@@ -2,7 +2,8 @@ import { createElement, useEffect } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
-import { HostProtocolGate, useHostProtocolGates } from './HostProtocolGate'
+import { HostProtocolGate } from './HostProtocolGate'
+import { useHostProtocolGates } from './host-protocol-gates-context'
 
 const nativeTestState = vi.hoisted(() => ({
   openUrl: vi.fn(),

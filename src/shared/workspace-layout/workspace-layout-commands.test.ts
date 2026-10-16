@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { EditorTabView } from '../editor-tab-view-types'
 import { applyLayoutCommand } from './workspace-layout-commands'
-import type { LayoutCommand } from './workspace-layout-command-types'
+import type { CommandOf, LayoutCommand } from './workspace-layout-command-types'
 import {
   asLoaded,
   build,
@@ -429,6 +430,60 @@ describe('layout command effects', () => {
     expect(entities).toContain('/w/c.ts')
     expect(entities).not.toContain('/w/b.ts')
   })
+
+  const viewedOpens: [string, CommandOf<'openEditorTab'>, EditorTabView, string[]][] = [
+    [
+      'a diff tab',
+      { type: 'openEditorTab', workspace: WS, fileId: '/w', contentType: 'diff' },
+      { mode: 'diff', diffSource: 'combined-all', combinedAreaFilter: 'staged' },
+      ['/w/a.ts']
+    ],
+    [
+      'an edit tab with conflict details',
+      {
+        type: 'openEditorTab',
+        workspace: WS,
+        fileId: '/w/b.ts',
+        contentType: 'editor',
+        file: { filePath: '/w/b.ts', relativePath: 'b.ts', language: 'typescript' }
+      },
+      {
+        mode: 'edit',
+        conflict: {
+          kind: 'conflict-editable',
+          conflictKind: 'both_modified',
+          conflictStatus: 'unresolved',
+          conflictStatusSource: 'git'
+        }
+      },
+      ['/w/a.ts', '/w/b.ts']
+    ]
+  ]
+
+  it.each(viewedOpens)(
+    '%s: holds its view by tab id, never saves it, and drops it on close',
+    (_name, open, view, savedFiles) => {
+      // Two identical setups mint identical ids, so only the view differs.
+      const plainSetup = setup()
+      const plain = build(plainSetup.ctx, [open], plainSetup.model)
+      const viewedSetup = setup()
+      const viewed = build(viewedSetup.ctx, [{ ...open, view }], viewedSetup.model)
+      const tabId = viewed.results[0]!.tabId!
+      expect(plain.results[0]!.tabId).toBe(tabId)
+      expect(viewed.model.workspaces[WS]!.editorViews).toEqual({ [tabId]: view })
+
+      const saved = saveWorkspaceLayout(asLoaded(viewed.model))
+      expect(JSON.stringify(saved)).toBe(JSON.stringify(saveWorkspaceLayout(asLoaded(plain.model))))
+      expect(saved.openFilesByWorktree?.[WS]?.map((file) => file.filePath)).toEqual(savedFiles)
+
+      const closed = build(
+        viewedSetup.ctx,
+        [{ type: 'closeTabs', workspace: WS, tabIds: [tabId] }],
+        viewed.model
+      )
+      expect(closed.model.workspaces[WS]!.editorViews).toEqual({})
+    }
+  )
 
   it('opens browser and agent-session tabs with their records', () => {
     const { model, ctx } = setup()

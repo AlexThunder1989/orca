@@ -118,7 +118,6 @@ function renderComposerDrop(attached: string[]) {
       selectedRepo: REPO,
       selectedRepoPath: REPO.path,
       selectedRepoExecutionHostId: `runtime:${ENVIRONMENT_ID}`,
-      selectedRepoSettings: { activeRuntimeEnvironmentId: null },
       connectionId: null
     })
     return useAttachmentDropState({
@@ -128,7 +127,7 @@ function renderComposerDrop(attached: string[]) {
       promptCaretFrameRef: { current: null },
       promptTextareaRef: createRef<HTMLTextAreaElement>(),
       selectedRepoPath: target.path ?? undefined,
-      selectedRepoSettings: target.settings,
+      selectedRepoRuntimeEnvironmentId: target.runtimeEnvironmentId,
       selectedWorktreeId: target.worktreeId,
       setAgentPrompt: () => {},
       setAttachmentPaths: (next) => {

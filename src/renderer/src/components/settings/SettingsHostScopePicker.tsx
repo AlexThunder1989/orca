@@ -8,11 +8,9 @@ import {
 import { translate } from '@/i18n/i18n'
 import { getLocalExecutionHostLabel } from '../../../../shared/execution-host'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
-import {
-  getSettingsHostScopeEnvironmentId,
-  type SettingsHostChoice,
-  type SettingsHostScope
-} from './settings-host-scope'
+import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import type { SettingsHostScope } from './settings-host-scope'
 
 const LOCAL_VALUE = 'local'
 const ENVIRONMENT_VALUE_PREFIX = 'environment:'
@@ -20,7 +18,7 @@ const ENVIRONMENT_VALUE_PREFIX = 'environment:'
 type SettingsHostScopePickerProps = {
   scope: SettingsHostScope
   environments: readonly PublicKnownRuntimeEnvironment[]
-  onChoose: (choice: SettingsHostChoice) => void
+  onChoose: (choice: RuntimeClientTarget) => void
 }
 
 export function shouldShowSettingsHostScopePicker(
@@ -35,7 +33,7 @@ export function SettingsHostScopePicker({
   environments,
   onChoose
 }: SettingsHostScopePickerProps): React.JSX.Element {
-  const scopeEnvironmentId = getSettingsHostScopeEnvironmentId(scope)
+  const scopeEnvironmentId = runtimeTargetEnvironmentId(scope.target)
   const value = scopeEnvironmentId
     ? `${ENVIRONMENT_VALUE_PREFIX}${scopeEnvironmentId}`
     : LOCAL_VALUE

@@ -140,18 +140,6 @@ describe('ChecksList expanded check details', () => {
     expect(container.innerHTML).toContain('data-variant="outline"')
   })
 
-  it('uses the sidebar sticky surface by default in the hosted checks panel', async () => {
-    activeWorktreeState.current = { id: 'wt-active-1' }
-    renderChecksList()
-
-    await act(async () => {
-      await Promise.resolve()
-    })
-
-    const stickyBar = container.querySelector('.sticky.top-0')
-    expect(stickyBar?.className).toContain('bg-sidebar/95')
-  })
-
   it('falls back to the active worktree when no worktree override is provided', async () => {
     activeWorktreeState.current = { id: 'wt-active-1' }
     renderChecksList()

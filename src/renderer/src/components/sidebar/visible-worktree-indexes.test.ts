@@ -21,8 +21,8 @@ vi.mock('../../../../shared/resolved-worktree-lineage', async (importOriginal) =
   }
 })
 
-import { computeVisibleWorktreeIds } from './visible-worktrees'
-import type { computeVisibleWorktrees } from './visible-worktrees'
+import { computeVisibleWorktreeIds } from './compute-visible-worktrees'
+import type { computeVisibleWorktrees } from './compute-visible-worktrees'
 import { getCyclicProjectedWorktreeLineageIds } from './worktree-lineage-projection'
 import { getLineageAncestorIndex, getSortedWorktreeRankIndex } from './visible-worktree-indexes'
 

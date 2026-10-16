@@ -31,6 +31,10 @@ import {
 import { seedRelayEraProfile } from './helpers/orcad-upgrade-profile'
 import { toSshExecutionHostId } from '../../src/shared/execution-host'
 import {
+  decommissionConvertedHost,
+  type ConvertedHostTeardown
+} from './helpers/orcad-convert-teardown'
+import {
   ORCAD_CONVERT_HOST_ENV,
   startOrcadConvertHost,
   type OrcadConvertHost
@@ -86,6 +90,7 @@ test('a relay-era profile converts its SSH host on the first connect after upgra
     ORCA_ORCAD_TEMPLATE_PATH: TEMPLATE_SOURCE!
   })
   let app: ElectronApplication | null = null
+  let teardown: (ConvertedHostTeardown & { page: Page }) | null = null
   try {
     // The first launch only establishes the profile the relay-era rows are written into.
     const first = await session.launch()
@@ -137,6 +142,12 @@ test('a relay-era profile converts its SSH host on the first connect after upgra
     if (!environment) {
       throw new Error('Converted host is missing from the environment catalog')
     }
+    teardown = {
+      page: upgraded.page,
+      environmentId: environment.id,
+      targetId: seeded.targetId,
+      worktreeId: seeded.worktreeId
+    }
     const hostId = `runtime:${environment.id}` as const
     await upgraded.page.evaluate((hostId) => {
       const state = window.__store!.getState()
@@ -183,10 +194,25 @@ test('a relay-era profile converts its SSH host on the first connect after upgra
     expect(status.result.app.desktopWindowStatus).toBe('blocked')
     await upgraded.page.screenshot({ path: testInfo.outputPath('managed-cli-ready.png') })
   } finally {
-    if (app) {
-      await session.close(app)
+    try {
+      // The Windows account survives client exit; stop its owned runtime before the lane's grace.
+      if (HOST !== 'docker' && teardown) {
+        const { page, ...owned } = teardown
+        const stopped = await page.evaluate(decommissionConvertedHost, owned)
+        await testInfo.attach('converted-host-teardown', {
+          body: JSON.stringify(stopped),
+          contentType: 'application/json'
+        })
+      }
+    } finally {
+      try {
+        if (app) {
+          await session.close(app)
+        }
+      } finally {
+        await session.dispose()
+      }
     }
-    await session.dispose()
   }
 })
 

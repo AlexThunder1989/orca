@@ -1,4 +1,4 @@
-import { guardedSafeStorage as safeStorage } from '../host/safe-storage-availability'
+import { getSecretStore } from '../../shared/secret-store'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -47,10 +47,10 @@ function readEnvelope(envelope: ZcodePlanApiKeyEnvelope): string {
   if (envelope.kind === 'plaintext') {
     return envelope.payload.toString('utf8')
   }
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!getSecretStore().isEncryptionAvailable()) {
     throw new Error('GLM Coding Plan API key could not be decrypted')
   }
-  return safeStorage.decryptString(envelope.payload)
+  return getSecretStore().decryptString(envelope.payload)
 }
 
 export function hasZcodePlanApiKey(): boolean {
@@ -123,10 +123,10 @@ export function saveZcodePlanApiKey(key: string): void {
   if (/[\r\n]/.test(trimmed)) {
     throw new Error('GLM Coding Plan API key must be a single line')
   }
-  if (safeStorage.isEncryptionAvailable()) {
+  if (getSecretStore().isEncryptionAvailable()) {
     writeSecureFile(
       getZcodePlanApiKeyPath(),
-      encodeApiKeyEnvelope('encrypted', safeStorage.encryptString(trimmed))
+      encodeApiKeyEnvelope('encrypted', getSecretStore().encryptString(trimmed))
     )
     cachedZcodePlanApiKey = trimmed
     return

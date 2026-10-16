@@ -18,9 +18,9 @@ import {
   orcadReadinessWaitCommand,
   parseOrcadReadinessWaitOutput
 } from './orcad-remote-readiness-wait'
-import type { SshConnection } from './ssh-connection'
+import type { OrcadHostTransport } from './orcad-host-transport'
 import { errorMessage } from '../../shared/error-message'
-import { execCommand, isUnconfirmedSshCommandTermination } from './ssh-relay-deploy-helpers'
+import { execCommand, isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
 import {
   currentOrcadFence,
   isOrcadFenceLost,
@@ -35,7 +35,7 @@ import { isWindowsRemoteHost, type RemoteHostPlatform } from './ssh-remote-platf
 const READINESS_RETRY_PAUSE_MS = 1_000
 
 export type OrcadRemoteExecTarget = {
-  conn: SshConnection
+  conn: OrcadHostTransport
   host: RemoteHostPlatform
   signal?: AbortSignal
   /** Locates the runtime store for host-record scripts; required on Windows, unused elsewhere. */
@@ -117,7 +117,15 @@ export async function launchOrcadAndAwaitReadiness(
       )
     )
   } else {
-    await execOrcadRemote(target, orcadLaunchCommand(target.host, spec))
+    await execOrcadRemote(
+      target,
+      orcadLaunchCommand(
+        target.host,
+        spec,
+        target.conn.orcadLaunchDetach ?? 'nohup',
+        (await target.conn.orcadLaunchEnv?.()) ?? []
+      )
+    )
   }
   const deadline = Date.now() + (target.readinessTimeoutMs ?? ORCAD_STARTUP_READINESS_TIMEOUT_MS)
   const sleep = target.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))

@@ -4,7 +4,7 @@ import type { AppState } from '@/store'
 import type { OpenFile } from '@/store/slices/editor'
 import { getConnectionIdForFile } from '@/lib/connection-context'
 import { editorTabFileAccess } from '@/lib/local-file-access'
-import { readRuntimeFileContent } from '@/runtime/runtime-file-client'
+import { readRuntimeFileContent } from '@/runtime/runtime-file-read-client'
 import {
   getRuntimeTargetForFileOwner,
   requireRuntimeTargetForFileOwner

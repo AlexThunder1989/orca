@@ -60,7 +60,7 @@ function listWith(fields: { actionError: string; setActionError: (value: string)
     relayRecovery: { pairingRejected: false },
     routeNotice: '',
     router: { push: () => {} },
-    sectionsResult: { rawSections: [], sections: [], uniqueRepoColors: new Map() },
+    sectionsResult: { rawSections: [], sections: [], repoById: new Map() },
     setDismissedNotice: () => {},
     settings: { activeFilterCount: 0 },
     state: {
@@ -69,7 +69,6 @@ function listWith(fields: { actionError: string; setActionError: (value: string)
       catalogError: null,
       collapsedGroups: new Set(),
       groupMode: 'none',
-      repoIconsByName: new Map(),
       search: '',
       showSearch: false,
       worktreesLoaded: true

@@ -62,6 +62,7 @@ export const HOST_OPERATION_OWNERSHIP = {
   stats: 'host',
   status: 'host',
   terminal: 'host',
+  terminalDaemon: 'host',
   ui: 'host',
   updater: 'host',
   workspacePorts: 'host',

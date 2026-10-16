@@ -18,6 +18,7 @@ import type {
 } from '../../../../shared/ssh-target-management'
 import {
   SshBrowseDir,
+  SshConnect,
   SshTarget,
   SshTargetAdd,
   SshTargetUpdate
@@ -84,10 +85,13 @@ export const SSH_METHODS = [
   defineMethod({
     name: 'ssh.connect',
     permission: 'host-admin',
-    params: SshTarget,
+    params: SshConnect,
     handler: async (params) => {
       try {
-        return { state: getPublicSshState(await connectRegisteredSshTarget(params.targetId)) }
+        const state = await connectRegisteredSshTarget(params.targetId, {
+          automatic: params.automatic === true
+        })
+        return { state: getPublicSshState(state) }
       } catch {
         const state = getRegisteredSshState(params.targetId)
         throw new Error(getPublicSshError(state?.status ?? 'error'))

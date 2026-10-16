@@ -50,6 +50,7 @@ function registerSharingHandlers(
   const preparations = new SkillSharePreparationService(
     join(app.getPath('userData'), 'skill-share-preparations'),
     {
+      findOwnedPackageId: (name, request) => runtime.findOwnedSkillPackageId(name, request),
       publishVersion: (request) => runtime.publishSkillPackageVersion(request),
       createShare: (packageId, request) => runtime.createSkillPackageShare(packageId, request)
     },

@@ -94,6 +94,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     isDeleting: linked.isDeleting,
     isSshDisconnected: foundation.isSshDisconnected,
     updateWorktreeMeta: foundation.updateWorktreeMeta,
+    setWorkspaceUnreadByUser: foundation.setWorkspaceUnreadByUser,
     openModal: foundation.openModal
   })
 

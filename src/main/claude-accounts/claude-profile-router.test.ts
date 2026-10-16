@@ -6,7 +6,9 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -48,6 +50,7 @@ vi.mock('../macos-keychain/generic-password', () => ({
 
 const roots: string[] = []
 afterEach(() => {
+  vi.useRealTimers()
   shell.hang = false
   installClaudeProfileRouter(undefined)
   roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }))
@@ -105,14 +108,41 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
 
 function signIn(stateDir: string, email: string, organizationUuid?: string): void {
   mkdirSync(stateDir, { recursive: true })
+  const stateFile = join(stateDir, '.claude.json')
+  const previousMtimeMs = existsSync(stateFile) ? statSync(stateFile).mtimeMs : 0
   writeFileSync(
-    join(stateDir, '.claude.json'),
+    stateFile,
     JSON.stringify({ oauthAccount: { emailAddress: email, organizationUuid } })
   )
+  // Equal-size fixture revisions must invalidate the real reader's mtime cache.
+  const mtime = new Date(
+    Math.max(
+      Math.floor(Date.now() / 1000) * 1000,
+      Math.floor(previousMtimeMs / 1000) * 1000 + 2_000
+    )
+  )
+  utimesSync(stateFile, mtime, mtime)
+}
+
+async function advanceRefreshDeadline(launch: Promise<unknown>, waitMs: number): Promise<void> {
+  let settled = false
+  void launch.then(
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    }
+  )
+  await vi.advanceTimersByTimeAsync(0)
+  await vi.advanceTimersByTimeAsync(waitMs - 1)
+  expect(settled).toBe(false)
+  await vi.advanceTimersByTimeAsync(1)
 }
 
 describe('ClaudeProfileRouter', () => {
   it('runs an account with no login of its own on System default while that is signed in to it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const f = fixture()
     mkdirSync(f.home('a'), { recursive: true })
     writeFileSync(join(f.home('a'), '..', 'profile.json'), '{}')
@@ -131,7 +161,9 @@ describe('ClaudeProfileRouter', () => {
 
     // After the account signs in to its own folder, the next launch uses it.
     signIn(f.home('a'), 'a@example.test')
-    await expect(f.router.prepareLaunch()).resolves.toMatchObject({
+    const ownFolderLaunch = f.router.prepareLaunch()
+    await advanceRefreshDeadline(ownFolderLaunch, 500)
+    await expect(ownFolderLaunch).resolves.toMatchObject({
       configDir: f.home('a')
     })
     expect(readFileSync(f.router.pointerPath, 'utf8')).toBe(f.home('a'))
@@ -153,13 +185,18 @@ describe('ClaudeProfileRouter', () => {
   })
 
   it('keeps an account on its own folder when System default is signed in to another email, or out', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const f = fixture()
     mkdirSync(f.home('a'), { recursive: true })
     writeFileSync(join(f.home('a'), '..', 'profile.json'), '{}')
     signIn(f.userHome, 'b@example.test')
-    await expect(f.router.prepareLaunch()).resolves.toMatchObject({ configDir: f.home('a') })
+    const anotherAccountLaunch = f.router.prepareLaunch()
+    await advanceRefreshDeadline(anotherAccountLaunch, 500)
+    await expect(anotherAccountLaunch).resolves.toMatchObject({ configDir: f.home('a') })
     writeFileSync(join(f.userHome, '.claude.json'), '{}')
-    await expect(f.router.prepareLaunch()).resolves.toMatchObject({ configDir: f.home('a') })
+    const signedOutLaunch = f.router.prepareLaunch()
+    await advanceRefreshDeadline(signedOutLaunch, 500)
+    await expect(signedOutLaunch).resolves.toMatchObject({ configDir: f.home('a') })
   })
 
   it('never covers an account saved for another organization of the same email', () => {
@@ -249,6 +286,7 @@ describe('ClaudeProfileRouter', () => {
   })
 
   it('refreshes a set-up folder before each launch, which never fails or hangs on it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const f = fixture()
     mkdirSync(f.home('a'), { recursive: true })
     const first = f.router.prepareLaunch()
@@ -269,10 +307,12 @@ describe('ClaudeProfileRouter', () => {
 
     // A refresh that hangs, then fails, only delays a launch briefly.
     f.setup.outcome = 'refused'
-    await expect(f.router.prepareLaunch()).resolves.toMatchObject({ configDir: f.home('a') })
+    const hungRefreshLaunch = f.router.prepareLaunch()
+    await advanceRefreshDeadline(hungRefreshLaunch, 500)
+    await expect(hungRefreshLaunch).resolves.toMatchObject({ configDir: f.home('a') })
     expect(f.setup.calls).toBe(3)
     f.setup.settle()
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await vi.advanceTimersByTimeAsync(10)
     const fourth = f.router.prepareLaunch()
     await vi.waitFor(() => expect(f.setup.calls).toBe(4))
     f.setup.settle()
@@ -307,6 +347,7 @@ describe('ClaudeProfileRouter', () => {
   })
 
   it("launches a set-up, signed-in account without waiting for the login shell's env", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     shell.hang = true
     const f = fixture()
     mkdirSync(f.home('a'), { recursive: true })
@@ -317,7 +358,9 @@ describe('ClaudeProfileRouter', () => {
       dataRoot: f.dataRoot,
       userHome: f.userHome
     })
-    await expect(router.prepareLaunch()).resolves.toMatchObject({ configDir: f.home('a') })
+    const launch = router.prepareLaunch()
+    await advanceRefreshDeadline(launch, 5_000)
+    await expect(launch).resolves.toMatchObject({ configDir: f.home('a') })
   })
 
   it("sets up a pre-update account's missing folder without a login, for Claude's own first run", async () => {

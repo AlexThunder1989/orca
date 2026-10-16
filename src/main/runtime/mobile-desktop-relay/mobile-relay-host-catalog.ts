@@ -16,6 +16,13 @@ import type {
 } from '../../../shared/mobile-relay-hosts-contract'
 import { lastVerifiedRuntimeStatus } from '../../../shared/runtime-host-status'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
+import {
+  getPairedDeviceIdsByEnvironment,
+  isWorkspaceOwnedBySomeoneElse
+} from '../../../shared/workspace-creator-visibility'
+import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
+import { getWorkspaceSessionTabActivityIds } from '../../../shared/workspace-session-tab-activity'
+import { runtimeWorktreeIdentityKey } from '../runtime-worktree-path-identity'
 import type {
   MobileDesktopRelayHostListing,
   MobileDesktopRelayHosts
@@ -53,6 +60,8 @@ export class MobileRelayHostCatalog {
     private readonly options: {
       hosts: MobileDesktopRelayHosts
       hostLabelOverrides: () => ReadonlyMap<ExecutionHostId, string>
+      /** The desktop's saved session for a host, as its sidebar last wrote it. */
+      getWorkspaceSession: (hostId: ExecutionHostId) => WorkspaceSessionState | null
     }
   ) {}
 
@@ -80,15 +89,28 @@ export class MobileRelayHostCatalog {
       await withinFetchBound(this.refresh(host))
     }
     const cached = this.cached.get(host.environmentId)
-    const current = this.options.hosts
-      .list()
-      .environments.find((environment) => environment.id === host.environmentId)
+    const { environments, statusByEnvironmentId } = this.options.hosts.list()
+    const current = environments.find((environment) => environment.id === host.environmentId)
     // Why the identity read after the fetch: one answered after a re-pair stored the old server's rows.
     if (!cached || !current || cached.fence !== fenceOf(current)) {
       return { worktrees: null }
     }
+    const desktopDeviceIds = getPairedDeviceIdsByEnvironment([current], statusByEnvironmentId)
+    const sessionActivity = new Set(
+      [
+        ...getWorkspaceSessionTabActivityIds(
+          this.options.getWorkspaceSession(toRuntimeExecutionHostId(host.environmentId))
+        )
+      ].map(runtimeWorktreeIdentityKey)
+    )
     // Why: the desktop asks with background-removal support; a phone asking itself never sees these rows.
-    return { worktrees: cached.worktrees.filter((row) => row.removing !== true) }
+    return {
+      worktrees: cached.worktrees
+        .filter((row) => row.removing !== true)
+        .map((row) =>
+          stampDesktopSidebarView(row, host.environmentId, desktopDeviceIds, sessionActivity)
+        )
+    }
   }
 
   private describe(): DescribedHost[] {
@@ -197,6 +219,33 @@ function relayVerdict(
     return 'update-needed'
   }
   return health === 'available' ? 'ready' : 'unavailable'
+}
+
+/**
+ * What the desktop's own sidebar knows and the server cannot: which rows are another client's
+ * (marked, not dropped; the phone applies the shared filter), and its browser and chat tabs as activity.
+ */
+function stampDesktopSidebarView(
+  row: MobileRelayServerWorktreeRow,
+  environmentId: string,
+  desktopDeviceIds: ReadonlyMap<string, string>,
+  sessionActivity: ReadonlySet<string>
+): MobileRelayServerWorktreeRow {
+  const otherClient = isWorkspaceOwnedBySomeoneElse(
+    { creatorProvenance: row.creatorProvenance, runtimeOwnerEnvironmentId: environmentId },
+    desktopDeviceIds
+  )
+  const active =
+    typeof row.worktreeId === 'string' &&
+    sessionActivity.has(runtimeWorktreeIdentityKey(row.worktreeId))
+  if (!otherClient && !active) {
+    return row
+  }
+  return {
+    ...row,
+    ...(otherClient ? { desktopOtherClient: true } : {}),
+    ...(active ? { hasHostSidebarActivity: true } : {})
+  }
 }
 
 /**

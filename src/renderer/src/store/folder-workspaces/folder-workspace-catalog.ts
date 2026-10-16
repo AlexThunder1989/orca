@@ -11,7 +11,8 @@ import {
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { catalogOwnsHost, getProjectGroupHostId } from '../slices/project-group-owner-routing'
 import type { FolderWorkspaceUpdateTicket } from '../slices/folder-workspace-update-coordinator'
-import { callRuntimeRpc, type RuntimeClientTarget } from '../../runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type {
   FolderWorkspaceUpdateCoordinatorInstance,
   FolderWorkspaceUpdateField
@@ -20,7 +21,7 @@ import {
   folderWorkspaceUpdateInvalidatesPathStatus,
   mergeFolderWorkspaceUpdateResponse
 } from './folder-workspace-routing'
-import { getRuntimeTargetHostId } from '../runtime-target-host'
+import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
 import { adoptFromEndpoint } from '../adopt-from-endpoint'
 import { mergeByIdentity, unchangedMergeSource } from '../catalog-identity'
 

@@ -19,7 +19,6 @@ import {
 } from './github-remote-identity-parsing'
 import { resolveSshConfigHostname } from './github-ssh-host-alias-resolution'
 import { parseWslPath } from '../wsl'
-import { getSshGitProviderGeneration } from '../providers/ssh-git-dispatch'
 import { isStableMissingGitRemoteError } from '../git/stable-missing-git-remote-error'
 import { requireReachableGitRoute } from '../providers/execution-host-provider-dispatch'
 import { getConnectionExecutionHostId } from '../../shared/execution-host'
@@ -46,14 +45,13 @@ const hostAuthInFlight = new Map<string, Promise<string | null | undefined>>()
 // repos, but the answer still describes that connection's runtime (it is probed
 // without the repository cwd). Keying it per connection stops a local repo and
 // an SSH-hosted repo at the same path from adopting each other's auth state.
-// Provider generation fences stale answers when reconnect replaces the runtime.
 function runtimeCacheKey(
   repoPath: string,
   connectionId?: string | null,
   wslDistro?: string
 ): string {
   if (connectionId) {
-    return `connection:${connectionId}:${getSshGitProviderGeneration(connectionId)}`
+    return `connection:${connectionId}`
   }
   const resolvedDistro = wslDistro ?? parseWslPath(repoPath)?.distro
   return `local:${resolvedDistro?.toLowerCase() ?? 'host'}`

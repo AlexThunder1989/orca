@@ -26,10 +26,17 @@ import {
 let rig: QueuedMessageTestRig
 
 beforeEach(async () => {
+  vi.useFakeTimers()
   rig = await createQueuedMessageTestRig()
 })
 
-afterEach(() => rig.dispose())
+afterEach(async () => {
+  try {
+    await rig.dispose()
+  } finally {
+    vi.useRealTimers()
+  }
+})
 
 function compact(
   delivery?: 'queue-if-active',
@@ -95,7 +102,7 @@ const BACKGROUND_TASK: AgentChildWorkView = {
   invocation: { invocationId: 'spawn-dev', generation: 1 }
 }
 
-const settleMs = () => new Promise((resolve) => setTimeout(resolve, 150))
+const settleMs = () => vi.advanceTimersByTimeAsync(150)
 
 describe('a /compact that waits in line', () => {
   it("uses the person's reserve when background cards fill their bound", async () => {

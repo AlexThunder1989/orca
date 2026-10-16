@@ -10,7 +10,7 @@ import {
   getLocalProjectWorktreeGitOptions
 } from '../project-runtime-git-options'
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
-import type { Store } from '../persistence'
+import type { ProjectRuntimeResolutionStore } from '../local-project-runtime-resolution'
 import { resolveRuntimeGitLabForkMrBase } from './runtime-gitlab-fork-mr-base'
 import { resolveRuntimeGitLabIssueSourceRemote } from './runtime-gitlab-issue-source-remote'
 
@@ -28,7 +28,10 @@ type RuntimeGitLabWorktreeBaseResult =
 
 export async function resolveRuntimeGitLabWorktreeBase(
   args: RuntimeGitLabWorktreeBaseArgs,
-  deps: { store: Store | null; resolveRepo: (selector: string) => Promise<Repo> }
+  deps: {
+    store: ProjectRuntimeResolutionStore | null
+    resolveRepo: (selector: string) => Promise<Repo>
+  }
 ): Promise<RuntimeGitLabWorktreeBaseResult> {
   if (!deps.store) {
     throw new Error('runtime_unavailable')

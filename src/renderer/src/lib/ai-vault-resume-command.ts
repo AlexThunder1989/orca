@@ -36,6 +36,7 @@ export type AiVaultResumeCommandSession = Pick<
   >
 
 export type AiVaultResumeStartup = {
+  agent?: AiVaultSession['agent']
   command: string
   cwd?: string
   env?: Record<string, string>
@@ -59,6 +60,7 @@ export type AiVaultResumeWorktreeArgs = {
   worktreeId?: string | null
   session: AiVaultResumeCommandSession
   commandOverride?: string | null
+  agentArgs?: string
 }
 
 export function buildAiVaultResumeCopyCommandForWorktree(args: AiVaultResumeWorktreeArgs): string {
@@ -173,10 +175,9 @@ function buildAiVaultResumeForWorktree(
       },
       platform,
       shell: liveShell,
-      agentArgs: resolveTuiAgentLaunchArgs(
-        args.session.agent,
-        args.state.settings?.agentDefaultArgs
-      ),
+      agentArgs:
+        args.agentArgs ??
+        resolveTuiAgentLaunchArgs(args.session.agent, args.state.settings?.agentDefaultArgs),
       agentEnv: resolveTuiAgentLaunchEnv(args.session.agent, args.state.settings?.agentDefaultEnv),
       resumeInLaunchCwd: true,
       ...(args.session.agent === 'omp' && resumeFilePath

@@ -1,6 +1,6 @@
 /**
  * A state mutation can outlast the activation fence's stale window, so it keeps the fence
- * fresh while it runs. Run for real with a one-second beat and the real steal command.
+ * fresh while it runs. Run a short real heartbeat and the real steal command.
  */
 import {
   existsSync,
@@ -24,6 +24,8 @@ import { getRemoteHostPlatform } from './ssh-remote-platform'
 
 const posix = getRemoteHostPlatform('linux-x64')
 const STALE_SECONDS = 3
+const HEARTBEAT_SECONDS = 0.1
+const OBSERVE_HEARTBEATS_MS = 300
 
 async function sh(command: string): Promise<string> {
   return (await runProcess({ program: '/bin/sh', args: ['-c', command] })).stdout.trim()
@@ -44,7 +46,10 @@ describe.skipIf(process.platform === 'win32')(
     })
     // The mutation runs under the fence its run holds, generation `holder-1`.
     const mutation = (script: string): string =>
-      serializedStateMutationCommand(base, script, 1, { lockDir: fence, token: 'holder-1' })
+      serializedStateMutationCommand(base, script, HEARTBEAT_SECONDS, {
+        lockDir: fence,
+        token: 'holder-1'
+      })
     afterEach(() => {
       rmSync(base, { recursive: true, force: true })
     })
@@ -66,15 +71,15 @@ describe.skipIf(process.platform === 'win32')(
           .toBeTruthy()
 
         await backdate()
-        await pause(2_500)
+        await expect.poll(age, { timeout: 5_000, interval: 25 }).toBeLessThan(STALE_SECONDS)
         expect(age()).toBeLessThan(STALE_SECONDS)
         expect(await steal()).toBe('BUSY')
 
         // The host process dies (OOM, reboot of the session): nothing refreshes the fence now.
         process.kill(Number(readFileSync(pidFile, 'utf8').trim()), 'SIGKILL')
-        await pause(1_500)
+        await pause(OBSERVE_HEARTBEATS_MS)
         await backdate()
-        await pause(2_500)
+        await pause(OBSERVE_HEARTBEATS_MS)
         expect(age()).toBeGreaterThan(STALE_SECONDS)
         expect(await steal()).toMatch(/OK$/u)
       } finally {
@@ -85,10 +90,14 @@ describe.skipIf(process.platform === 'win32')(
     it('stops refreshing a fence another run took over mid-mutation, and keeps its token', async () => {
       const run = spawnProcess({ program: '/bin/sh', args: ['-c', mutation('sleep 6')] })
       try {
-        await pause(1_500)
+        await expect
+          .poll(() => existsSync(join(base, 'orcad-state-mutation.lock', 'pid')))
+          .toBe(true)
+        await backdate()
+        await expect.poll(age, { timeout: 5_000, interval: 25 }).toBeLessThan(STALE_SECONDS)
         writeFileSync(join(fence, ORCAD_FENCE_OWNER_FILENAME), 'successor')
         await backdate()
-        await pause(2_500)
+        await pause(OBSERVE_HEARTBEATS_MS)
         expect(age()).toBeGreaterThan(STALE_SECONDS)
         expect(readFileSync(join(fence, ORCAD_FENCE_OWNER_FILENAME), 'utf8')).toBe('successor')
       } finally {
@@ -105,13 +114,13 @@ describe.skipIf(process.platform === 'win32')(
     }, 20_000)
 
     it('stops refreshing once the mutation finishes, and never creates a missing fence', async () => {
-      await sh(mutation('sleep 2'))
+      await sh(mutation('sleep 0.3'))
       await backdate()
-      await pause(2_500)
+      await pause(OBSERVE_HEARTBEATS_MS)
       expect(age()).toBeGreaterThan(STALE_SECONDS)
 
       rmSync(fence, { recursive: true })
-      await sh(serializedStateMutationCommand(base, 'sleep 2', 1, null))
+      await sh(serializedStateMutationCommand(base, ':', HEARTBEAT_SECONDS, null))
       expect(existsSync(fence)).toBe(false)
     }, 20_000)
   }

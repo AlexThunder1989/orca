@@ -191,6 +191,11 @@ export class SshPortForwardManager {
     await Promise.all(stale.map((id) => this.removeForwardAsync(id)))
   }
 
+  /** Stops every forward and waits until each released its port; quit uses it. */
+  async closeAll(): Promise<void> {
+    await Promise.all([...this.forwards.keys()].map((id) => this.removeForwardAsync(id)))
+  }
+
   dispose(): void {
     const ids = [...this.forwards.keys()]
     for (const id of ids) {

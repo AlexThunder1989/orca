@@ -188,10 +188,7 @@ describe('terminal inventory after a pane is dropped', () => {
     const runtime = makeRuntime()
     dropOnePane(runtime)
     // Spawn records the renderer's pane identity before the graph carrying it arrives (#7587).
-    // Re-recording the dropped pane stands in for that: the graph has not spoken since, so its
-    // silence is not a retraction. This also pins that the runtime stamps the record at all —
-    // orca-runtime-record-pty-worktree.ts is `@ts-nocheck`, so a missing stamp is silent there
-    // and would leave every freshly spawned terminal reporting orphaned for one graph.
+    // Re-recording waits for the first graph statement; prior silence cannot retract the claim.
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: recordPtyWorktree is protected; reaching it is the only way to stamp a pane the graph never published.
     const stamp = runtime as unknown as {
       recordPtyWorktree: (ptyId: string, worktreeId: string, state: Record<string, unknown>) => void

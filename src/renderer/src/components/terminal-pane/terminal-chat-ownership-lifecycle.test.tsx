@@ -58,7 +58,9 @@ vi.mock('../../store', async () => {
   const useAppStore = create(() => mocks.state)
   return { useAppStore }
 })
-vi.mock('@/runtime/web-runtime-session', () => ({ clearWebRuntimeTerminalBuffer: vi.fn() }))
+vi.mock('@/runtime/web-runtime-terminal-buffer-actions', () => ({
+  clearWebRuntimeTerminalBuffer: vi.fn()
+}))
 
 function makeFixture(paneIds = [1, 2], remotePusher?: RemotePaneLayoutPusher) {
   const container = document.createElement('div')

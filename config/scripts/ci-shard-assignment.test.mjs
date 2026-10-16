@@ -100,6 +100,23 @@ describe('timing-weighted shard selection', () => {
     }
   })
 
+  it.each([
+    { name: 'absent', path: undefined, enabled: false },
+    { name: 'empty', path: '', enabled: false },
+    { name: 'explicit', path: join(tmpdir(), 'orca-unit-cache-experiment'), enabled: true }
+  ])(
+    'uses persistent transforms only with an explicit cache path ($name)',
+    async ({ path, enabled }) => {
+      vi.stubEnv('ORCA_UNIT_MODULE_CACHE_PATH', path)
+      vi.resetModules()
+      const { default: config } = await import('../vitest.config')
+      for (const test of [config.test, ...config.test.projects.map((project) => project.test)]) {
+        expect(test.fsModuleCache).toBe(enabled)
+        expect(test.fsModuleCachePath).toBe(enabled ? path : undefined)
+      }
+    }
+  )
+
   it('keeps nested/serial E2E files atomic and fails closed on discovery errors', () => {
     const spec = (id, file) => ({ id, file, tests: [{ projectName: 'electron-headless' }] })
     const report = {

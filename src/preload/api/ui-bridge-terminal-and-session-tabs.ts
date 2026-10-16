@@ -1,8 +1,10 @@
+import type { RuntimeFileOpenPosition } from '../../shared/runtime-file-contracts'
 import { ipcRenderer } from 'electron'
 import type { TerminalPaneSplitSource } from '../../shared/feature-education-telemetry'
 import type { TerminalTabCreateReply } from '../../shared/terminal-reveal-identity'
 import type {
   AgentLaunchTabPublishReply,
+  AgentLaunchTabViewerRule,
   AgentLaunchTabPublishRequest
 } from '../../shared/agent-launch-tab-publication'
 import type { AgentLaunchPaneVerdictEvent } from '../../shared/agent-launch-pane-verdict'
@@ -38,6 +40,7 @@ export const uiTerminalAndSessionTabsApi = {
       focus?: boolean
       presentation?: RuntimeTerminalPresentation
       surfaceOwner?: false
+      agentLaunchViewer?: AgentLaunchTabViewerRule
       tabId?: string
       leafId?: string
       splitFromLeafId?: string
@@ -64,6 +67,7 @@ export const uiTerminalAndSessionTabsApi = {
         focus?: boolean
         presentation?: RuntimeTerminalPresentation
         surfaceOwner?: false
+        agentLaunchViewer?: AgentLaunchTabViewerRule
         tabId?: string
         leafId?: string
         splitFromLeafId?: string
@@ -229,6 +233,7 @@ export const uiTerminalAndSessionTabsApi = {
       relativePath: string
       runtimeEnvironmentId?: string | null
       navigation?: RuntimeNavigationTarget
+      position?: RuntimeFileOpenPosition
     }) => void
   ): (() => void) => {
     const listener = (
@@ -239,6 +244,7 @@ export const uiTerminalAndSessionTabsApi = {
         relativePath: string
         runtimeEnvironmentId?: string | null
         navigation?: RuntimeNavigationTarget
+        position?: RuntimeFileOpenPosition
       }
     ) => callback(data)
     ipcRenderer.on('ui:openFileFromMobile', listener)

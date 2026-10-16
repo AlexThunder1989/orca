@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
-
-type InventoryInternals = {
-  sessionTabsInventoryWaiters: Set<() => void>
-}
+import { getSessionTabsInventoryPublication } from './session-tabs/session-tabs-inventory-test-fixture'
+import type { RuntimeStore } from './runtime-store-contract'
+import { getDefaultWorkspaceSession } from '../../shared/constants'
+import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
+import type { DurableProfileStateMutation } from '../persistence/loading-store/store-runtime-state'
 
 function createInventoryRuntime(): OrcaRuntimeService {
   const runtime = new OrcaRuntimeService()
@@ -12,11 +13,11 @@ function createInventoryRuntime(): OrcaRuntimeService {
 }
 
 async function waitForInventoryWaiter(runtime: OrcaRuntimeService): Promise<void> {
-  const internals = runtime as unknown as InventoryInternals
-  for (let index = 0; index < 20 && internals.sessionTabsInventoryWaiters.size === 0; index += 1) {
+  const publication = getSessionTabsInventoryPublication(runtime)
+  for (let index = 0; index < 20 && publication.pendingWaiterCount === 0; index += 1) {
     await Promise.resolve()
   }
-  expect(internals.sessionTabsInventoryWaiters.size).toBe(1)
+  expect(publication.pendingWaiterCount).toBe(1)
 }
 
 describe('authoritative session tab inventory publication', () => {
@@ -365,7 +366,7 @@ describe('authoritative session tab inventory publication', () => {
     controller.abort()
 
     await expect(pending).rejects.toThrow('client_disconnected')
-    expect((runtime as unknown as InventoryInternals).sessionTabsInventoryWaiters.size).toBe(0)
+    expect(getSessionTabsInventoryPublication(runtime).pendingWaiterCount).toBe(0)
   })
 
   it('does not scan when the inventory request is already cancelled', async () => {
@@ -399,10 +400,7 @@ describe('authoritative session tab inventory publication', () => {
     ).toThrow('Runtime graph publisher does not match the authoritative window')
     await Promise.resolve()
     expect(settled).toBe(false)
-    expect(
-      (runtime as unknown as { sessionTabsInventoryPublicationEpoch: number | null })
-        .sessionTabsInventoryPublicationEpoch
-    ).toBeNull()
+    expect(getSessionTabsInventoryPublication(runtime).epoch).toBeNull()
 
     runtime.syncWindowGraph(1, { tabs: [], leaves: [], mobileSessionTabs: [] })
     await expect(pending).resolves.toEqual({ snapshots: [], authoritative: true })
@@ -415,5 +413,320 @@ describe('authoritative session tab inventory publication', () => {
     } finally {
       vi.unstubAllEnvs()
     }
+  })
+})
+
+describe('workspace-persistence-construction characterization', () => {
+  type Runtime = InstanceType<typeof OrcaRuntimeService>
+
+  const WORKTREE_ID = 'repo::/workspace'
+
+  function constructRuntime(observe: (runtime: Runtime) => void): Runtime {
+    class ConstructorObservedRuntime extends OrcaRuntimeService {
+      protected override get canonicalFetchKeyCache(): ReadonlyMap<string, string> {
+        const cache = super.canonicalFetchKeyCache
+        observe(this)
+        return cache
+      }
+    }
+    return new ConstructorObservedRuntime(null)
+  }
+
+  function getNativeMethod(
+    runtime: Runtime,
+    name: string
+  ): (this: Runtime, ...args: unknown[]) => unknown {
+    let prototype = Object.getPrototypeOf(runtime)
+    while (prototype) {
+      const method = Object.getOwnPropertyDescriptor(prototype, name)?.value
+      if (typeof method === 'function') {
+        return method
+      }
+      prototype = Object.getPrototypeOf(prototype)
+    }
+    throw new Error(`Missing runtime method: ${name}`)
+  }
+
+  describe('workspace persistence during full runtime construction', () => {
+    // The fetch-cache getter runs in the base constructor before later runtime fields initialize.
+    it('returns a native promise for absent active-workspace context', async () => {
+      let observed: Promise<unknown> | undefined
+      const observe = vi.fn((runtime: Runtime) => {
+        expect(runtime['store']).toBeNull()
+        observed = runtime.resolveActiveWorktreeContext()
+        expect(observed).toBeInstanceOf(Promise)
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+      await expect(observed).resolves.toBeNull()
+    })
+
+    it('collects no public tab ids when no snapshot exists', () => {
+      const observe = vi.fn((runtime: Runtime) => {
+        const ids = runtime['collectPublicMobileSessionTabIds'](undefined)
+        expect(ids).toBeInstanceOf(Set)
+        expect(ids.size).toBe(0)
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+    })
+
+    it('resolves no host tab id when no snapshot exists', () => {
+      const observe = vi.fn((runtime: Runtime) => {
+        expect(runtime['resolveMobileSessionHostTabId'](undefined, 'absent-tab')).toBeNull()
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+    })
+
+    it('normalizes an empty group order without a snapshot', () => {
+      const observe = vi.fn((runtime: Runtime) => {
+        const order = runtime['normalizeMobileSessionTabOrder'](
+          undefined,
+          { id: 'empty-group', activeTabId: null, tabOrder: [] },
+          []
+        )
+        expect(order).toEqual([])
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+    })
+
+    it('leaves a title unchanged when persistence is unavailable', () => {
+      const observe = vi.fn((runtime: Runtime) => {
+        expect(runtime['store']).toBeNull()
+        expect(runtime['persistHeadlessTerminalTitle'](WORKTREE_ID, 'absent-tab', 'Title')).toBe(
+          undefined
+        )
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+    })
+
+    it('finds no split source in an empty runtime', () => {
+      const observe = vi.fn((runtime: Runtime) => {
+        expect(
+          runtime['resolveTerminalSplitSourceAuthority'](
+            WORKTREE_ID,
+            'absent-tab',
+            'absent-leaf',
+            'absent-pty'
+          )
+        ).toBeNull()
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+    })
+
+    it('rejects destructive removal asynchronously when no local provider exists', async () => {
+      let observed: Promise<unknown> | undefined
+      const observe = vi.fn((runtime: Runtime) => {
+        observed = runtime['stopPtysForDestructiveWorktreeRemoval'](WORKTREE_ID)
+        expect(observed).toBeInstanceOf(Promise)
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+      await expect(observed).rejects.toThrow(
+        `PTY provider unavailable for worktree deletion: ${WORKTREE_ID}`
+      )
+    })
+
+    it('rejects resume-record clearing asynchronously when persistence is unavailable', async () => {
+      let observed: Promise<unknown> | undefined
+      const observe = vi.fn((runtime: Runtime) => {
+        const clear = getNativeMethod(runtime, 'clearWorktreeTerminalResumeRecords')
+        const result = clear.call(runtime, WORKTREE_ID, 'local', ['absent-tab'])
+        expect(result).toBeInstanceOf(Promise)
+        if (!(result instanceof Promise)) {
+          throw new Error('Resume clearing must return a native promise')
+        }
+        observed = result
+      })
+      constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+      await expect(observed).rejects.toThrow('workspace_session_unavailable')
+    })
+
+    it('keeps the root mutation map and pending promise after construction finishes', async () => {
+      const created = Promise.resolve('created')
+      const run = vi.fn(() => created)
+      let mapDuringConstruction: unknown
+      let promiseDuringConstruction: Promise<string> | undefined
+      const observe = vi.fn((runtime: Runtime) => {
+        mapDuringConstruction = runtime['worktreeCreateByMutationId']
+        expect(mapDuringConstruction).toBeInstanceOf(Map)
+        promiseDuringConstruction = runtime.dedupeWorktreeCreate('repo', 'mutation', run)
+        expect(promiseDuringConstruction).toBe(created)
+        expect(runtime['worktreeCreateByMutationId'].get('repo\0mutation')).toBe(created)
+      })
+      const runtime = constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+      expect(runtime['worktreeCreateByMutationId']).toBe(mapDuringConstruction)
+      expect(runtime['worktreeCreateByMutationId'].get('repo\0mutation')).toBe(created)
+      const duplicate = vi.fn(() => Promise.resolve('duplicate'))
+      expect(runtime.dedupeWorktreeCreate('repo', 'mutation', duplicate)).toBe(created)
+      expect(run).toHaveBeenCalledOnce()
+      expect(duplicate).not.toHaveBeenCalled()
+      await expect(promiseDuringConstruction).resolves.toBe('created')
+    })
+
+    it('removes metadata through the narrow store capabilities during construction', () => {
+      const worktreeId = 'constructor-metadata::/workspace'
+      const removeWorktreeMeta = vi.fn()
+      const store: Pick<RuntimeStore, 'getWorktreeMeta' | 'removeWorktreeMeta' | 'getRepos'> = {
+        getWorktreeMeta: () => undefined,
+        removeWorktreeMeta,
+        getRepos: () => []
+      }
+      let removedMapDuringConstruction: unknown
+      let snapshotsDuringConstruction: unknown
+      let acceptedSnapshotsDuringConstruction: unknown
+      const observe = vi.fn((runtime: Runtime) => {
+        expect(runtime['store']).toBeNull()
+        removedMapDuringConstruction = runtime['removedMobileSessionWorktreeIds']
+        snapshotsDuringConstruction = runtime['mobileSessionTabsByWorktree']
+        acceptedSnapshotsDuringConstruction = runtime['acceptedRendererMobileSnapshotByWorktree']
+        const remove = getNativeMethod(runtime, 'removeWorktreeMetadataAndHistory')
+        expect(remove.call(runtime, store, worktreeId, 'local')).toBeUndefined()
+        expect(runtime['removedMobileSessionWorktreeIds'].get(worktreeId)).toEqual({})
+        expect(removeWorktreeMeta).toHaveBeenCalledExactlyOnceWith(worktreeId, 'local')
+      })
+      const runtime = constructRuntime(observe)
+      expect(observe).toHaveBeenCalledOnce()
+      expect(runtime['removedMobileSessionWorktreeIds']).toBe(removedMapDuringConstruction)
+      expect(runtime['mobileSessionTabsByWorktree']).toBe(snapshotsDuringConstruction)
+      expect(runtime['acceptedRendererMobileSnapshotByWorktree']).toBe(
+        acceptedSnapshotsDuringConstruction
+      )
+      expect(runtime['removedMobileSessionWorktreeIds'].get(worktreeId)).toEqual({})
+      expect(runtime['mobileSessionTabsByWorktree'].has(worktreeId)).toBe(false)
+      expect(runtime['acceptedRendererMobileSnapshotByWorktree'].has(worktreeId)).toBe(false)
+    })
+  })
+})
+
+describe('workspace-terminal-resume-records characterization', () => {
+  type ResumeStore = Pick<
+    RuntimeStore,
+    'getWorkspaceSession' | 'setWorkspaceSession' | 'runDurableMutation'
+  >
+  const WORKTREE_ID = 'repo::/workspace'
+  const HOST_ID = 'runtime:original-partition'
+
+  function clear(runtime: InstanceType<typeof OrcaRuntimeService>): Promise<void> {
+    return runtime['clearWorktreeTerminalResumeRecords'](WORKTREE_ID, HOST_ID, ['closed'])
+  }
+
+  describe('workspace terminal resume mutation ownership', () => {
+    it('reads the current mutation and rollback stores with their original receivers', async () => {
+      const runtime = new OrcaRuntimeService(null)
+      let runMutation = (): void => {
+        throw new Error('mutation was not reserved')
+      }
+      let rollback = (): void => {
+        throw new Error('rollback was not installed')
+      }
+      let finish = (): void => {
+        throw new Error('mutation was not staged')
+      }
+      const before: WorkspaceSessionState = {
+        ...getDefaultWorkspaceSession(),
+        terminalPtyIncarnationsByPaneKey: { 'closed:leaf': 'old', 'other:leaf': 'other' }
+      }
+      let mutationSession = before
+      let rollbackSession = before
+      const reservation: ResumeStore = {
+        getWorkspaceSession: () => {
+          throw new Error('reservation store read')
+        },
+        setWorkspaceSession: () => {
+          throw new Error('reservation store write')
+        },
+        runDurableMutation<Value>(
+          mutate: () => DurableProfileStateMutation<Value>
+        ): Promise<Value> {
+          expect(this).toBe(reservation)
+          const deferred = Promise.withResolvers<Value>()
+          runMutation = () => {
+            const staged = mutate()
+            rollback =
+              staged.rollback ??
+              (() => {
+                throw new Error('rollback absent')
+              })
+            finish = () => deferred.resolve(staged.value)
+          }
+          return deferred.promise
+        }
+      }
+      const mutation: ResumeStore = {
+        getWorkspaceSession(hostId) {
+          expect(this).toBe(mutation)
+          expect(hostId).toBe(HOST_ID)
+          return mutationSession
+        },
+        setWorkspaceSession(session, hostId) {
+          expect(this).toBe(mutation)
+          expect(hostId).toBe(HOST_ID)
+          mutationSession = session
+        }
+      }
+      const recovery: ResumeStore = {
+        getWorkspaceSession(hostId) {
+          expect(this).toBe(recovery)
+          expect(hostId).toBe(HOST_ID)
+          return rollbackSession
+        },
+        setWorkspaceSession(session, hostId) {
+          expect(this).toBe(recovery)
+          expect(hostId).toBe(HOST_ID)
+          rollbackSession = session
+        }
+      }
+      let current: ResumeStore | null = reservation
+      Object.defineProperty(runtime, 'store', { get: () => current })
+      const pending = clear(runtime)
+      current = mutation
+      runMutation()
+      expect(mutationSession.terminalPtyIncarnationsByPaneKey).toEqual({ 'other:leaf': 'other' })
+      rollbackSession = {
+        ...mutationSession,
+        activeWorktreeId: 'another-worktree',
+        terminalPtyIncarnationsByPaneKey: {
+          ...mutationSession.terminalPtyIncarnationsByPaneKey,
+          'new:leaf': 'new'
+        }
+      }
+      current = recovery
+      rollback()
+      expect(rollbackSession.activeWorktreeId).toBe('another-worktree')
+      expect(rollbackSession.terminalPtyIncarnationsByPaneKey).toEqual({
+        'closed:leaf': 'old',
+        'other:leaf': 'other',
+        'new:leaf': 'new'
+      })
+      finish()
+      await pending
+    })
+
+    it.each([
+      { label: 'null', store: null },
+      { label: 'missing reader', store: {} },
+      {
+        label: 'missing writer',
+        store: { getWorkspaceSession: () => getDefaultWorkspaceSession() }
+      },
+      {
+        label: 'missing reservation',
+        store: {
+          getWorkspaceSession: () => getDefaultWorkspaceSession(),
+          setWorkspaceSession: () => {}
+        }
+      }
+    ])('refuses admission with $label', async ({ store }) => {
+      const runtime = new OrcaRuntimeService(null)
+      Object.defineProperty(runtime, 'store', { get: () => store })
+      await expect(clear(runtime)).rejects.toThrow('workspace_session_unavailable')
+    })
   })
 })

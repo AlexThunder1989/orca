@@ -10,6 +10,10 @@ import {
 import { connectionManager, persistedStore, portForwardManager } from './ssh-ipc-context'
 import { runTargetLifecycle } from './ssh-target-lifecycle-queue'
 import { errorMessage } from '../../shared/error-message'
+import {
+  forgetLegacyRelayTarget,
+  stopLegacyRelayBridge
+} from '../ssh/legacy-relay-bridge/legacy-relay-bridge-registry'
 
 export async function disconnectRegisteredSshTarget(targetId: string): Promise<void> {
   invalidateConnectAttempt(targetId)
@@ -32,6 +36,7 @@ export async function removeRegisteredSshTarget(targetId: string): Promise<void>
       console.warn(`[ssh] Failed to disconnect removed target ${targetId}: ${errorMessage(err)}`)
     }
     persistedStore?.removeSshRemotePtyLeases(targetId)
+    forgetLegacyRelayTarget(targetId)
     store.removeTarget(targetId)
     // Why: removal is the storage boundary — the target's browser cookie jars
     // must not outlive the record that scoped them.
@@ -57,6 +62,8 @@ export async function removeRegisteredSshTarget(targetId: string): Promise<void>
 }
 
 export async function teardownSshTargetTransport(targetId: string): Promise<void> {
+  // COMPAT(legacy-relay-bridge): hangs up only this client; the relays keep their terminals.
+  stopLegacyRelayBridge(targetId)
   // Why first: local listeners must be released before disconnect completes, else an immediate
   // reconnect hits EADDRINUSE.
   const [forwards, disconnect] = await Promise.allSettled([
@@ -94,6 +101,7 @@ export async function abandonDecisionTransport(
   ) {
     return
   }
+  stopLegacyRelayBridge(targetId)
   try {
     await connectionManager!.disconnectConnection(targetId, opened)
   } catch (error) {

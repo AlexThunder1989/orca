@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { expect, it } from 'vitest'
 import { parse } from 'yaml'
@@ -29,7 +29,7 @@ it('shares one setup and overlaps the compiler only after type-aware checks fini
   expect(compiler.background).toBe(true)
   expect(compiler.run).toContain('pnpm run typecheck:ci')
   const bunSetup = steps.find((step) => step.name === 'Set up Bun for preflight checks')
-  expect(bunSetup.with['bun-version']).toBe('1.4.3')
+  expect(bunSetup.with['bun-version-file']).toBe('config/.bun-version')
   expect(bunSetup.if).toBeUndefined()
   expect(plan.background).toBe(true)
   expect(plan.run.trim().split('\n')).toEqual([
@@ -48,6 +48,22 @@ it('shares one setup and overlaps the compiler only after type-aware checks fini
   expect(compilerJoin).toBeGreaterThan(
     steps.findIndex((step) => step.wait?.includes('localization-extraction'))
   )
+})
+
+it('uses the shared Bun pin for every current-toolchain workflow', () => {
+  expect(readFileSync('config/.bun-version', 'utf8').trim()).toBe('1.4.3')
+  for (const file of readdirSync('.github/workflows').filter((name) => /\.ya?ml$/.test(name))) {
+    const current = parse(readFileSync(`.github/workflows/${file}`, 'utf8'))
+    for (const job of Object.values(current.jobs)) {
+      for (const step of job.steps ?? []) {
+        if (!String(step.uses).startsWith('oven-sh/setup-bun@')) {
+          continue
+        }
+        expect(step.with['bun-version-file'], file).toBe('config/.bun-version')
+        expect(step.with['bun-version'], file).toBeUndefined()
+      }
+    }
+  }
 })
 
 it('keeps the Bun anti-slop scan aligned with the local audit', () => {
@@ -224,6 +240,7 @@ it('pins every foreground and background step to its selected phase', () => {
     ['Enforce ts-nocheck ratchet', staticPhase],
     ['Enforce runtime Electron-import ratchet', staticPhase],
     ['Enforce focus-read ratchet', staticPhase],
+    ['Enforce layout-writer ratchets', staticPhase],
     ['Check Node runtime pin', staticPhase],
     ['Boot orcad and round-trip a terminal', staticPhase],
     ['Verify the generated RPC params catalog', staticPhase],
@@ -242,6 +259,7 @@ it('pins every foreground and background step to its selected phase', () => {
       .map((step) => [step.id, step.env.PREFLIGHT_PHASE_SELECTED])
   ).toEqual([
     ['process-host-imports', `\${{ ${staticPhase} }}`],
+    ['main-sync-spawn-ratchet', `\${{ ${staticPhase} }}`],
     ['root-lint', `\${{ ${staticPhase} }}`],
     ['native-code-quality', `\${{ ${staticPhase} }}`],
     ['changed-code-quality', `\${{ ${staticPhase} }}`],
@@ -309,4 +327,13 @@ it('registers successful no-op background work when a phase is unselected or alr
       'if [ "$PREFLIGHT_PHASE_SELECTED" != true ] || [ "$PREFLIGHT_PRIOR_SUCCESS" != true ]; then exit 0; fi'
     )
   }
+})
+
+it('shares import analysis without dropping either boundary gate', () => {
+  const imports = steps.find((step) => step.id === 'process-host-imports')
+  expect(imports.run).toContain('bun config/scripts/check-import-boundaries.mjs')
+  expect(steps.some((step) => step.name === 'Check compatibility-folder imports')).toBe(false)
+  expect(steps.find((step) => step.name === 'Verify localization coverage').run).toBe(
+    'bun config/scripts/audit-localization-coverage.mjs --check'
+  )
 })

@@ -5,8 +5,7 @@ import {
 } from '../../../../../shared/terminal-stream-protocol'
 import {
   TerminalMultiplexLegacyAckFrame,
-  TerminalMultiplexSnapshotRequestFrame,
-  TerminalMultiplexSourceRangeAckFrame
+  TerminalMultiplexSnapshotRequestFrame
 } from './stream-schemas'
 import { getTerminalInputSequenceLedger } from './terminal-input-sequence-ledger'
 import { handleMultiplexInputFrame } from './terminal-multiplex-input-frame'
@@ -64,20 +63,9 @@ export function installMultiplexSlotFrames(state: TerminalMultiplexConnection): 
     }
     if (frame.opcode === TerminalStreamOpcode.Ack) {
       const payload = decodeTerminalStreamJson<unknown>(frame.payload) ?? {}
-      if (stream.ackOutputSourceRanges) {
-        const parsed = TerminalMultiplexSourceRangeAckFrame.safeParse(payload)
-        if (parsed.success) {
-          state.acknowledgeSourceRanges(
-            stream,
-            parsed.data.streamGeneration,
-            parsed.data.ackedEndByte
-          )
-        }
-      } else {
-        const parsed = TerminalMultiplexLegacyAckFrame.safeParse(payload)
-        if (parsed.success) {
-          state.acknowledgeOutput(stream, parsed.data.bytes)
-        }
+      const parsed = TerminalMultiplexLegacyAckFrame.safeParse(payload)
+      if (parsed.success) {
+        state.acknowledgeOutput(stream, parsed.data.bytes)
       }
       return
     }

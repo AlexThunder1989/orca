@@ -11,9 +11,12 @@ import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../shared
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
+import { projectMatchesRepo } from '../../../shared/project-repo-match'
 import { getIndexedRepoMap } from '@/store/worktree-repo-index'
+import { defaultScopeHost } from './default-creation-host'
 import { getLocalProjectRuntimeWorkspace } from './local-project-runtime-workspace'
-import { getProviderRuntimeContextKey } from './provider-runtime-context'
+import { getActiveWorkspaceOwnerTarget } from './resolved-worktree-execution-host'
+import { getEnvironmentRuntimeContextKey } from './provider-runtime-context'
 import { getRendererAppPlatform } from './renderer-app-platform'
 import {
   getCachedWindowsTerminalCapabilities,
@@ -62,11 +65,7 @@ export function getLocalProjectExecutionRuntimeContext(
   appPlatform: NodeJS.Platform = getRendererAppPlatform(),
   wslContext: LocalProjectRuntimeWslContext = {}
 ): ProjectExecutionRuntimeResolution | undefined {
-  if (appPlatform !== 'win32') {
-    return undefined
-  }
-
-  if (worktreeId === FLOATING_TERMINAL_WORKTREE_ID) {
+  if (appPlatform !== 'win32' || worktreeId === FLOATING_TERMINAL_WORKTREE_ID) {
     return undefined
   }
   const worktree = getLocalProjectRuntimeWorkspace(state, worktreeId)
@@ -162,8 +161,10 @@ export function getLocalPreflightContext(
   appPlatform: NodeJS.Platform = getRendererAppPlatform(),
   wslContext: LocalProjectRuntimeWslContext = getCachedLocalProjectRuntimeWslContext()
 ): LocalPreflightContext {
-  if (state.settings?.activeRuntimeEnvironmentId?.trim()) {
-    return { runtimeContextKey: getProviderRuntimeContextKey(state.settings) }
+  // Why: forge CLIs are checked on the focused workspace's owner, else the default scope host.
+  const host = getActiveWorkspaceOwnerTarget(state) ?? defaultScopeHost(state.settings)
+  if (host.kind === 'environment') {
+    return { runtimeContextKey: getEnvironmentRuntimeContextKey(host.environmentId) }
   }
   const projectRuntime = getLocalProjectExecutionRuntimeContext(
     state,
@@ -318,8 +319,7 @@ function getLocalRuntimeProject(
   repoId: string
 ) {
   return state.projects?.find(
-    (entry) =>
-      entry.id === projectId || entry.id === repoId || entry.sourceRepoIds?.includes(repoId)
+    (entry) => entry.id === projectId || projectMatchesRepo(entry, repoId)
   )
 }
 

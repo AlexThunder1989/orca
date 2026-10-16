@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { sshTargetConnectFailureText } from '@/ssh/ssh-connect-failure-text'
+import { sshTargetConnectFailureText } from '@/ssh/ssh-host-server-status-copy'
 import { translate } from '@/i18n/i18n'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useAppStore } from '../../store'

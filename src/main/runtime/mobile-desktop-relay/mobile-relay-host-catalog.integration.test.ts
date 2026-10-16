@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../../shared/paired-runtime-connection'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -135,7 +136,13 @@ describe('mobile relay hosts: phone -> desktop lists the servers it shows', () =
         return server ? { environmentId, fence: 'pairing-1', pairing: server.pairing } : null
       },
       call: (host, method, params) =>
-        sendRemoteRuntimeRequest(servers.get(host.environmentId)!.pairing, method, params, 5_000),
+        sendRemoteRuntimeRequest(
+          pairedRuntimeConnectionFromOffer(servers.get(host.environmentId)!.pairing),
+          method,
+          params,
+          5_000
+        ),
+      hostsBrowserPage: () => false,
       onEnvironmentRetired: () => () => {}
     }
     desktop.setMobileDesktopRelayHosts(hosts)

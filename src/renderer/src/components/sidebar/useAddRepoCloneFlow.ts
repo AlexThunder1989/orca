@@ -15,7 +15,6 @@ export function useAddRepoCloneFlow({
   step,
   hostId,
   activeRuntimeEnvironmentId,
-  sshTargetId,
   workspaceDir,
   fetchWorktrees,
   onGitRepoReady
@@ -24,11 +23,13 @@ export function useAddRepoCloneFlow({
   /** The dialog's chosen host; null while it is unresolved, which blocks the clone. */
   hostId?: string | null
   activeRuntimeEnvironmentId: string | null | undefined
-  sshTargetId?: string | null
   workspaceDir: string | null | undefined
   fetchWorktrees: (
     repoId: string,
-    options?: { requireAuthoritative?: boolean; executionHostId?: ExecutionHostId }
+    options?: {
+      requireAuthoritative?: boolean
+      executionHostId?: ExecutionHostId
+    }
   ) => Promise<unknown>
   onGitRepoReady: (
     repoId: string,
@@ -52,10 +53,11 @@ export function useAddRepoCloneFlow({
   const [cloneDestination, setCloneDestination] = useState('')
   const [isCloning, setIsCloning] = useState(false)
   const [cloneError, setCloneError] = useState<string | null>(null)
-  const [cloneProgress, setCloneProgress] = useState<{ phase: string; percent: number } | null>(
-    null
-  )
-  const hostToken = `${activeRuntimeEnvironmentId?.trim() ?? ''}:${sshTargetId?.trim() ?? ''}`
+  const [cloneProgress, setCloneProgress] = useState<{
+    phase: string
+    percent: number
+  } | null>(null)
+  const hostToken = activeRuntimeEnvironmentId?.trim() ?? ''
   const hostTokenRef = useRef(hostToken)
   hostTokenRef.current = hostToken
   // Why: monotonic ID so stale clone callbacks can detect they were superseded.
@@ -75,7 +77,6 @@ export function useAddRepoCloneFlow({
     step,
     cloneDestination,
     activeRuntimeEnvironmentId,
-    sshTargetId,
     workspaceDir,
     cloneStepAutoFilled: cloneStepAutoFilledRef.current
   })
@@ -98,9 +99,9 @@ export function useAddRepoCloneFlow({
   }, [])
 
   const handlePickDestination = useCallback(async (): Promise<void> => {
-    if (activeRuntimeEnvironmentId?.trim() || sshTargetId?.trim()) {
+    if (activeRuntimeEnvironmentId?.trim()) {
       // Why: the native folder picker returns a client-local path. Runtime
-      // and SSH clone destinations must be typed as paths on that host.
+      // clone destinations must be typed as paths on that host.
       toast.error(
         translate(
           'auto.components.sidebar.useAddRepoCloneFlow.0dc4d1b657',
@@ -115,7 +116,7 @@ export function useAddRepoCloneFlow({
       setCloneDestination(dir)
       setCloneError(null)
     }
-  }, [activeRuntimeEnvironmentId, sshTargetId])
+  }, [activeRuntimeEnvironmentId])
 
   const handleClone = useCallback(async (): Promise<void> => {
     const trimmedUrl = cloneUrl.trim()
@@ -132,13 +133,8 @@ export function useAddRepoCloneFlow({
     setCloneProgress(null)
     try {
       const target = resolveAddRepoRuntimeTarget(activeRuntimeEnvironmentId)
-      const repo = sshTargetId?.trim()
-        ? await window.api.repos.cloneRemote({
-            connectionId: sshTargetId.trim(),
-            url: trimmedUrl,
-            destination: cloneDestination.trim()
-          })
-        : target.kind === 'environment'
+      const repo =
+        target.kind === 'environment'
           ? (
               await callRuntimeRpc<{ repo: Repo }>(
                 target,
@@ -158,8 +154,7 @@ export function useAddRepoCloneFlow({
         return
       }
       const { repo: ownedRepo } = upsertAddedRepoWithProjectHostSetup(repo, {
-        runtimeEnvironmentId: activeRuntimeEnvironmentId,
-        sshConnectionId: sshTargetId
+        runtimeEnvironmentId: activeRuntimeEnvironmentId
       })
       toast.success(
         translate('auto.components.sidebar.useAddRepoCloneFlow.4d0013cc93', 'Repository cloned'),
@@ -167,7 +162,7 @@ export function useAddRepoCloneFlow({
       )
       // Why: once the repo exists, a transient non-authoritative refresh
       // should fall through to project reveal instead of leaving the add flow open.
-      const ownerOptions = worktreeRefreshOptions(activeRuntimeEnvironmentId, sshTargetId)
+      const ownerOptions = worktreeRefreshOptions(activeRuntimeEnvironmentId)
       await fetchWorktrees(ownedRepo.id, ownerOptions)
       if (!isCurrent()) {
         return
@@ -190,8 +185,7 @@ export function useAddRepoCloneFlow({
     cloneDestination,
     fetchWorktrees,
     hostId,
-    onGitRepoReady,
-    sshTargetId
+    onGitRepoReady
   ])
 
   return {

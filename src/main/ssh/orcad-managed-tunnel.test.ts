@@ -85,12 +85,14 @@ function setup(overrides: Partial<SshTarget> = {}, targeting?: OrcadManagedTunne
       })
     )
   const removeForwardAndWait = vi.fn().mockResolvedValue(null)
+  const closeAll = vi.fn().mockResolvedValue(undefined)
   const ensureServing = vi.fn().mockResolvedValue({ state: 'serving' })
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a test double for the members the tunnel manager calls.
   const forwardManager = {
     setCallbacks: vi.fn(),
     addForward,
     removeForwardAndWait,
+    closeAll,
     dispose: vi.fn()
   } as unknown as SshPortForwardManager
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a test double for the members the tunnel manager calls.
@@ -111,6 +113,7 @@ function setup(overrides: Partial<SshTarget> = {}, targeting?: OrcadManagedTunne
   })
   return {
     addForward,
+    closeAll,
     connect,
     connection,
     ensureServing,
@@ -128,7 +131,7 @@ function setup(overrides: Partial<SshTarget> = {}, targeting?: OrcadManagedTunne
 }
 
 describe('OrcadManagedTunnelManager initial binding', () => {
-  it.each(['close', 'dispose', 'reconnect'] as const)(
+  it.each(['close', 'dispose', 'shutdown', 'reconnect'] as const)(
     'removes a late initial forward after %s supersedes setup',
     async (action) => {
       const state = setup()
@@ -138,6 +141,9 @@ describe('OrcadManagedTunnelManager initial binding', () => {
         }
         if (action === 'dispose') {
           state.manager.dispose()
+        }
+        if (action === 'shutdown') {
+          await state.manager.shutdown()
         }
         if (action === 'reconnect') {
           state.setTransportGeneration(4)
@@ -154,6 +160,28 @@ describe('OrcadManagedTunnelManager initial binding', () => {
       expect(state.removeForwardAndWait).toHaveBeenCalledTimes(1)
     }
   )
+
+  it('shutdown waits for every forward process to stop, so none outlives quit', async () => {
+    const state = setup()
+    await state.manager.ensure(createEnvironment('sshAccess'))
+    let finishClose!: () => void
+    state.closeAll.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishClose = resolve
+      })
+    )
+
+    let done = false
+    const shutdown = state.manager.shutdown().then(() => {
+      done = true
+    })
+    await Promise.resolve()
+    expect(done).toBe(false)
+    finishClose()
+    await shutdown
+
+    expect(state.closeAll).toHaveBeenCalledOnce()
+  })
 
   it('does not open a forward when canceled while the prior forward is closing', async () => {
     const state = setup()

@@ -94,6 +94,8 @@ jobs:
           id_token_include_email: true
 
       - uses: google-github-actions/setup-gcloud@v2
+        with:
+          skip_install: true
 
       - name: Write or preview the cell's switch object
         env:

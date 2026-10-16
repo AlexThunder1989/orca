@@ -2,7 +2,7 @@ import type {
   TerminalPaneLayoutNode,
   TerminalPaneSplitDirection
 } from '../../../../shared/terminal-tab-types'
-import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
+import { isRemoteRuntimePtyId } from '../../../../shared/remote-runtime-pty-id'
 import { collectLeafIds } from './terminal-pane-layout-tree'
 
 /**

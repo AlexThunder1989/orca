@@ -19,7 +19,7 @@ import {
   getWorkspaceFileRevealOwner,
   revealInFileManager
 } from '@/lib/reveal-in-file-manager'
-import { isLocalPathOpenBlocked } from '@/lib/local-path-open-guard'
+import { isRevealOrEditorOpenBlocked } from '@/lib/local-path-open-guard'
 import { useAppStore } from '@/store'
 import type { OpenFile } from '@/store/slices/editor'
 import { isVirtualEditorFile } from '@/store/slices/editor/tabs/editor-tab-content-type'
@@ -58,7 +58,7 @@ export function EditorPanelHeaderPath({
       runtimeEnvironmentId: activeFile.runtimeEnvironmentId
     })
   )
-  const revealBlocked = isLocalPathOpenBlocked(revealOwner)
+  const revealBlocked = isRevealOrEditorOpenBlocked(revealOwner)
   const markdownPreviewShortcutLabel = useShortcutLabel('editor.markdownPreview')
   const {
     canRename,

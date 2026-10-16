@@ -1,14 +1,13 @@
-import type { StateCreator } from 'zustand'
-import type { AppState } from '../types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   callRuntimeRpc,
   getRuntimeEnvironmentStatus,
-  RuntimeRpcCallError,
   runtimeEnvironmentSupportsCapability
 } from '@/runtime/runtime-rpc-client'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { getConnectionIdFromState } from '@/lib/connection-owner-resolution'
+import { captureRuntimeEnvironmentRequestRevision } from '@/runtime/runtime-environment-revision'
 import { PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import {
   getRuntimeAgentInventoryEnvironmentId,
@@ -102,6 +101,15 @@ export function callRuntimeAgentDetection<T>(
   })
 }
 
+type PairingFence = { expectedEnvironmentPairingRevision: number | undefined }
+
+// Why: captured before the capability wait, so a re-pair during it cannot retarget the probe.
+function capturePairingFence(environmentId: string): PairingFence {
+  return {
+    expectedEnvironmentPairingRevision: captureRuntimeEnvironmentRequestRevision(environmentId)
+  }
+}
+
 export function _getRuntimeDetectPromiseCountForTest(): number {
   return runtimeDetectPromises.size
 }
@@ -119,12 +127,20 @@ function withoutKeys<T>(record: Record<string, T>, drop: (key: string) => boolea
   return changed ? next : record
 }
 
-export const createRuntimeDetectedAgentsSlice: StateCreator<
-  AppState,
-  [],
-  [],
-  RuntimeDetectedAgentsSlice
-> = (set, get) => {
+export type RuntimeDetectedAgentsStoreState = RuntimeDetectedAgentsSlice &
+  Parameters<typeof getConnectionIdFromState>[0]
+
+export type RuntimeDetectedAgentsStoreSetState = (
+  partial:
+    | Partial<RuntimeDetectedAgentsStoreState>
+    | ((state: RuntimeDetectedAgentsStoreState) => Partial<RuntimeDetectedAgentsStoreState>)
+) => void
+
+export const createRuntimeDetectedAgentsSlice: (
+  set: RuntimeDetectedAgentsStoreSetState,
+  get: () => RuntimeDetectedAgentsStoreState,
+  store?: unknown
+) => RuntimeDetectedAgentsSlice = (set, get) => {
   // Drops every workspace's inventory for the environments `drop` selects.
   const dropEnvironments = (drop: (environmentId: string) => boolean): void => {
     const dropKey = (key: string) => drop(getRuntimeAgentInventoryEnvironmentId(key))
@@ -159,14 +175,15 @@ export const createRuntimeDetectedAgentsSlice: StateCreator<
 
   const nestedSshDetection = (
     target: RuntimeClientTarget,
-    worktreeId: string | null | undefined
+    worktreeId: string | null | undefined,
+    fence: PairingFence
   ): NestedSshAgentDetection<TuiAgent[]> | undefined => {
     const connectionId = worktreeId ? getConnectionIdFromState(get(), worktreeId) : null
     return typeof connectionId === 'string'
       ? {
           connectionId,
           call: (params) =>
-            callRuntimeRpc<TuiAgent[]>(target, 'preflight.detectRemoteAgents', params)
+            callRuntimeRpc<TuiAgent[]>(target, 'preflight.detectRemoteAgents', params, fence)
         }
       : undefined
   }
@@ -212,16 +229,17 @@ export const createRuntimeDetectedAgentsSlice: StateCreator<
       }))
 
       const target = { kind: 'environment', environmentId } as const
+      const fence = capturePairingFence(environmentId)
       const pending = callRuntimeAgentDetection(
         environmentId,
         worktreeId,
-        (params) => callRuntimeRpc<TuiAgent[]>(target, 'preflight.detectAgents', params),
-        nestedSshDetection(target, worktreeId)
+        (params) => callRuntimeRpc<TuiAgent[]>(target, 'preflight.detectAgents', params, fence),
+        nestedSshDetection(target, worktreeId, fence)
       )
         .then((typed) => {
-          // Why: skip committing if the environment was removed (retained out)
-          // while the detect was in flight — otherwise it re-adds a stale entry
-          // that retainRuntimeDetectedAgents just pruned.
+          // Why: skip committing if the environment was removed (retained out) or
+          // re-paired while the detect was in flight — otherwise it re-adds a stale
+          // entry that retainRuntimeDetectedAgents or clearRuntimeDetectedAgents just pruned.
           if (runtimeDetectPromises.get(key) === pending) {
             commitDetection(key, typed, false)
           }
@@ -268,11 +286,12 @@ export const createRuntimeDetectedAgentsSlice: StateCreator<
       }))
 
       const target = { kind: 'environment', environmentId } as const
+      const fence = capturePairingFence(environmentId)
       const pending = callRuntimeAgentDetection(
         environmentId,
         worktreeId,
         (params) =>
-          callRuntimeRpc<{ agents: TuiAgent[] }>(target, 'preflight.refreshAgents', params)
+          callRuntimeRpc<{ agents: TuiAgent[] }>(target, 'preflight.refreshAgents', params, fence)
             .then((result) => result.agents)
             .catch((error) => {
               if (!isRuntimeMethodNotFoundError(error)) {
@@ -280,13 +299,13 @@ export const createRuntimeDetectedAgentsSlice: StateCreator<
               }
               // Why: only older servers need the fallback; retrying disconnects and
               // runtime failures doubles remote work without any chance of recovery.
-              return callRuntimeRpc<TuiAgent[]>(target, 'preflight.detectAgents', params)
+              return callRuntimeRpc<TuiAgent[]>(target, 'preflight.detectAgents', params, fence)
             }),
-        nestedSshDetection(target, worktreeId)
+        nestedSshDetection(target, worktreeId, fence)
       )
         .then((typed) => {
           // Why: same guard as ensureRuntimeDetectedAgents — if the environment
-          // was retained out mid-refresh, don't re-add a pruned entry.
+          // was retained out or re-paired mid-refresh, don't re-add a pruned entry.
           if (runtimeRefreshPromises.get(key) === pending) {
             commitDetection(key, typed, false)
           }

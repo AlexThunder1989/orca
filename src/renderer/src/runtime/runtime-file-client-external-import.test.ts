@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { importExternalPathsToRuntime } from './runtime-file-client'
+import { importExternalPathsToRuntime } from './runtime-file-import-client'
 import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
 import {
   fsImportExternalPaths,

@@ -3,12 +3,12 @@ import { parseExecutionHostId } from '../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { HostLiveTerminalProbeVerdict } from '@/runtime/host-live-terminal-probe'
 import type { SshConnectionState } from '../../../shared/ssh-types'
-import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session'
+import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session-environment'
 import {
   getExecutionHostIdForWorktree,
-  getRuntimeEnvironmentIdForWorktree,
-  type WorktreeRuntimeOwnerState
+  getRuntimeEnvironmentIdForWorktree
 } from '@/lib/worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from '@/lib/worktree-runtime-owner-state'
 
 /**
  * Who holds a workspace's terminals right now, in the same three-verdict vocabulary the renderer

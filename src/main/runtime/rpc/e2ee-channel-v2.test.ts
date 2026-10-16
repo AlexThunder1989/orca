@@ -14,7 +14,7 @@ import {
 import { deriveSharedKey } from './e2ee-crypto'
 import type { RpcBinarySendResult } from './rpc-binary-sender'
 import { E2EEChannel } from './e2ee-channel'
-import { deriveMobileE2EEV2KeySchedule } from './mobile-e2ee-v2-key-schedule'
+import { deriveMobileE2EEV2KeySchedule } from '../../../shared/mobile-e2ee-v2-node-key-schedule'
 
 const server = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(1))
 const client = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(2))
@@ -55,7 +55,14 @@ function setup() {
   const onError = vi.fn()
   const resolveAuthenticatedDevice = vi.fn((token: string) =>
     token === 'valid-token'
-      ? { deviceId: 'device-1', deviceToken: token, scope: 'mobile' as const, clientId: token, callerFingerprint: 'test-fingerprint', credentialRevision: 0 }
+      ? {
+          deviceId: 'device-1',
+          deviceToken: token,
+          scope: 'mobile' as const,
+          clientId: token,
+          callerFingerprint: 'test-fingerprint',
+          credentialRevision: 0
+        }
       : null
   )
   const channel = new E2EEChannel(ws as unknown as WebSocket, {

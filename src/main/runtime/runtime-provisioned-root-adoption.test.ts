@@ -1,4 +1,14 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
+import { wslMoveCutoverFixture as cutover } from '../persistence/__fixtures__/wsl-mover/wsl-move-cutover-fixture'
+import { seedWslMoveCutover } from '../persistence/__fixtures__/wsl-mover/wsl-move-journal-seeding'
+import {
+  WslMoveProjectFencedError,
+  loadWslMoveFence,
+  resetWslMoveFenceForTests
+} from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
 import type { Repo } from '../../shared/repo-types'
 import type { GitWorktreeInfo } from '../../shared/worktree/types'
 import {
@@ -32,6 +42,7 @@ function ports(worktrees: GitWorktreeInfo[], sparse = false) {
   const value: RuntimeProvisionedRootPorts = {
     store: {
       getSettings: () => ({ workspaceDir: '/workspaces', nestWorkspaces: false }),
+      getRepo: () => repo,
       setWorktreeMeta
     },
     resolveRepo: async () => repo,
@@ -90,5 +101,30 @@ describe('adoptRuntimeProvisionedRoot', () => {
     await expect(
       adoptRuntimeProvisionedRoot('repo-vm', { name: 'fix-login', expectedPath: '/other' }, value)
     ).rejects.toThrow('does not match')
+  })
+
+  it('refuses a project a WSL move is taking before reading its checkout', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'wsl-move-adopt-'))
+    try {
+      loadWslMoveFence(userDataPath)
+      seedWslMoveCutover(
+        userDataPath,
+        cutover('move-1', 'source-fenced', {}, { repoIds: ['repo-vm'] })
+      )
+      const listWorktrees = vi.fn(async () => [checkout()])
+      const { value, setWorktreeMeta } = ports([checkout()])
+      await expect(
+        adoptRuntimeProvisionedRoot(
+          'repo-vm',
+          { name: 'fix-login', expectedPath: root },
+          { ...value, listWorktrees }
+        )
+      ).rejects.toBeInstanceOf(WslMoveProjectFencedError)
+      expect(listWorktrees).not.toHaveBeenCalled()
+      expect(setWorktreeMeta).not.toHaveBeenCalled()
+    } finally {
+      resetWslMoveFenceForTests()
+      rmSync(userDataPath, { recursive: true, force: true })
+    }
   })
 })

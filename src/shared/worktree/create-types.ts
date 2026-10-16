@@ -111,6 +111,8 @@ export type CreateWorktreeArgs = {
    *  legitimately contains `/` while the worktree directory must not. */
   branchNameOverride?: string
   setupDecision?: SetupDecision
+  /** Per-create choice; omitted callers use the execution host's saved default. */
+  setupOnly?: boolean
   sparseCheckout?: CreateSparseCheckoutRequest
   linkedIssue?: number
   linkedPR?: number

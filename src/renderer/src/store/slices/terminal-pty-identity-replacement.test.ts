@@ -284,7 +284,7 @@ import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/ter
       const normalized = store.getState().terminalLayoutsByTabId['tab-1']
       expect(normalized.ptyIdsByLeafId).not.toEqual(duplicate.ptyIdsByLeafId)
 
-      store.getState().markTerminalPaneUnread('tab-1:leaf-a', 'terminal-bell')
+      store.setState({ unreadTerminalPanes: { 'tab-1:leaf-a': 'terminal-bell' } })
       const beforeUnread = { ...store.getState().unreadTerminalPanes }
 
       for (let i = 0; i < REPEATS; i += 1) {

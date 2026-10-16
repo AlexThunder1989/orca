@@ -47,35 +47,56 @@ export function fileReferenceContent(path: string): JSONContent {
   }
 }
 
-/** Each boundary maps a plain-text caret to a document position, including atomic skills. */
-export function promptTextMap(doc: ProseMirrorNode): { text: string; positions: number[] } {
-  let text = ''
-  const positions = [1]
-  doc.forEach((block, blockOffset, index) => {
-    if (index > 0) {
-      text += '\n'
-      positions.push(blockOffset + 1)
-    }
-    block.forEach((node, offset) => {
-      const start = blockOffset + 1 + offset
-      const value = node.isText
-        ? node.text!
-        : node.type.name === 'hardBreak'
-          ? '\n'
-          : String(node.attrs.token ?? '')
-      for (let i = 0; i < value.length; i++) {
-        text += value[i]
-        positions.push(
-          node.isText ? start + i + 1 : i === value.length - 1 ? start + node.nodeSize : start
-        )
-      }
-    })
-  })
-  return { text, positions }
+/** A pill reads as its token and a hard break as a newline, so the text is what the agent receives. */
+export function promptLeafText(node: ProseMirrorNode): string {
+  return node.type.name === 'hardBreak' ? '\n' : String(node.attrs.token ?? '')
 }
 
+export function promptText(doc: ProseMirrorNode, from = 0, to = doc.content.size): string {
+  return doc.textBetween(from, to, '\n', promptLeafText)
+}
+
+/** The plain-text caret for a document position. */
 export function promptTextOffset(doc: ProseMirrorNode, position: number): number {
-  const { positions } = promptTextMap(doc)
-  const index = positions.findIndex((candidate) => candidate >= position)
-  return index === -1 ? positions.length - 1 : index
+  const resolved = doc.resolve(position)
+  // Paragraph node selections start outside the block; include its preceding newline.
+  const to = resolved.parent === doc && resolved.nodeAfter?.isTextblock ? position + 1 : position
+  return promptText(doc, 0, to).length
+}
+
+/** The document position for a plain-text caret; one inside a pill's token lands on the pill's
+ *  `before` or `after` edge, and one past the end on the end. */
+export function promptTextPosition(
+  doc: ProseMirrorNode,
+  offset: number,
+  side: 'before' | 'after' = 'before'
+): number {
+  let remaining = offset
+  let blockStart = 0
+  let end = 1
+  for (let index = 0; index < doc.childCount; index++) {
+    const block = doc.child(index)
+    if (index > 0) {
+      if (remaining === 0) {
+        return end
+      }
+      remaining--
+    }
+    let start = blockStart + 1
+    for (let child = 0; child < block.childCount; child++) {
+      if (remaining === 0) {
+        return start
+      }
+      const node = block.child(child)
+      const length = (node.text ?? promptLeafText(node)).length
+      if (remaining < length) {
+        return node.isText ? start + remaining : side === 'before' ? start : start + node.nodeSize
+      }
+      remaining -= length
+      start += node.nodeSize
+    }
+    end = start
+    blockStart += block.nodeSize
+  }
+  return end
 }

@@ -1,12 +1,13 @@
+import type * as ExecCommandModule from './ssh-relay-exec-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('./ssh-relay-deploy-helpers', () => ({
-  execCommand: vi.fn(),
-  isUnconfirmedSshCommandTermination: () => false
+vi.mock('./ssh-relay-exec-command', async (importOriginal) => ({
+  ...(await importOriginal<typeof ExecCommandModule>()),
+  execCommand: vi.fn()
 }))
 
-import { execCommand } from './ssh-relay-deploy-helpers'
-import type { SshConnection } from './ssh-connection'
+import { execCommand } from './ssh-relay-exec-command'
+import type { OrcadHostTransport } from './orcad-host-transport'
 import { getRemoteHostPlatform } from './ssh-remote-platform'
 import { orcadLivenessProbeCommand, type OrcadLaunchSpec } from './orcad-remote-launch'
 import {
@@ -57,9 +58,9 @@ const spec: OrcadLaunchSpec = {
   activationRoot: `${base}/.orcad-activation-transaction`
 }
 
-function windowsConn(): { conn: SshConnection; writes: [string, string][] } {
+function windowsConn(): { conn: OrcadHostTransport; writes: [string, string][] } {
   const writes: [string, string][] = []
-  const conn: SshConnection = Object.assign(Object.create(null), {
+  const conn: OrcadHostTransport = Object.assign(Object.create(null), {
     writeFile: async (path: string, contents: string) => {
       writes.push([path, contents])
     }

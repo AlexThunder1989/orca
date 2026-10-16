@@ -1,12 +1,12 @@
 // Host-held drafts as this pane acts on them: the card list, Send-now (Steer),
-// Delete, in-place Edit, the Cmd/Ctrl+Enter steer chord, Resume of a held queue, and
-// clearing it before a new message.
+// Delete, in-place Edit, the Cmd/Ctrl+Enter steer chord, and a held queue's Resume and Clear all.
 // Everything durable lives on the host; an open editor holds only its own typing.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import type { AgentJournalSubmission } from '../../../../shared/agent-session-journal-types'
+import { mapSettledWithConcurrency } from '../../../../shared/map-with-concurrency'
 import type {
   AgentSessionQueuedMessage,
   AgentSessionQueuedMessageDeleteResult,
@@ -29,21 +29,22 @@ import {
   type QueuedMessageCard
 } from './structured-agent-session-queued-cards'
 import type { StructuredAgentSessionMutate } from './use-structured-agent-session-mutate'
-import type { NativeChatQueueHold } from './native-chat-composer-types'
 
 export type StructuredAgentSessionQueuedMessagesController = {
   cards: QueuedMessageCard[]
   /** The host queues sends. Without it a card can still show — a message the host kept unsent —
    *  but queueing settings and the steer chord would do nothing. */
   queueCapable: boolean
+  clearCapable: boolean
   /** Why the queue holds cards Resume would send: the header row above them. A string reason: a
    *  newer host may name one this build does not know. */
   pause: { reason: string } | null
-  /** Whether the host lifted the pause; a failure is a toast, and Resume is the retry. Shared by
-   *  the header row and the composer. */
+  /** Whether the host lifted the pause; a failure is a toast, and Resume is the retry. */
   resume: () => Promise<boolean>
   /** A Resume is in flight. */
   resuming: boolean
+  /** Delete every card shown; false when one could not be (already a toast). */
+  clear: () => Promise<boolean>
   /** Send-now into the running turn; the transcript shows it at delivery position. */
   steer: (messageId: string) => Promise<void>
   remove: (messageId: string) => Promise<void>
@@ -55,21 +56,10 @@ export type StructuredAgentSessionQueuedMessagesController = {
   edit: (messageId: string) => Promise<void>
   /** Cmd/Ctrl+Enter: Send-now the newest card. False when there is none to steer. */
   steerNewest: () => boolean
-  /** Present while the header row shows and the queue could send now: the composer offers
-   *  Resume. A failure is a toast, and Resume stays the retry. */
-  queueResume: StructuredAgentSessionQueueResume | undefined
-  /** Present while `queueResume` is: a new message first asks whether to clear the cards. */
-  queueHold: NativeChatQueueHold | undefined
-}
-
-export type StructuredAgentSessionQueueResume = {
-  /** Whether the host lifted the pause (`resume`). */
-  resume: () => Promise<boolean>
-  /** A Resume is in flight. */
-  resuming: boolean
 }
 
 const NO_SENDS: readonly StructuredAgentSessionPendingSend[] = []
+const CLEAR_DELETE_CONCURRENCY = 8
 
 function alreadySentNotice(): void {
   toast.error(
@@ -216,41 +206,73 @@ export function useStructuredAgentSessionQueuedMessages(args: {
     }
   }, [mutate])
   const pause = useMemo(() => queuedMessagesQueuePause(cards, queuePause), [cards, queuePause])
-  // Resume and the "Send message?" choice only where the queue could send now: no turn runs (the
-  // queue's coming send counts, as the host names it) and no prompt waits, which holds the queue
-  // too; the composer shows beside a prompt only when this build cannot answer it.
-  const held = enabled && pause !== null && !isWorking && !hasPendingPrompt
-  const queueResume = useMemo(
-    () => (held ? { resume, resuming } : undefined),
-    [held, resume, resuming]
-  )
 
-  // Every card shown, held or not: Clear queue empties the list the person sees. One at a time,
-  // stopping at the first failure, so one failed press is one toast.
-  const clear = useCallback(
-    (): Promise<boolean> =>
-      cardsRef.current.reduce<Promise<boolean>>(
-        (previous, card) => previous.then((removed) => removed && removeCard(card.messageId)),
-        Promise.resolve(true)
-      ),
-    [removeCard]
-  )
-  const count = cards.length
-  const queueHold = useMemo(() => (held ? { count, clear } : undefined), [held, count, clear])
+  const clearCapable = !cards.some((card) => card.hold === 'sending')
+  const clearingRef = useRef<Promise<boolean> | null>(null)
+  const clearCards = useCallback(async (): Promise<boolean> => {
+    if (!clearCapable) {
+      return false
+    }
+    const messageIds = cardsRef.current
+      .filter((card) => card.hold !== 'sending')
+      .map((card) => card.messageId)
+    if (messageIds.length === 0) {
+      return false
+    }
+    const results = await mapSettledWithConcurrency(
+      messageIds,
+      CLEAR_DELETE_CONCURRENCY,
+      (messageId) =>
+        args.editTransport.write<AgentSessionQueuedMessageDeleteResult>(
+          'agentSession.queuedMessageDelete',
+          'agentSession.queuedMessageDelete',
+          { messageId }
+        )
+    )
+    const dispatched = results.some(
+      (result) =>
+        result.status === 'fulfilled' &&
+        result.value.kind === 'done' &&
+        !result.value.value.deleted &&
+        result.value.value.disposition === 'dispatched'
+    )
+    const failure = results.find(
+      (result) => result.status === 'fulfilled' && result.value.kind === 'not-done'
+    )
+    if (failure?.status === 'fulfilled' && failure.value.kind === 'not-done') {
+      toast.error(failure.value.notice)
+    }
+    if (dispatched) {
+      alreadySentNotice()
+    }
+    return (
+      !dispatched &&
+      results.every((result) => result.status === 'fulfilled' && result.value.kind === 'done')
+    )
+  }, [args.editTransport, clearCapable])
+  const clear = useCallback((): Promise<boolean> => {
+    const pending =
+      clearingRef.current ??
+      clearCards().finally(() => {
+        clearingRef.current = null
+      })
+    clearingRef.current = pending
+    return pending
+  }, [clearCards])
 
   return {
     cards,
     queueCapable: enabled,
+    clearCapable,
     pause,
     resume,
     resuming,
+    clear,
     steer,
     remove,
     edit: editing.begin,
     editCapable: editing.capable,
     editor: editing.editor,
-    steerNewest,
-    queueResume,
-    queueHold
+    steerNewest
   }
 }

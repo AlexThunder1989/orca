@@ -43,7 +43,6 @@ function makeController(): {
     getStore: () => store as unknown as RuntimeStore,
     listRepos: () => [repo],
     addRepo: vi.fn(),
-    addRemoteRepo: vi.fn(),
     cloneRepo: vi.fn(),
     invalidateResolvedWorktrees,
     invalidateWorktreeScan: vi.fn(),

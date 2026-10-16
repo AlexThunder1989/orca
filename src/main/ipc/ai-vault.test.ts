@@ -2,23 +2,15 @@ import { homedir } from 'node:os'
 import { join, sep } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
-import type { IFilesystemProvider } from '../providers/types'
 import type * as CachedSessionListModule from '../ai-vault/cached-session-list'
 import type * as SessionParseCacheModule from '../ai-vault/session-scanner-parse-cache'
-import { getRemoteHostPlatform } from '../ssh/ssh-remote-platform'
 
 const mocks = vi.hoisted(() => ({
   scanLocalSessions: vi.fn(),
   resolveAiVaultSessionTitlesInService: vi.fn(),
-  scanRemoteAiVaultSessions: vi.fn(),
   listSubagentsInService: vi.fn(),
   scanRuntimeAiVaultSessions: vi.fn(),
   getAiVaultWslHomeDirs: vi.fn(),
-  getSshFilesystemProvider: vi.fn(),
-  getActiveSshAiVaultHostInfo: vi.fn(),
-  getActiveSshAiVaultHostInfos: vi.fn(),
-  requestActiveSshAiVaultSessionList: vi.fn(),
-  requestActiveSshAiVaultSessionTitles: vi.fn(),
   ipcHandle: vi.fn(),
   deleteAiVaultSessionFile: vi.fn(),
   invalidateAiVaultSessionListCache: vi.fn(),
@@ -35,10 +27,6 @@ vi.mock('../ai-vault/session-scanner-service-spawn', async (importOriginal) => (
   scanAiVaultSessionsInService: mocks.scanLocalSessions,
   resolveAiVaultSessionTitlesInService: mocks.resolveAiVaultSessionTitlesInService,
   listAiVaultSubagentSessionsInService: mocks.listSubagentsInService
-}))
-
-vi.mock('../ai-vault/remote-session-scanner', () => ({
-  scanRemoteAiVaultSessions: mocks.scanRemoteAiVaultSessions
 }))
 
 vi.mock('../ai-vault/session-delete', () => ({
@@ -70,42 +58,19 @@ vi.mock('../wsl', () => ({
   hasCachedWslDistros: vi.fn(() => false)
 }))
 
-vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE:
-    'Remote connection dropped. Click Reconnect on the SSH target before retrying.',
-  getSshFilesystemProvider: mocks.getSshFilesystemProvider
-}))
-
-vi.mock('./ssh', () => ({
-  getActiveSshAiVaultHostInfo: mocks.getActiveSshAiVaultHostInfo,
-  getActiveSshAiVaultHostInfos: mocks.getActiveSshAiVaultHostInfos,
-  requestActiveSshAiVaultSessionList: mocks.requestActiveSshAiVaultSessionList,
-  requestActiveSshAiVaultSessionTitles: mocks.requestActiveSshAiVaultSessionTitles
-}))
-
 const { resolveOmpSessionsDir } = await import('../ai-vault/omp-session-root')
 const { _internals, registerAiVaultHandlers } = await import('./ai-vault')
 const { deleteAiVaultSession: deleteAiVaultSessionWithDeps } = await import('./ai-vault-delete')
-
-const provider = {} as IFilesystemProvider
 
 beforeEach(() => {
   vi.clearAllMocks()
   _internals.resetAiVaultCacheForTests()
   mocks.scanLocalSessions.mockResolvedValue(result([session('local', 'local-session')]))
   mocks.resolveAiVaultSessionTitlesInService.mockResolvedValue({ titles: [] })
-  mocks.scanRemoteAiVaultSessions.mockResolvedValue(
-    result([session('ssh:dev-box', 'remote-session')])
-  )
   mocks.listSubagentsInService.mockResolvedValue({ sessions: [], issues: [] })
   mocks.scanRuntimeAiVaultSessions.mockResolvedValue(
     result([session('runtime:remote-server', 'runtime-session')])
   )
-  mocks.getSshFilesystemProvider.mockReturnValue(provider)
-  mocks.requestActiveSshAiVaultSessionList.mockResolvedValue(null)
-  mocks.requestActiveSshAiVaultSessionTitles.mockResolvedValue(null)
-  mocks.getActiveSshAiVaultHostInfo.mockReturnValue(hostInfo('dev-box'))
-  mocks.getActiveSshAiVaultHostInfos.mockReturnValue([hostInfo('dev-box')])
 })
 
 describe('listAiVaultSessions host routing', () => {
@@ -122,9 +87,14 @@ describe('listAiVaultSessions host routing', () => {
         includeAntigravityIdeSessions: true,
         executionHostId: 'local'
       }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
+      expect.objectContaining({
+        sent: expect.any(Function),
+        work: expect.any(Function),
+        finish: expect.any(Function),
+        fail: expect.any(Function)
+      })
     )
-    expect(mocks.scanRemoteAiVaultSessions).not.toHaveBeenCalled()
   })
 
   it('keeps direct runtime host scans on the normal runtime timeout', async () => {
@@ -186,11 +156,7 @@ describe('resolveAiVaultSessionTitles host routing', () => {
     expect(mocks.scanRuntimeAiVaultSessions).not.toHaveBeenCalled()
   })
 
-  it('degrades unsupported hosts without falling back to a broad scan', async () => {
-    mocks.requestActiveSshAiVaultSessionTitles.mockRejectedValue(
-      new Error('Method not found: aiVault.resolveSessionTitles')
-    )
-
+  it('degrades unserved SSH hosts without falling back to a broad scan', async () => {
     await expect(
       _internals.resolveAiVaultSessionTitles({
         executionHostScope: 'ssh:dev-box',
@@ -199,7 +165,6 @@ describe('resolveAiVaultSessionTitles host routing', () => {
     ).resolves.toEqual({ titles: [] })
 
     expect(mocks.scanLocalSessions).not.toHaveBeenCalled()
-    expect(mocks.scanRemoteAiVaultSessions).not.toHaveBeenCalled()
   })
 })
 
@@ -486,15 +451,6 @@ describe('deleteAiVaultSession', () => {
     expect(mocks.ipcHandle).toHaveBeenCalledWith('aiVault:deleteSession', expect.any(Function))
   })
 })
-
-function hostInfo(targetId: string) {
-  return {
-    targetId,
-    executionHostId: `ssh:${targetId}` as const,
-    remoteHome: '/home/ada',
-    hostPlatform: getRemoteHostPlatform('linux-x64')
-  }
-}
 
 function result(sessions: AiVaultSession[]): AiVaultListResult {
   return { sessions, issues: [], scannedAt: new Date().toISOString() }

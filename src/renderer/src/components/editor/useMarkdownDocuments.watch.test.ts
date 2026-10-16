@@ -20,7 +20,7 @@ vi.mock('@/store', () => ({
   })
 }))
 vi.mock('@/lib/connection-context', () => ({ getConnectionIdFromState: () => null }))
-vi.mock('@/runtime/runtime-file-client', () => ({
+vi.mock('@/runtime/runtime-file-metadata-client', () => ({
   listRuntimeMarkdownDocuments: runtime.list,
   statRuntimePath: runtime.stat
 }))

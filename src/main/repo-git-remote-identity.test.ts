@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gitExecFileAsync } from './git/runner'
-import { registerSshGitProvider, unregisterSshGitProvider } from './providers/ssh-git-dispatch'
 import { probeGitRemoteIdentity } from './repo-git-remote-identity'
 
 vi.mock('./git/runner', () => ({ gitExecFileAsync: vi.fn() }))
@@ -12,23 +11,8 @@ const gitlabIdentity = {
   remoteUrl: 'git@gitlab.example.com:team/orca.git'
 }
 
-const registered: string[] = []
-
-function registerHost(connectionId: string, stdout = gitlabRemote) {
-  const exec = vi.fn().mockResolvedValue({ stdout, stderr: '' })
-  registerSshGitProvider(connectionId, { exec } as never)
-  registered.push(connectionId)
-  return exec
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-afterEach(() => {
-  for (const connectionId of registered.splice(0)) {
-    unregisterSshGitProvider(connectionId)
-  }
 })
 
 describe('probeGitRemoteIdentity', () => {
@@ -49,26 +33,20 @@ describe('probeGitRemoteIdentity', () => {
     })
   })
 
-  it('reports unavailable for an SSH host, even with a registered git provider', async () => {
-    const exec = registerHost('builder')
-
+  it('reports unavailable for an SSH host', async () => {
     await expect(probeGitRemoteIdentity('/repos/orca', 'ssh:builder')).resolves.toEqual({
       status: 'unavailable'
     })
-    expect(exec).not.toHaveBeenCalled()
     expect(gitExecFileAsync).not.toHaveBeenCalled()
   })
 
   // A runtime host's Git is executed by that environment's own server, and the SSH target on its
   // repo row lives in that server's namespace. Dialing a same-named target here answers for
   // another machine's repository.
-  it('refuses a runtime host even when its nested SSH target is registered on this client', async () => {
-    const nested = registerHost('nested-1')
-
+  it('refuses a runtime host', async () => {
     await expect(probeGitRemoteIdentity('/repos/orca', 'runtime:env-a')).resolves.toEqual({
       status: 'unavailable'
     })
-    expect(nested).not.toHaveBeenCalled()
     expect(gitExecFileAsync).not.toHaveBeenCalled()
   })
 

@@ -25,6 +25,7 @@ import type {
 import {
   admitPane,
   moveLeaf,
+  topologyCommitContext,
   withdrawPane,
   type TerminalTopologyCommitContext
 } from '../terminal-topology/terminal-topology-commit'
@@ -229,7 +230,7 @@ export class PtyBindingPersistenceOperations {
    */
   moveTerminalLeafToNewTab(request: TerminalLeafMoveRequest): Promise<TerminalLeafMoveResult> {
     return this[ptyBindingPersistenceOperationsContext].runtime.runDurableMutation(
-      moveLeaf(request, topologyCommitContext(this))
+      moveLeaf(request, this.topology())
     )
   }
 
@@ -239,7 +240,7 @@ export class PtyBindingPersistenceOperations {
     hostId?: string | null
   ): Promise<TerminalPaneAdmissionOutcome> {
     return this[ptyBindingPersistenceOperationsContext].runtime.runDurableMutation(
-      admitPane(resolveHostId(hostId), admission, topologyCommitContext(this))
+      admitPane(resolveHostId(hostId), admission, this.topology())
     )
   }
 
@@ -248,20 +249,12 @@ export class PtyBindingPersistenceOperations {
     hostId?: string | null
   ): Promise<LayoutRefusalCode | null> {
     return this[ptyBindingPersistenceOperationsContext].runtime.runDurableMutation(
-      withdrawPane(resolveHostId(hostId), pane, topologyCommitContext(this))
+      withdrawPane(resolveHostId(hostId), pane, this.topology())
     )
   }
-}
 
-function topologyCommitContext(
-  owner: PtyBindingPersistenceOperations
-): TerminalTopologyCommitContext {
-  const { runtime, sessions } = owner[ptyBindingPersistenceOperationsContext]
-  return {
-    state: runtime.state,
-    hostIds: () => sessions.getWorkspaceSessionHostIds(),
-    getSession: (hostId) => sessions.getWorkspaceSession(hostId),
-    markDirty: (domain) => runtime.dirtyProfileStateDomains?.add(domain)
+  private topology(): TerminalTopologyCommitContext {
+    return topologyCommitContext(this[ptyBindingPersistenceOperationsContext])
   }
 }
 

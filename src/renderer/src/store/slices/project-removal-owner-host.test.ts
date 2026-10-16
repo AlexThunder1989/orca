@@ -4,7 +4,13 @@
  * focused-host fallback), or the other host's live project is destroyed.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTestStore } from './store-test-helpers'
+import {
+  createTestStore,
+  makeLayout,
+  makeOpenFile,
+  makeTab,
+  makeWorktree
+} from './store-test-helpers'
 import { purgeOrphanedRuntimeSshProjects } from './worktrees/teardown/orphaned-runtime-ssh-project-purge'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -169,6 +175,39 @@ describe('project removal stays on its owner host (#13071)', () => {
     expect(store.getState().repos).toEqual([localRow])
     expect(reposRemoveForHost).toHaveBeenCalledTimes(1)
     expect(reposRemoveForHost).toHaveBeenCalledWith({ repoId: 'same-repo', hostId: 'ssh:target-1' })
+  })
+
+  // Why: removal writes no tab state itself; the host-scoped purge of a twin id must still drop it.
+  it('drops terminal and editor state under a worktree id the other host also publishes', async () => {
+    const store = createTestStore()
+    const worktreeId = 'same-repo::/work/same'
+    const sshTwin = makeWorktree({ id: worktreeId, repoId: 'same-repo', hostId: 'ssh:target-1' })
+    store.setState({
+      repos: [localRow, sshRow],
+      worktreesByRepo: {
+        'same-repo': [
+          makeWorktree({ id: worktreeId, repoId: 'same-repo', hostId: 'local' }),
+          sshTwin
+        ]
+      },
+      tabsByWorktree: { [worktreeId]: [makeTab({ id: 'tab-1', worktreeId })] },
+      terminalLayoutsByTabId: { 'tab-1': makeLayout() },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] },
+      activeTabId: 'tab-1',
+      openFiles: [makeOpenFile({ id: '/work/same/a.ts', worktreeId })],
+      activeFileIdByWorktree: { [worktreeId]: '/work/same/a.ts' }
+    })
+
+    await store.getState().removeProject('same-repo', { hostId: 'local' })
+
+    const state = store.getState()
+    expect(state.worktreesByRepo['same-repo']).toEqual([sshTwin])
+    expect(state.tabsByWorktree[worktreeId]).toBeUndefined()
+    expect(state.terminalLayoutsByTabId['tab-1']).toBeUndefined()
+    expect(state.ptyIdsByTabId['tab-1']).toBeUndefined()
+    expect(state.activeTabId).toBeNull()
+    expect(state.openFiles).toEqual([])
+    expect(state.activeFileIdByWorktree[worktreeId]).toBeUndefined()
   })
 })
 

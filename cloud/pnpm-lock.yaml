@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@orca/process-host':
+        specifier: link:../src/packages/process-host
+        version: link:../src/packages/process-host
       '@types/node':
         specifier: ^24.19.0
         version: 24.19.0

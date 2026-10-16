@@ -53,8 +53,9 @@ vi.mock('../pi/titlebar-extension-service', () => ({
   piTitlebarExtensionService: { buildPtyEnv: () => ({}), clearPty: vi.fn() }
 }))
 
-import { registerPtyHandlers, setLocalPtyProvider } from './pty'
-import type { IPtyProvider, PtyProcessInfo } from '../providers/types'
+import { registerPtyHandlers } from './pty/register-handlers'
+import { setLocalPtyProvider } from './pty/provider/registry'
+import type { IPtyProvider, PtyProcessInfo } from '../providers/pty-provider-contract'
 
 // The runtime's worktree.ps liveness refresh calls the aggregate inventory (no connectionId)
 // under a 3s budget, and only a returned inventory can retire an exited PTY. STA-517: one

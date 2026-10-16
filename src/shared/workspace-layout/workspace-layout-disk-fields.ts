@@ -48,7 +48,14 @@ type PartSources = {
         'workspace',
         Exclude<
           keyof WorkspaceLayout,
-          'tabs' | 'groups' | 'editorFiles' | 'browserTabs' | 'leaves' | 'closedTerminalTabs'
+          // `editorViews` is in memory only: the view is not saved.
+          | 'tabs'
+          | 'groups'
+          | 'editorFiles'
+          | 'editorViews'
+          | 'browserTabs'
+          | 'leaves'
+          | 'closedTerminalTabs'
         >
       >
     | Prefixed<
@@ -122,9 +129,10 @@ const ROW = {
   forceHostRuntime: own('tab.terminal', 'forceHostRuntime'),
   startupCwd: own('tab.terminal', 'startupCwd'),
   launchAgent: own('tab.terminal', 'launchAgent'),
-  agentLaunchPane: own('tab.terminal', 'agentLaunchPane'),
   // Transient handoffs, never restored; the window strips them, but older builds' minimal row mint
-  // stored `pendingActivationSpawn`, so the Loader drops it.
+  // stored `pendingActivationSpawn`, so the Loader drops it. A launch pane is this session's: the
+  // window saves only a pending one, for a reload, and after a restart its pane spawns like any other.
+  agentLaunchPane: 'unwritten',
   pendingActivationSpawn: 'unwritten',
   recovery: 'unwritten',
   restoredFromSession: 'unwritten'

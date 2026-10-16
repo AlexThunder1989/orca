@@ -7,7 +7,7 @@ import {
   AGENT_SESSION_REWIND_RECOVERY_CAPABILITY,
   type RuntimeCapability
 } from '../../../shared/protocol-version'
-import type { RuntimeClientTarget } from './runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import {
   ensureLocalRuntimeCapabilities,
   readLocalRuntimeCapabilitiesOrUnknown

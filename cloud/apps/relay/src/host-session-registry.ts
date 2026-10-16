@@ -42,6 +42,8 @@ import { relayHostLogDigest } from './relay-host-log-digest.js'
 import type { RelayTokenClaims } from './relay-token-verifier.js'
 import {
   percentile,
+  type HostPreAuthOutcome,
+  type HostPreAuthPath,
   type RelayClientAcceptStage,
   type RelayClientAcceptTimedStage,
   type RelayRuntimeObserver
@@ -168,6 +170,16 @@ function payload(raw: RawData, expectedType: string): unknown {
   }
 }
 
+// Who the token speaks for; only its expiry may change across a refresh or a resume.
+function sameHostIdentity(current: RelayTokenClaims, next: RelayTokenClaims): boolean {
+  return (
+    next.sub === current.sub &&
+    next.prof === current.prof &&
+    next.org === current.org &&
+    next.relayHostId === current.relayHostId
+  )
+}
+
 function send(socket: WebSocket, type: string, message: object): void {
   socket.send(JSON.stringify({ type, ...message }))
 }
@@ -176,25 +188,43 @@ function readControlFrame(
   socket: WebSocket,
   timeoutMs: number,
   timeoutReason: string,
-  receive: (raw: RawData, isBinary: boolean) => void
+  receive: (raw: RawData, isBinary: boolean) => void,
+  ended?: (how: 'timeout' | 'closed') => void
 ): void {
-  if (socket.readyState !== socket.OPEN) return
+  if (socket.readyState !== socket.OPEN) {
+    ended?.('closed')
+    return
+  }
   const timer = setTimeout(() => {
     finish()
+    ended?.('timeout')
     socket.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, timeoutReason)
   }, timeoutMs)
   function finish(): void {
     clearTimeout(timer)
     socket.off('message', onMessage)
-    socket.off('close', finish)
+    socket.off('close', onClose)
+  }
+  function onClose(): void {
+    finish()
+    ended?.('closed')
   }
   function onMessage(raw: RawData, isBinary: boolean): void {
     finish()
     receive(raw, isBinary)
   }
   socket.once('message', onMessage)
-  socket.once('close', finish)
+  socket.once('close', onClose)
 }
+
+// Records one host control's pre-auth time, from the cell accepting the WebSocket to the
+// hello's admission and proof being decided, exactly once.
+type SettlePreAuth = (outcome: HostPreAuthOutcome, path: HostPreAuthPath) => void
+
+const preAuthEnded =
+  (settle: SettlePreAuth, path: HostPreAuthPath) =>
+  (how: 'timeout' | 'closed'): void =>
+    settle(how === 'timeout' ? 'refused' : 'abandoned', path)
 
 // Hosts abandon connects after 15s; waiting much longer than that behind a
 // stalled predecessor only accumulates doomed sockets.
@@ -689,7 +719,7 @@ export class HostSessionRegistry {
 
   // A director names this seat the loser of a duplicate: stop taking phones for it now, and
   // close it once its splices have had time to finish. Repeats are one demotion.
-  demote(request: DemoteRequest): 'demoted' | 'already-demoted' | 'not-seated' | 'off' {
+  demote(request: DemoteRequest): 'demoted' | 'already-demoted' | 'draining' | 'not-seated' | 'off' {
     // Only a reserve-mode cell takes demotions, so flipping admitMode back reverts the route.
     if (!this.reserveMode()) return 'off'
     const session = this.get(request)
@@ -705,6 +735,8 @@ export class HostSessionRegistry {
     ) {
       return 'not-seated'
     }
+    // A drain already told this host to go: its own grace stands, never cut to the demotion's.
+    if (this.drainSentHosts.has(session.relayHostId) || session.regionalDrainAttemptId) return 'draining'
     const socket = session.socket
     if (this.demotedSeats.get(key) === socket) return 'already-demoted'
     this.demotedSeats.set(key, socket)
@@ -1202,35 +1234,64 @@ export class HostSessionRegistry {
     hostCapabilities?: ReadonlySet<string>,
     assignmentLease?: string
   ): void {
+    const settlePreAuth = this.startPreAuth(socket)
+    const refuse = (code: number, reason: string): void => {
+      settlePreAuth('refused', 'beforeCheck')
+      socket.close(code, reason)
+    }
     if (this.idleAttempts.has(identity.relayHostId)) {
-      socket.close(RELAY_CLOSE_CODE.WRONG_CELL, 'idle cutover in progress')
+      refuse(RELAY_CLOSE_CODE.WRONG_CELL, 'idle cutover in progress')
       return
     }
     // Keyed by socket, not session: a rebind swaps the session's socket, and the
     // successor's own advertisement is the only one that describes its decoder.
     if (hostCapabilities?.size) this.hostCapabilities.set(socket, hostCapabilities)
     if (this.draining) {
-      socket.close(RELAY_CLOSE_CODE.DRAINING, 'relay draining')
+      refuse(RELAY_CLOSE_CODE.DRAINING, 'relay draining')
       return
     }
-    readControlFrame(socket, 2_000, 'host hello timeout', (raw, isBinary) => {
-      if (isBinary) {
-        socket.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'host hello must be text')
-        return
-      }
-      this.guardSessionTask(
-        () =>
-          this.beginProof(
-            socket,
-            identity,
-            payload(raw, 'host-hello'),
-            connectionInclusionWatermark,
-            assignmentLease
-          ),
-        socket,
-        'host hello proof'
-      )
-    })
+    readControlFrame(
+      socket,
+      2_000,
+      'host hello timeout',
+      (raw, isBinary) => {
+        if (isBinary) {
+          refuse(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'host hello must be text')
+          return
+        }
+        this.guardSessionTask(
+          () =>
+            this.beginProof(
+              socket,
+              identity,
+              payload(raw, 'host-hello'),
+              settlePreAuth,
+              connectionInclusionWatermark,
+              assignmentLease
+            ).catch((error: unknown) => {
+              // guardSessionTask closes the socket, so any throw refuses the hello as beforeCheck,
+              // including one after the database answered (e.g. in send or the session lookup).
+              settlePreAuth('refused', 'beforeCheck')
+              throw error
+            }),
+          socket,
+          'host hello proof'
+        )
+      },
+      preAuthEnded(settlePreAuth, 'beforeCheck')
+    )
+  }
+
+  private startPreAuth(socket: WebSocket): SettlePreAuth {
+    const startedAt = this.now()
+    let settled = false
+    return (outcome, path) => {
+      if (settled) return
+      settled = true
+      // A decision made after the host hung up never reached it, so it counts as abandoned.
+      const recorded = socket.readyState === socket.OPEN ? outcome : 'abandoned'
+      this.observer.recordHostPreAuth?.(path, recorded, nonNegativeMs(this.now() - startedAt))
+    }
   }
 
   // A dependency failure (e.g. a database connect timeout) must cost one
@@ -1369,29 +1430,34 @@ export class HostSessionRegistry {
     socket: WebSocket,
     identity: RelayTokenClaims,
     candidate: unknown,
+    settlePreAuth: SettlePreAuth,
     connectionInclusionWatermark?: number,
     assignmentLease?: string
   ): Promise<void> {
+    // Which check decided the hello; refusals before one answers stay 'beforeCheck'.
+    let path: HostPreAuthPath = 'beforeCheck'
+    const refuse = (code: number, reason: string): void => {
+      settlePreAuth('refused', path)
+      this.observer.recordAuth(false)
+      socket.close(code, reason)
+    }
     const hello = HostHelloSchema.safeParse(candidate)
     const hostPublicKey = hello.success
       ? decodeCanonicalBase64(hello.data.hostPublicKeyB64, 32)
       : null
     if (!hello.success) {
-      this.observer.recordAuth(false)
-      socket.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'invalid host hello')
+      refuse(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'invalid host hello')
       return
     }
     if (!hostPublicKey) {
-      this.observer.recordAuth(false)
-      socket.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'invalid host public key')
+      refuse(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'invalid host public key')
       return
     }
     if (
       hello.data.relayHostId !== identity.relayHostId ||
       relayHostId(hostPublicKey) !== identity.relayHostId
     ) {
-      this.observer.recordAuth(false)
-      socket.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'host key binding mismatch')
+      refuse(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'host key binding mismatch')
       return
     }
     const leaseShadow = this.config.role === 'cell' ? this.assignmentLeaseShadow : undefined
@@ -1424,12 +1490,12 @@ export class HostSessionRegistry {
             relayHostId: identity.relayHostId,
             helloEpoch: hello.data.assignmentEpoch
           })) === 'valid')
+      if (admittedFromMemory) path = 'reserve'
     }
     if (reserveMode && !admittedFromMemory && this.reserveAdmission!.databaseShedding()) {
       // Memory cannot admit it (e.g. seated here, but at another epoch), and the wedged pool
       // would only time out its database check: shed it now, as the upgrade shed does.
-      this.observer.recordAuth(false)
-      socket.close(RELAY_CLOSE_CODE.LIMIT_EXCEEDED, 'relay temporarily unavailable')
+      refuse(RELAY_CLOSE_CODE.LIMIT_EXCEEDED, 'relay temporarily unavailable')
       return
     }
     const assignmentReadStartedAt = performance.now()
@@ -1452,12 +1518,16 @@ export class HostSessionRegistry {
         performance.now() - assignmentReadStartedAt
       )
     }
+    // The `combined` role compares the epoch without querying but is still labelled db.
+    if (!admittedFromMemory) path = 'db'
     if (!assignmentValid) {
-      this.observer.recordAuth(false)
-      socket.close(RELAY_CLOSE_CODE.WRONG_CELL, 'wrong assignment epoch')
+      refuse(RELAY_CLOSE_CODE.WRONG_CELL, 'wrong assignment epoch')
       return
     }
-    if (socket.readyState !== socket.OPEN) return
+    if (socket.readyState !== socket.OPEN) {
+      settlePreAuth('abandoned', path)
+      return
+    }
 
     const key = this.key(identity.sub, identity.relayHostId)
     const existing = this.sessions.get(key)
@@ -1465,7 +1535,8 @@ export class HostSessionRegistry {
       existing &&
       hello.data.controlResumeSecret &&
       hello.data.controlResumeSecret === existing.controlResumeSecret &&
-      (existing.state === 'orphaned' || existing.state === 'active')
+      (existing.state === 'orphaned' || existing.state === 'active') &&
+      sameHostIdentity(existing.identity, identity)
     )
     const generation = rebind ? existing!.generation : (existing?.generation ?? 0) + 1
     const ephemeral = nacl.box.keyPair()
@@ -1502,40 +1573,46 @@ export class HostSessionRegistry {
       ciphertextB64: Buffer.from(ciphertext).toString('base64'),
       expiresAt
     })
-    readControlFrame(socket, 10_000, 'host proof timeout', (raw, isBinary) => {
-      const ack = isBinary
-        ? null
-        : HostChallengeAckSchema.safeParse(payload(raw, 'host-challenge-ack'))
-      const proof = ack?.success ? decodeCanonicalBase64(ack.data.proofB64, 32) : null
-      if (
-        !ack?.success ||
-        ack.data.challengeId !== challengeId ||
-        !proof ||
-        this.now() > expiresAt ||
-        !timingSafeEqual(proof, expectedProof)
-      ) {
-        this.observer.recordAuth(false)
-        socket.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'invalid host proof')
-        return
-      }
-      this.observer.recordAuth(true)
-      this.guardSessionTask(
-        () =>
-          this.activate(
-            socket,
-            identity,
-            existing ?? null,
-            generation,
-            rebind,
-            hello.data.assignmentEpoch,
-            hello.data.appVersion,
-            connectionInclusionWatermark,
-            admittedFromMemory ? { reservedBy } : undefined
-          ),
-        socket,
-        'host activation'
-      )
-    })
+    readControlFrame(
+      socket,
+      10_000,
+      'host proof timeout',
+      (raw, isBinary) => {
+        const ack = isBinary
+          ? null
+          : HostChallengeAckSchema.safeParse(payload(raw, 'host-challenge-ack'))
+        const proof = ack?.success ? decodeCanonicalBase64(ack.data.proofB64, 32) : null
+        if (
+          !ack?.success ||
+          ack.data.challengeId !== challengeId ||
+          !proof ||
+          this.now() > expiresAt ||
+          !timingSafeEqual(proof, expectedProof)
+        ) {
+          refuse(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'invalid host proof')
+          return
+        }
+        settlePreAuth('admitted', path)
+        this.observer.recordAuth(true)
+        this.guardSessionTask(
+          () =>
+            this.activate(
+              socket,
+              identity,
+              existing ?? null,
+              generation,
+              rebind,
+              hello.data.assignmentEpoch,
+              hello.data.appVersion,
+              connectionInclusionWatermark,
+              admittedFromMemory ? { reservedBy } : undefined
+            ),
+          socket,
+          'host activation'
+        )
+      },
+      preAuthEnded(settlePreAuth, path)
+    )
   }
 
   private activate(
@@ -1663,6 +1740,9 @@ export class HostSessionRegistry {
       // id today, since a rebind keeps its generation).
       if (controlActivityId) existing.controlActivityId = controlActivityId
       existing.socket = socket
+      // The hello's token was just verified; keeping the predecessor's would let the next
+      // heartbeat expire a control that proved itself, and every resume would repeat it.
+      if (identity.exp > existing.identity.exp) existing.identity = identity
       existing.state = existing.regionalDrainAttemptId ? 'drain-only' : 'active'
       existing.appVersion = appVersion
       existing.leaseExpiresAt = this.controlLeaseExpiresAt()
@@ -1839,7 +1919,11 @@ export class HostSessionRegistry {
         if (parsed.type === 'auth-refresh') {
           // Close the socket the message arrived on: after a rebind,
           // session.socket already points at the successor.
-          this.guardSessionTask(() => this.acceptRefresh(session, raw), socket, 'auth refresh')
+          this.guardSessionTask(
+            () => this.acceptRefresh(session, socket, raw),
+            socket,
+            'auth refresh'
+          )
           return
         }
         this.guardSessionTask(
@@ -1872,34 +1956,32 @@ export class HostSessionRegistry {
     )
   }
 
-  private async acceptRefresh(session: HostSession, raw: RawData): Promise<void> {
+  private async acceptRefresh(session: HostSession, socket: WebSocket, raw: RawData): Promise<void> {
     const release = this.beginIdleWork(session.relayHostId)
     if (!release) {
-      session.socket?.close(RELAY_CLOSE_CODE.DRAINING, 'resolve-director')
+      socket.close(RELAY_CLOSE_CODE.DRAINING, 'resolve-director')
       return
     }
     try {
-      await this.acceptRefreshUnfenced(session, raw)
+      await this.acceptRefreshUnfenced(session, socket, raw)
     } finally {
       release()
     }
   }
 
-  private async acceptRefreshUnfenced(session: HostSession, raw: RawData): Promise<void> {
+  private async acceptRefreshUnfenced(
+    session: HostSession,
+    socket: WebSocket,
+    raw: RawData
+  ): Promise<void> {
     const parsed = AuthRefreshSchema.safeParse(payload(raw, 'auth-refresh'))
     if (!parsed.success) return
     const refreshed = await this.verifyRelayToken(parsed.data.relayJwt)
-    const sameIdentity =
-      refreshed &&
-      refreshed.sub === session.identity.sub &&
-      refreshed.prof === session.identity.prof &&
-      refreshed.org === session.identity.org &&
-      refreshed.relayHostId === session.identity.relayHostId
-    if (!sameIdentity) {
-      session.socket?.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'refresh identity changed')
+    if (!refreshed || !sameHostIdentity(session.identity, refreshed)) {
+      socket.close(RELAY_CLOSE_CODE.BAD_OUTER_CREDENTIAL, 'refresh identity changed')
       return
     }
-    session.identity = refreshed
+    if (refreshed.exp > session.identity.exp) session.identity = refreshed
     if (!session.regionalDrainAttemptId) this.markSeatActive(session)
   }
 

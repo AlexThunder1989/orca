@@ -6,9 +6,9 @@ import { useAppStore } from '@/store'
 import {
   getRuntimeGitBranchDiff,
   getRuntimeGitCommitDiff,
-  getRuntimeGitDiff,
-  getRuntimeGitScope
-} from '@/runtime/runtime-git-client'
+  getRuntimeGitDiff
+} from '@/runtime/runtime-git-diff-client'
+import { getRuntimeGitScope } from '@/runtime/runtime-git-client-context'
 import type { DiffContent, InFlightContentRead } from './editor-panel-content-types'
 import { canUseChangesModeForFile } from './editor-panel-file-mode'
 import type { EditorPanelContentLoadOptions } from './useEditorPanelExternalContentEvents'

@@ -20,8 +20,9 @@ import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { TerminalPanePlacement } from '../../../../shared/terminal-pane-placement'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { PtyDataMeta } from './pty-dispatcher'
-import type { RemoteRuntimeSnapshotOutcome } from '../../runtime/remote-runtime-terminal-multiplexer'
+import type { RemoteRuntimeSnapshotOutcome } from '../../runtime/remote-runtime-terminal-multiplexer-types'
 import type { AcceptedInputOptions, PtyPreconnectInputEntry } from './pty-preconnect-input-buffer'
+import type { AgentPaneLaunchRequest } from '../../../../shared/agent-pane-launch-request'
 
 export type PtyBufferSnapshot = {
   data: string
@@ -233,8 +234,6 @@ export type PtyTransport = {
   retryRecovery?: () => boolean
   /** True while the transport has a retry armed or parked; pane-level remounts must defer to it. */
   ownsRecovery?: () => boolean
-  /** Lets a wrapper retain input when recovery re-enters connect internally. */
-  setConnectForRecovery?: (connect: PtyTransport['connect']) => void
   /** The user dismissed the error surface; the next occurrence of the same message must surface again. */
   notifyErrorSurfaceDismissed?: () => void
   getPtyId: () => string | null
@@ -289,6 +288,7 @@ export type IpcPtyTransportOptions = {
   agentLaunchPreferences?: AgentLaunchPreferences
   launchToken?: string
   launchAgent?: TuiAgent
+  agentLaunch?: AgentPaneLaunchRequest
   startupCommandDelivery?: StartupCommandDelivery
   connectionId?: string | null
   executionHostId?: ExecutionHostId | null

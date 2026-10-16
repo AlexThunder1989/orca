@@ -81,7 +81,7 @@ describe('daemon hello reader handoff', () => {
           protocolVersion: PROTOCOL_VERSION,
           timeoutMs: 1000
         })
-        const off = attachStreamEventReader(socket, outcome, onEvent)
+        const reader = attachStreamEventReader(socket, outcome, onEvent)
         await new Promise<void>((resolve) => setImmediate(resolve))
         if (!tailBuffered) {
           socket.push(data.subarray(3))
@@ -90,7 +90,7 @@ describe('daemon hello reader handoff', () => {
         expect(onEvent).toHaveBeenCalledExactlyOnceWith(event)
         expect(errors).toEqual([])
         expect(socket.destroyed).toBe(false)
-        off()
+        reader.detach()
       } finally {
         socket.destroy()
       }

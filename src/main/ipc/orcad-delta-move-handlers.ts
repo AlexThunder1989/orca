@@ -11,9 +11,7 @@ import { keepOrcadServerVersion, runOrcadDeltaMove } from '../ssh/orcad-migratio
 import { planOrcadDeltaMove } from '../ssh/orcad-migration-delta-plan'
 import { censusHostRelayTerminalsFor } from '../ssh/ssh-host-relay-census-for-target'
 import { orcadMigrationDestinationFor } from '../ssh/orcad-runtime-conversion-wiring'
-import { hasRegisteredDirectSshAuthority } from '../ssh/ssh-target-registry'
 import { requiredString } from './orcad-runtime-lifecycle-handlers'
-import { disconnectRegisteredSshTarget } from './ssh-session-teardown'
 import { publishResolvedChangedHostStatus } from './runtime-environment-managed-tunnel'
 import { runTargetLifecycle } from './ssh-target-lifecycle-queue'
 
@@ -46,11 +44,6 @@ export function registerOrcadDeltaMoveHandlers(getUserDataPath: () => string): v
         environment,
         destination: orcadMigrationDestinationFor(environment),
         censusHost: censusHostRelayTerminalsFor(target),
-        releaseDirectSession: async (targetId) => {
-          if (hasRegisteredDirectSshAuthority(targetId)) {
-            await disconnectRegisteredSshTarget(targetId)
-          }
-        },
         ensureTunnel: async () => {
           await ensureOrcadManagedTunnel(userDataPath, environment.id)
         },

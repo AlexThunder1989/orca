@@ -10,7 +10,7 @@ import {
 } from './ssh-host-relay-endpoint-census'
 import type { SshConnection } from './ssh-connection'
 import { censusWindowsHostRelays, windowsCensusNodePath } from './ssh-host-relay-windows-census'
-import { execCommand } from './ssh-relay-deploy-helpers'
+import { execCommand } from './ssh-relay-exec-command'
 import { readRemoteHomeCommand } from './ssh-remote-commands'
 import { resolveRemoteNodePath } from './ssh-remote-node-resolution'
 import { detectRemoteHostPlatform } from './ssh-remote-platform-detection'
@@ -29,13 +29,17 @@ export async function relayTerminalsOnConnect(args: {
   const proof = await assessOrcadMigrationTerminals(args.store, args.targetId, async () =>
     hostTerminalProofFromCensus(await args.censusHost())
   )
-  return proof.verdict === 'exited'
-    ? { verdict: 'exited', count: 0 }
-    : {
-        verdict: proof.verdict,
-        count: proof.ptyIds.length || (proof.hostTerminals ?? 0),
-        ...(terminalsRunElsewhere(proof) ? { elsewhere: true } : {})
-      }
+  if (proof.verdict === 'exited') {
+    return { verdict: 'exited', count: 0 }
+  }
+  if (proof.verdict === 'bridged') {
+    return { verdict: proof.relayVerdict, count: proof.hostTerminals, bridged: true }
+  }
+  return {
+    verdict: proof.verdict,
+    count: proof.ptyIds.length || (proof.hostTerminals ?? 0),
+    ...(terminalsRunElsewhere(proof) ? { elsewhere: true } : {})
+  }
 }
 
 /** Only a listing that found no endpoint, or only idle ones, proves exit; `unenumerable` does not. */

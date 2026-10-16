@@ -1,11 +1,7 @@
 import WebSocket from 'ws'
-import type { PairingOffer } from './pairing'
-import {
-  deriveSharedKey,
-  generateKeyPair,
-  publicKeyFromBase64,
-  publicKeyToBase64
-} from './e2ee-crypto'
+import type { PairedRuntimeConnection } from './paired-runtime-connection'
+import type { PairedE2EEClientHandshake } from './paired-e2ee-client-handshake'
+import { createRemoteRuntimeClientHandshake } from './remote-runtime-client-handshake'
 import { RemoteRuntimeClientError } from './remote-runtime-client'
 import {
   remoteRuntimeConnectFailureMessage,
@@ -19,7 +15,7 @@ import {
 
 export type RemoteRuntimeWebSocket = {
   ws: WebSocket
-  sharedKey: Uint8Array
+  handshake: PairedE2EEClientHandshake
   cleanup: () => void
 }
 
@@ -36,33 +32,26 @@ export type RemoteRuntimeWebSocketCallbacks = {
 }
 
 export function openRemoteRuntimeWebSocket(
-  pairing: PairingOffer,
+  connection: PairedRuntimeConnection,
   callbacks: RemoteRuntimeWebSocketCallbacks,
   // Why: overridable so the connect-bound regression test can pin the behaviour
   // without spending the production budget of wall-clock time.
   connectTimeoutMs?: number
 ): { ok: true; socket: RemoteRuntimeWebSocket } | { ok: false; error: RemoteRuntimeClientError } {
-  const opened = createSocket(pairing, connectTimeoutMs)
+  const opened = createSocket(connection, connectTimeoutMs)
   if (!opened.ok) {
     return opened
   }
-  const { ws, keyPair } = opened
-  const serverPublicKey = publicKeyFromBase64(pairing.publicKeyB64)
-  const sharedKey = deriveSharedKey(keyPair.secretKey, serverPublicKey)
+  const { ws, handshake } = opened
 
   let cleanedUp = false
   const onOpen = (): void => {
-    ws.send(
-      JSON.stringify({
-        type: 'e2ee_hello',
-        publicKeyB64: publicKeyToBase64(keyPair.publicKey)
-      })
-    )
+    ws.send(handshake.helloText())
   }
   const onError = (error: Error): void => {
     callbacks.onError(
       ws,
-      remoteRuntimeUnavailableError(remoteRuntimeConnectFailureMessage(error, pairing.endpoint))
+      remoteRuntimeUnavailableError(remoteRuntimeConnectFailureMessage(error, connection.endpoint))
     )
   }
   const onClose = (code: number, reason: Buffer): void => callbacks.onClose(ws, code, reason)
@@ -108,21 +97,20 @@ export function openRemoteRuntimeWebSocket(
   ws.on('message', onMessage)
   ws.on('pong', onPong)
   ws.on('ping', onPing)
-  return { ok: true, socket: { ws, sharedKey, cleanup } }
+  return { ok: true, socket: { ws, handshake, cleanup } }
 }
 
 function ignoreLateSocketError(): void {}
 
 function createSocket(
-  pairing: PairingOffer,
+  connection: PairedRuntimeConnection,
   connectTimeoutMs?: number
 ):
-  | { ok: true; ws: WebSocket; keyPair: ReturnType<typeof generateKeyPair> }
+  | { ok: true; ws: WebSocket; handshake: PairedE2EEClientHandshake }
   | { ok: false; error: RemoteRuntimeClientError } {
-  let keyPair: ReturnType<typeof generateKeyPair>
+  let handshake: PairedE2EEClientHandshake
   try {
-    keyPair = generateKeyPair()
-    publicKeyFromBase64(pairing.publicKeyB64)
+    handshake = createRemoteRuntimeClientHandshake(connection.hostPublicKeyB64)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return {
@@ -138,13 +126,13 @@ function createSocket(
       ok: true,
       // Why: no runtime frame exceeds this, so a larger one is a broken peer, not a payload to buffer.
       ws: new WebSocket(
-        pairing.endpoint,
+        connection.endpoint,
         remoteRuntimeConnectOptions(
           { maxPayload: REMOTE_RUNTIME_MAX_WEBSOCKET_FRAME_BYTES },
           connectTimeoutMs
         )
       ),
-      keyPair
+      handshake
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

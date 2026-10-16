@@ -5,9 +5,9 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { toast } from 'sonner'
 import {
   clearRuntimeCompatibilityCache,
-  markRuntimeEnvironmentCompatible,
-  unwrapRuntimeRpcResult
+  markRuntimeEnvironmentCompatible
 } from '@/runtime/runtime-rpc-client'
+import { unwrapRuntimeRpcResult } from '@/runtime/runtime-rpc-result'
 import { assertRuntimeStatusCompatible } from '@/runtime/runtime-protocol-compat'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
 import { normalizeTerminalQuickCommands } from '../../../../shared/terminal-quick-commands'

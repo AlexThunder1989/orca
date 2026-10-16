@@ -46,7 +46,6 @@ const LOCAL_ROW: Extract<Row, { type: 'item' }> = {
   repo: LOCAL_REPO,
   depth: 0,
   groupDepth: 0,
-  lineageTrail: [],
   isLastLineageChild: true,
   lineageChildCount: 0
 }

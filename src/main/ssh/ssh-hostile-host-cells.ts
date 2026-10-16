@@ -4,7 +4,7 @@
  * client-side deploy against each one; `.github/workflows/ssh-hostile-hosts.yml` runs it.
  */
 import type { NodeRuntimeTarget } from '../../shared/node-runtime-pin'
-import type { OrcadHostUnavailableReason } from './orcad-host-unavailable'
+import type { OrcadHostUnavailableReason } from '../orcad/orcad-host-unavailable'
 
 /** Every shimmed toolchain command appends its name here; a managed deploy must leave it empty. */
 export const FORBIDDEN_TOOL_LOG = '/tmp/orca-forbidden-tool-calls.log'

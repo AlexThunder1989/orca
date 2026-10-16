@@ -88,6 +88,9 @@ export function createCloseFileAction(
                     preClose.readOnly !== true &&
                     file.readOnly !== true &&
                     isSameOwnedDocument(file, preClose) &&
+                    !get().unifiedTabsByWorktree[file.worktreeId]?.some(
+                      (tab) => tab.entityId === file.id && tab.isPinned
+                    ) &&
                     !file.isDirty &&
                     !(file.id in get().editorDrafts))
               )
@@ -241,8 +244,7 @@ export function createCloseFileAction(
           closedFile &&
           wtRecent &&
           !shouldDeleteFromDisk &&
-          closedFile.mode !== 'markdown-preview' &&
-          closedFile.mode !== 'chat-visual'
+          closedFile.mode !== 'markdown-preview'
         ) {
           const {
             id: _id,

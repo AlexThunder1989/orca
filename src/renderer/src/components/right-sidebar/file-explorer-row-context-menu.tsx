@@ -33,7 +33,7 @@ import {
   getWorkspaceFileRevealOwner,
   revealInFileManager
 } from '@/lib/reveal-in-file-manager'
-import { isLocalPathOpenBlocked } from '@/lib/local-path-open-guard'
+import { isRevealOrEditorOpenBlocked } from '@/lib/local-path-open-guard'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import type { FileExplorerRowProps } from './FileExplorerRow'
 import {
@@ -126,7 +126,7 @@ export function FileExplorerRowContextMenu({
       runtimeEnvironmentId: getRuntimeEnvironmentIdForWorktree(s, s.activeWorktreeId)
     })
   )
-  const revealBlocked = isLocalPathOpenBlocked(revealOwner)
+  const revealBlocked = isRevealOrEditorOpenBlocked(revealOwner)
   const handleOpenInOrcaBrowser = useCallback(() => {
     if (!activeWorktreeId) {
       return

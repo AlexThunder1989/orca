@@ -13,7 +13,7 @@ import {
   getExplicitRuntimeEnvironmentIdForWorktree,
   getRuntimeEnvironmentIdForWorktree
 } from '@/lib/worktree-runtime-owner'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { FileExplorerOperationOwner } from './file-explorer-types'
 import {
   getFloatingWorkspaceOperationRoute,

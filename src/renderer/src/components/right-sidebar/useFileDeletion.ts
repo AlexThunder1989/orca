@@ -22,11 +22,8 @@ import {
   requestEditorSaveQuiesce
 } from '@/components/editor/editor-autosave'
 import { commitFileExplorerOp } from './fileExplorerUndoRedo'
-import {
-  deleteRuntimePath,
-  readRuntimeFileContent,
-  writeRuntimeFile
-} from '@/runtime/runtime-file-client'
+import { deleteRuntimePath, writeRuntimeFile } from '@/runtime/runtime-file-mutation-client'
+import { readRuntimeFileContent } from '@/runtime/runtime-file-read-client'
 import { translate } from '@/i18n/i18n'
 
 type UseFileDeletionParams = {

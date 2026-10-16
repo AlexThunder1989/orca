@@ -57,6 +57,7 @@ import type { KeybindingsApi, SettingsApi } from './api/settings-api'
 import type { ShellApi } from './api/shell-api'
 import type { SpeechApi } from './api/speech-api'
 import type { SshApi } from './api/ssh-api'
+import type { LegacyRelayBridgeApi } from './api/legacy-relay-bridge-api'
 import type { DiagnosticsApi, MemoryApi, StatsApi, TelemetryApi } from './api/telemetry-api'
 import type { UiCommandEventApi } from './api/ui-command-event-api'
 import type { UiWindowApi } from './api/ui-window-api'
@@ -151,6 +152,8 @@ export type PreloadApi = {
   grokAccounts: GrokAccountsApi
   cursorAccounts: CursorAccountsApi
   ssh: SshApi
+  /** COMPAT(legacy-relay-bridge): desktop-only, revisit 2027-01-15. */
+  legacyRelayBridge?: LegacyRelayBridgeApi
   automations: AutomationsApi
   wsl: RuntimeApi['wsl']
   pwsh: RuntimeApi['pwsh']
@@ -203,7 +206,9 @@ export type {
   PtyManagementDaemonCwdClass,
   PtyManagementFolderAccessMismatch,
   PtyManagementMacTccAttributionHealth,
-  PtyManagementSession
+  PtyManagementSession,
+  PtyManagementSeveredDaemon,
+  PtyManagementSeveredDaemonRestartResult
 } from './api/pty-management-api'
 export type {
   ShellOpenExternalEditorRequest,

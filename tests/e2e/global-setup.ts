@@ -48,7 +48,6 @@ export default function globalSetup(): void {
   const outMain = path.join(root, 'out', 'main', 'index.js')
   const outCli = path.join(root, 'out', 'cli', 'index.js')
   const outWeb = path.join(root, 'out', 'web', 'web-index.html')
-  const outLinuxRelay = path.join(root, 'out', 'relay', 'linux-x64', 'relay.js')
 
   // ── 1. Build the Electron app ──────────────────────────────────────
   if (process.env.SKIP_BUILD && existsSync(outMain)) {
@@ -97,22 +96,6 @@ export default function globalSetup(): void {
         timeout: WEB_E2E_BUILD_TIMEOUT_MS
       })
       console.error('[e2e] Web client build complete.')
-    }
-  }
-  if (
-    process.env.ORCA_E2E_SSH_DOCKER === '1' ||
-    (process.env.ORCA_E2E_SKILL_STAGING === '1' && Boolean(process.env.ORCA_E2E_SKILL_SSH_HOST))
-  ) {
-    if (process.env.SKIP_BUILD && existsSync(outLinuxRelay)) {
-      console.error('[e2e] SKIP_BUILD set and SSH relay bundle exists — skipping relay build')
-    } else {
-      // Why: explicit SSH specs need deployable Relay outputs in source-tree runs.
-      console.error('[e2e] Building SSH relay bundle for SSH E2E...')
-      execSync('pnpm run build:relay', {
-        cwd: root,
-        stdio: 'inherit',
-        timeout: 120_000
-      })
     }
   }
   if (process.env.ORCA_E2E_SSH_DOCKER === '1') {

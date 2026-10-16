@@ -1,7 +1,7 @@
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import { getProjectGroupHeaderKey } from '../grouping/group-keys'
-import type { ProjectGroupingModel } from '../grouping/project-grouping'
+import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
 
 function getProjectIdFromHeaderRowKey(rowKey: string): string | null {
   if (!rowKey.startsWith('project:')) {

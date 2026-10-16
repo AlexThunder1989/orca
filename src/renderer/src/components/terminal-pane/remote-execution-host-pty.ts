@@ -1,4 +1,4 @@
-import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
+import { isRemoteRuntimePtyId } from '../../../../shared/remote-runtime-pty-id'
 
 import { parseAppSshPtyId } from '../../../../shared/ssh-pty-id'
 

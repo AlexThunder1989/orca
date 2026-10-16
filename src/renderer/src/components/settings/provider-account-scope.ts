@@ -1,31 +1,38 @@
 import { translate } from '@/i18n/i18n'
 import { getLocalExecutionHostLabel } from '../../../../shared/execution-host'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import { defaultScopeHost } from '@/lib/default-creation-host'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 
-export type ProviderAccountScope = {
+/** Which host a provider card or budget belongs to, and how to change it. */
+export type ProviderHostScope = {
   label: string
   description: string
 }
 
-export type ProviderRateLimitScope = {
-  label: string
-  description: string
+function remoteServerScopeLabel(name: string): string {
+  return translate(
+    'auto.components.settings.providerAccountScope.remoteServer',
+    'Remote server: {{value0}}',
+    { value0: name }
+  )
+}
+
+function providerHostScopeLabel(target: RuntimeClientTarget): string {
+  return target.kind === 'environment'
+    ? remoteServerScopeLabel(target.environmentId)
+    : getLocalExecutionHostLabel()
 }
 
 /** Accounts-pane scope while a remote server owns the roster (#8186). */
-export function getRemoteAccountsPaneScope(serverName: string | null): ProviderAccountScope {
+export function getRemoteAccountsPaneScope(serverName: string | null): ProviderHostScope {
   const name = serverName?.trim()
   return {
     // Why: the saved-server list is still empty on first paint, and the generic
     // fallback is already a noun phrase — interpolating it would render
     // "Remote server: the remote server".
     label: name
-      ? translate(
-          'auto.components.settings.providerAccountScope.remoteServer',
-          'Remote server: {{value0}}',
-          { value0: name }
-        )
+      ? remoteServerScopeLabel(name)
       : translate(
           'auto.components.settings.AccountsPane.accountScopeRemoteServerUnnamed',
           'Remote server'
@@ -39,55 +46,40 @@ export function getRemoteAccountsPaneScope(serverName: string | null): ProviderA
 
 export function getProviderAccountScope(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
-): ProviderAccountScope {
-  const runtimeId = settings?.activeRuntimeEnvironmentId?.trim()
-  if (runtimeId) {
-    return {
-      label: translate(
-        'auto.components.settings.providerAccountScope.remoteServer',
-        'Remote server: {{value0}}',
-        { value0: runtimeId }
-      ),
-      description: translate(
-        'auto.components.settings.providerAccountScope.remoteServerCredentials',
-        'Credentials and account checks for this provider are owned by this remote server. To use another host, change Settings > Remote Orca Servers > Advanced > Default host for new projects.'
-      )
-    }
-  }
+): ProviderHostScope {
+  const target = defaultScopeHost(settings)
   return {
-    label: getLocalExecutionHostLabel(),
-    description: translate(
-      'auto.components.settings.providerAccountScope.localCredentials',
-      'Credentials and account checks for this provider are owned by this desktop client. To use a server, change Settings > Remote Orca Servers > Advanced > Default host for new projects.'
-    )
+    label: providerHostScopeLabel(target),
+    description:
+      target.kind === 'environment'
+        ? translate(
+            'auto.components.settings.providerAccountScope.remoteServerCredentials',
+            'Credentials and account checks for this provider are owned by this remote server. To use another host, change Settings > Remote Orca Servers > Advanced > Default host for new projects.'
+          )
+        : translate(
+            'auto.components.settings.providerAccountScope.localCredentials',
+            'Credentials and account checks for this provider are owned by this desktop client. To use a server, change Settings > Remote Orca Servers > Advanced > Default host for new projects.'
+          )
   }
 }
 
 export function getProviderRateLimitScope(
   target: RuntimeClientTarget,
   providerLabel: string
-): ProviderRateLimitScope {
-  if (target.kind === 'environment') {
-    const runtimeId = target.environmentId
-    return {
-      label: translate(
-        'auto.components.settings.providerAccountScope.remoteServer',
-        'Remote server: {{value0}}',
-        { value0: runtimeId }
-      ),
-      description: translate(
-        'auto.components.settings.providerAccountScope.remoteServerRateLimit',
-        '{{value0}} API budget is fetched from the CLI on this remote server. Choose another host in the Host menu at the top of Settings to see its budget.',
-        { value0: providerLabel }
-      )
-    }
-  }
+): ProviderHostScope {
   return {
-    label: getLocalExecutionHostLabel(),
-    description: translate(
-      'auto.components.settings.providerAccountScope.localRateLimit',
-      '{{value0}} API budget is fetched from the CLI on this desktop client. Choose a server in the Host menu at the top of Settings to see its budget.',
-      { value0: providerLabel }
-    )
+    label: providerHostScopeLabel(target),
+    description:
+      target.kind === 'environment'
+        ? translate(
+            'auto.components.settings.providerAccountScope.remoteServerRateLimit',
+            '{{value0}} API budget is fetched from the CLI on this remote server. Choose another host in the Host menu at the top of Settings to see its budget.',
+            { value0: providerLabel }
+          )
+        : translate(
+            'auto.components.settings.providerAccountScope.localRateLimit',
+            '{{value0}} API budget is fetched from the CLI on this desktop client. Choose a server in the Host menu at the top of Settings to see its budget.',
+            { value0: providerLabel }
+          )
   }
 }

@@ -75,6 +75,13 @@ export async function resolveUncommittedStructuredCreate<TPrepared>(
   try {
     return await prepare()
   } catch (error) {
-    return { refusal: precommitRefusal(error) }
+    const refusal = precommitRefusal(error)
+    return {
+      refusal:
+        refusal.code === 'agent_session_identity_required' &&
+        refusal.details?.reason === 'transcriptNotFound'
+          ? { ...refusal, createAttemptRefusedBeforeCommit: true }
+          : refusal
+    }
   }
 }

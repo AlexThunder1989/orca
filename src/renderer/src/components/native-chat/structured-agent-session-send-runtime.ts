@@ -6,7 +6,7 @@ import {
 import type { AgentSessionWriteNoticePart } from '../../../../shared/agent-session-write-notice-copy'
 import type { AgentSessionWriteFailure } from '../../../../shared/agent-session-write-failure'
 import { dispatchWasWithdrawn } from '../../../../shared/structured-agent-session-dispatch-rejection'
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { agentSessionWriteNoticeText } from './agent-session-write-notice-text'
 import { nativeChatRewindReasonCopy } from './native-chat-rewind-copy'
 import { handBackStructuredAgentSessionMessage } from './structured-agent-session-message-hand-back'

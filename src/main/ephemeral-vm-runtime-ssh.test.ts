@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
-  remove: vi.fn(async () => {}),
-  gitProvider: vi.fn(),
-  fsProvider: vi.fn()
+  remove: vi.fn(async () => {})
 }))
 
+vi.mock('./ssh/ssh-target-registry', () => ({
+  connectRegisteredSshTarget: mocks.connect
+}))
 vi.mock('./ipc/ssh', () => ({
-  connectRegisteredSshTarget: mocks.connect,
   getSshConnectionStore: () => ({
     upsertRuntimeOwnedTarget: (runtimeId: string) => ({
       id: `runtime-ssh-${runtimeId}`,
@@ -23,12 +23,9 @@ vi.mock('./ipc/ssh-session-teardown', () => ({
   disconnectRegisteredSshTarget: vi.fn(),
   removeRegisteredSshTarget: mocks.remove
 }))
-vi.mock('./providers/ssh-git-dispatch', () => ({ getSshGitProvider: mocks.gitProvider }))
-vi.mock('./providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: mocks.fsProvider
-}))
 
 import { connectRuntimeOwnedSshTarget } from './ephemeral-vm-runtime-ssh'
+import { SSH_HOST_NOT_SERVED_MESSAGE } from './providers/ssh-host-not-served-error'
 
 const connection = {
   type: 'ssh' as const,
@@ -41,7 +38,7 @@ describe('connectRuntimeOwnedSshTarget', () => {
     vi.clearAllMocks()
   })
 
-  it("returns the managed server a recipe VM's host runs, without waiting on relay providers", async () => {
+  it("returns the managed server a recipe VM's host runs", async () => {
     mocks.connect.mockResolvedValue({
       targetId: 'runtime-ssh-vm-1',
       status: 'connected',
@@ -52,21 +49,21 @@ describe('connectRuntimeOwnedSshTarget', () => {
     await expect(
       connectRuntimeOwnedSshTarget({ runtimeId: 'vm-1', connection })
     ).resolves.toMatchObject({ targetId: 'runtime-ssh-vm-1', environmentId: 'env-vm' })
-    expect(mocks.gitProvider).not.toHaveBeenCalled()
     expect(mocks.remove).not.toHaveBeenCalled()
   })
 
-  it('waits for the direct providers when the host has no managed server', async () => {
+  it('fails at once and removes the target when the host has no managed server', async () => {
     mocks.connect.mockResolvedValue({
       targetId: 'runtime-ssh-vm-1',
       status: 'connected',
       error: null,
       reconnectAttempt: 0
     })
-    mocks.gitProvider.mockReturnValue({})
-    mocks.fsProvider.mockReturnValue({})
-    const result = await connectRuntimeOwnedSshTarget({ runtimeId: 'vm-1', connection })
-    expect(result.environmentId).toBeUndefined()
-    expect(mocks.gitProvider).toHaveBeenCalledWith('runtime-ssh-vm-1')
+    const started = Date.now()
+    await expect(connectRuntimeOwnedSshTarget({ runtimeId: 'vm-1', connection })).rejects.toThrow(
+      SSH_HOST_NOT_SERVED_MESSAGE
+    )
+    expect(Date.now() - started).toBeLessThan(1_000)
+    expect(mocks.remove).toHaveBeenCalledWith('runtime-ssh-vm-1')
   })
 })

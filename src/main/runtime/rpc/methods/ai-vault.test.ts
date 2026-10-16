@@ -31,6 +31,8 @@ import {
 } from './ai-vault'
 import { agentSessionRefusalError } from '../../../../shared/agent-session-wire-refusals'
 import { recordStructuredAgentSessionHostInstallRefusal } from '../../structured-agent-session-host-refusal'
+import { setStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-registry'
+import { installCopyingChat } from '../../../ai-vault/structured-session-ownership.test-support'
 import {
   configureAiVaultSessionSources,
   listAiVaultSessions,
@@ -249,6 +251,51 @@ describe('aiVault.prepareSessionResume', () => {
     expect(prepareAiVaultSessionResume).toHaveBeenCalledWith(
       expect.objectContaining({ fork: true, executionHostId: 'local' })
     )
+  })
+})
+
+describe('aiVault.prepareSessionResume for a chat whose host makes the copy', () => {
+  afterEach(() => setStructuredAgentSessionHost(null))
+
+  it("has the server's chat copy an OMP conversation and answers the copy", async () => {
+    const providerSessionId = '019fd611-2b3c-7d4e-9f50-6b7c8d9e0f1a'
+    const copy = vi.fn(async () => ({
+      sessionId: 'copy-1',
+      filePath: '/sessions/copy-1.jsonl'
+    }))
+    installCopyingChat({ transport: 'acp', agent: 'omp', nativeId: providerSessionId }, copy)
+    const prepareAiVaultSessionResume = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler reads only these runtime members.
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      ensureStructuredAgentSessionHost: vi.fn(async () => undefined),
+      prepareAiVaultSessionResume
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: AI_VAULT_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('aiVault.prepareSessionResume', {
+        agent: 'omp',
+        sessionId: providerSessionId,
+        filePath: `/home/me/.omp/agent/sessions/--repo--/x_${providerSessionId}.jsonl`,
+        codexHome: null,
+        fork: true
+      })
+    )
+
+    expect(response).toMatchObject({
+      ok: true,
+      result: {
+        useRealCodexHome: false,
+        forkedSession: {
+          sessionId: 'copy-1',
+          filePath: '/sessions/copy-1.jsonl',
+          agent: 'omp'
+        }
+      }
+    })
+    expect(copy).toHaveBeenCalledWith(expect.objectContaining({ providerSessionId }))
+    expect(prepareAiVaultSessionResume).not.toHaveBeenCalled()
   })
 })
 
@@ -527,7 +574,8 @@ describe('aiVault.listSessions handler + shared cache', () => {
     expect(response).toMatchObject({ ok: true })
     expect(scanAiVaultSessionsInService).toHaveBeenCalledWith(
       expect.objectContaining({ limit: undefined, unlimited: true }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
+      expect.objectContaining({ sent: expect.any(Function), work: expect.any(Function) })
     )
   })
 

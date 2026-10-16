@@ -2,7 +2,7 @@ import type {
   AutomaticWorkResumeOutcome,
   AutomaticWorkStatus
 } from '../../shared/host-spawn-admission'
-import type { IPtyProvider } from '../providers/types'
+import type { IPtyProvider } from '../providers/pty-provider-contract'
 import { DaemonPtyAdapter } from './daemon-pty-adapter'
 import { DaemonPtyRouter } from './daemon-pty-router'
 import { DegradedDaemonPtyProvider } from './degraded-daemon-pty-provider'

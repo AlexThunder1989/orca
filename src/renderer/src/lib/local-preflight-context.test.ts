@@ -124,6 +124,27 @@ describe('local preflight context', () => {
     expect(localPreflightContextKey(context)).toBe(context?.runtimeContextKey)
   })
 
+  it('keys preflight by the focused worktree host over the default host', () => {
+    const localFocused: AppState = {
+      ...makeState({
+        repoPath: '/Users/alice/repo',
+        worktreePath: '/Users/alice/repo',
+        repo: { executionHostId: 'local' }
+      }),
+      settings: { ...getDefaultSettings('/tmp'), activeRuntimeEnvironmentId: 'runtime-1' }
+    }
+    expect(localPreflightContextKey(getLocalPreflightContext(localFocused))).toBe('host')
+
+    const remoteFocused = makeState({
+      repoPath: '/srv/repo',
+      worktreePath: '/srv/repo',
+      repo: { executionHostId: 'runtime:runtime-2' }
+    })
+    expect(getLocalPreflightContext(remoteFocused)?.runtimeContextKey).toMatch(
+      /^runtime:runtime-2#\d+$/
+    )
+  })
+
   it('uses the project runtime for Windows local preflight WSL paths', () => {
     const state = makeState({
       repoPath: String.raw`\\wsl.localhost\Ubuntu\home\alice\repo`

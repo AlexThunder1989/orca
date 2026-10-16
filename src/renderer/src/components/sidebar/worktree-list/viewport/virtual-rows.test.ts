@@ -300,7 +300,6 @@ describe('buildLineageRowRekeyMap', () => {
       worktree: { id: worktreeId },
       depth: 0,
       groupDepth: 0,
-      lineageTrail: [],
       isLastLineageChild: true,
       lineageChildCount: 0
     } as unknown as RenderRow

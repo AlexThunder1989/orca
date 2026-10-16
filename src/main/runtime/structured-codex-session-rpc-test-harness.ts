@@ -29,6 +29,7 @@ import {
   stopStructuredAgentSessionRuntime
 } from './structured-agent-session-runtime'
 import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
+import { scriptedCodexTransport } from './scripted-codex-transport.test-fixture'
 
 export const SESSION = 'session-integration-1'
 export const THREAD = 'thread-integration'
@@ -227,14 +228,15 @@ export async function openStructuredCodexRpcHarness(
       EXAMPLE_GATEWAY_TOKEN: 'shell-exported',
       CODEX_HOME: '/shell/home'
     }),
-    resolveCodexOverrides: () => ({ CODEX_PROFILE: 'configured' }),
-    openCodexConnection: codex.openConnection,
-    readProcessStartTime: async () => 1_700_000_000_000
+    resolveAgentLaunchEnv: (agent): Record<string, string> =>
+      agent === 'codex' ? { CODEX_PROFILE: 'configured' } : {},
+    ...scriptedCodexTransport(codex.openConnection)
   })
   const runtime = {
     getRuntimeId: () => 'runtime-1',
     getClientSettings: () => ({ experimentalStructuredNativeChat: true }),
     getStructuredAgentSessionCreateSupport: async () => ({ supported: true }),
+    structuredAgentSessionLaunchSeedOptions: () => undefined,
     resolveStructuredAgentSessionCreateIntent: async () => {
       const {
         envelope: _envelope,

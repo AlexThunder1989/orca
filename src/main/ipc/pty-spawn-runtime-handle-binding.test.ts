@@ -11,7 +11,7 @@ import {
   makePaneSpawnReservationKey,
   reservePaneSpawn
 } from './pty/pane/spawn-reservation'
-import { registerPtyHandlers } from './pty'
+import { registerPtyHandlers } from './pty/register-handlers'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))

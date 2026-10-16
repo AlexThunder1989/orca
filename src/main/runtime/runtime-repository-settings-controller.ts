@@ -5,6 +5,7 @@ import type { GhAccountBinding } from '../../shared/github/account-binding'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 import type { RuntimeStore } from './runtime-store-contract'
+import { assertWslMoveRepoWritable } from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 type RuntimeRepositorySettingsDependencies = {
   getStore: () => RuntimeStore | null
@@ -28,6 +29,7 @@ type RepositoryUpdates = Partial<
     | 'kind'
     | 'symlinkPaths'
     | 'issueSourcePreference'
+    | 'defaultJiraProject'
     | 'externalWorktreeVisibility'
     | 'externalWorktreeVisibilityPromptDismissedAt'
     | 'externalWorktreeInboxBaselinePaths'
@@ -59,6 +61,7 @@ export class RuntimeRepositorySettingsController {
   async setBaseRef(repoSelector: string, baseRef: string): Promise<Repo> {
     const store = this.requireStore()
     const repo = await this.deps.resolveRepo(repoSelector)
+    assertWslMoveRepoWritable(store, repo)
     if (isFolderRepo(repo)) {
       throw new Error('Folder mode does not support base refs.')
     }
@@ -74,6 +77,7 @@ export class RuntimeRepositorySettingsController {
   async update(repoSelector: string, updates: RepositoryUpdates): Promise<Repo> {
     const store = this.requireStore()
     const repo = await this.deps.resolveRepo(repoSelector)
+    assertWslMoveRepoWritable(store, repo)
     const sanitizedUpdates = omitUndefined(updates)
     if ('worktreeBasePath' in updates && updates.worktreeBasePath === undefined) {
       sanitizedUpdates.worktreeBasePath = undefined
@@ -109,7 +113,9 @@ export class RuntimeRepositorySettingsController {
       throw new Error('runtime_unavailable')
     }
     const repo = await this.deps.resolveRepo(repoSelector)
-    store.removeProjectForHost(repo.id, getRepoExecutionHostId(repo))
+    const hostId = getRepoExecutionHostId(repo)
+    assertWslMoveRepoWritable(store, repo)
+    store.removeProjectForHost(repo.id, hostId)
     this.deps.forgetTerminalTopology(repo.id)
     this.deps.invalidateResolvedWorktrees()
     this.deps.invalidateWorktreeScan(repo.id)

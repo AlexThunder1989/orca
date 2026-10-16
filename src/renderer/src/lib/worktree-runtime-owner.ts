@@ -26,12 +26,10 @@ import {
 import {
   getFloatingWorkspaceOperationRoute,
   resolveActiveWorkspaceRoute,
-  resolveExplicitWorktreeOperationRouteResult,
   resolveWorktreeOperationRouteResult
 } from './worktree-operation-route'
+import { resolveExplicitWorktreeOperationRouteResult } from './worktree-operation-catalog-route'
 import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner-state'
-export type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner-state'
-export { getRuntimeSessionMirrorEnvironmentIds } from './runtime-session-mirror-owners'
 
 function getExplicitRuntimeEnvironmentIdFromHost(
   executionHostId: string | null | undefined

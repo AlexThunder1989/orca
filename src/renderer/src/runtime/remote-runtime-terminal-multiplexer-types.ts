@@ -52,6 +52,8 @@ export type RemoteRuntimeMultiplexedTerminalCallbacks = {
     }
   ) => void
   onSubscribed?: () => void
+  /** The host installed the stream and named its capabilities; its initial snapshot is still on the way. */
+  onSubscribeAcknowledged?: () => void
   onOutputPauseCapability?: () => void
   onEnd?: (verdict: TerminalStreamEndVerdict) => void
   onError?: (message: string) => void
@@ -191,6 +193,8 @@ export type RemoteRuntimeMultiplexedTerminalState = {
   resyncPendingSend: boolean
   resyncTimer: ReturnType<typeof setTimeout> | null
   resyncAttempts: number
+  /** Consecutive resync timeouts with no recovery frame at all. */
+  resyncUnansweredTimeouts: number
   capacityRejected: boolean
   watchdog: RemoteTerminalStreamWatchdog
 }

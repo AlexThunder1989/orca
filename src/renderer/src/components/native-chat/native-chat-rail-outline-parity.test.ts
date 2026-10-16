@@ -20,7 +20,7 @@ import {
   nativeChatRailReplyPreview
 } from './native-chat-message-rail-items'
 import { createNativeChatMessageListProjection } from './native-chat-message-list-projection'
-import type { NativeChatResolvedPrompt } from './native-chat-resolution-receipt'
+import type { NativeChatResolvedPrompt } from '../../../../shared/native-chat-resolution-receipt'
 import { nativeChatSubagentSections } from './native-chat-subagent-sections'
 import { projectNativeChatTaskListFrames } from './native-chat-task-list-frames'
 import { omitNativeChatThreadGoalRows } from './native-chat-thread-goal-rows'
@@ -151,6 +151,18 @@ describe('conversation outline parity with the loaded rail', () => {
       'item-11',
       'item-12'
     ])
+  })
+
+  // Served to clients of every version: a rejected row the transcript draws in place, as not sent,
+  // changes nothing in it, neither its own tick nor any other entry or reply.
+  it('is the same as if a rejected message had never been sent', () => {
+    const rejectedId = agentJournalSubmissionKey(REJECTED.clientMessageId)
+    expect(projectAgentSessionConversationOutline(JOURNAL, [REJECTED])).toEqual(
+      projectAgentSessionConversationOutline(
+        JOURNAL.filter((item) => item.itemId !== rejectedId),
+        []
+      )
+    )
   })
 
   // The host serves this outline to clients of every version, so it lists what it always listed.

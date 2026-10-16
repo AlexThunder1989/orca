@@ -1,7 +1,7 @@
 import type { PtyRendererDelivery } from '../session'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
 import type { Store } from '../../../persistence'
-import type { IPtyProvider } from '../../../providers/types'
+import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
@@ -46,7 +46,10 @@ export type PtyRuntimeControllerDeps = {
     env: T,
     launch: CodexResumeLaunch
   ) => T
-  assertFolderWorkspacePtyPathUsable: (worktreeId: string | undefined) => Promise<void> | void
+  assertWorkspaceAcceptsNewPty: (
+    worktreeId: string | undefined,
+    sessionId?: string
+  ) => Promise<void> | void
   resolvePtySpawnStartupCwd: (
     worktreeId: string | undefined,
     cwd: string | undefined,

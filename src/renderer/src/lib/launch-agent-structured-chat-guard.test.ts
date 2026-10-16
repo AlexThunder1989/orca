@@ -137,10 +137,14 @@ vi.mock('@/lib/telemetry', () => ({
   track: vi.fn(),
   tuiAgentToAgentKind: (agent: string) => agent
 }))
-vi.mock('@/runtime/web-runtime-session', () => ({
+vi.mock('@/runtime/web-runtime-terminal-creation', () => ({
   createWebRuntimeSessionTerminal: vi.fn(),
-  createWebRuntimeAgentSessionTerminalWithLaunchDraft: vi.fn(),
-  isWebRuntimeSessionActive: vi.fn(() => false),
+  createWebRuntimeAgentSessionTerminalWithLaunchDraft: vi.fn()
+}))
+vi.mock('@/runtime/web-runtime-session-environment', () => ({
+  isWebRuntimeSessionActive: vi.fn(() => false)
+}))
+vi.mock('../../../shared/terminal-surface-id', () => ({
   isWebTerminalSurfaceTabId: vi.fn(() => false)
 }))
 vi.mock('@/lib/launch-structured-agent-session', () => {
@@ -159,8 +163,10 @@ vi.mock('@/lib/launch-structured-agent-session', () => {
     StructuredAgentSessionOwnerUnresolvedError
   }
 })
-vi.mock('@/runtime/local-structured-session-tabs-sync', () => ({
-  refreshLocalStructuredSessionTabs: mockRefreshLocalStructuredSessionTabs,
+vi.mock('@/runtime/local-structured-session-tabs-sync/inventory-refresh', () => ({
+  refreshLocalStructuredSessionTabs: mockRefreshLocalStructuredSessionTabs
+}))
+vi.mock('@/runtime/local-structured-session-owner', () => ({
   LOCAL_STRUCTURED_SESSION_OWNER: 'local-structured-session'
 }))
 vi.mock('@/runtime/local-runtime-capabilities', () => ({

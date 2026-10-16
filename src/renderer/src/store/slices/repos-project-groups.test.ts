@@ -201,7 +201,11 @@ describe('project group store routing', () => {
       result: { status: { path: '/workspace/platform', exists: true } },
       _meta: { runtimeId: 'runtime-remote' }
     })
-    const folderGroup = { ...projectGroup, parentPath: '/workspace/platform' }
+    const folderGroup: ProjectGroup = {
+      ...projectGroup,
+      parentPath: '/workspace/platform',
+      executionHostId: 'runtime:env-1'
+    }
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'wrong-env' } as never,

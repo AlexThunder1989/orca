@@ -1,3 +1,4 @@
+import type { OccurrenceSectionPath } from '../../../../../../shared/worktree-occurrence-plan'
 import {
   compareFolderWorkspacesForDisplay,
   type RenderableFolderWorkspace
@@ -8,12 +9,12 @@ import { getEffectiveProjectGroupManualRank } from '../../../../../../shared/pro
 import { PROJECT_GROUP_META, getProjectGroupHeaderKey } from './group-keys'
 import { appendOrderedGroups } from './group-sections'
 import type { SectionAppendContext } from './group-sections'
-import type { OrderedGroupEntry } from './project-grouping'
+import type { OrderedGroupEntry } from './worktree-group-entry'
 import {
   compareRecentRank,
   createRecentRankLookup,
   withRepoSectionDisplayLabels
-} from './section-order'
+} from '../../../../../../shared/project-section-order'
 import { buildFolderWorkspaceRow } from './row-builders'
 
 export function appendProjectGroupSections(
@@ -141,4 +142,28 @@ export function appendProjectGroupSections(
     withRepoSectionDisplayLabels(sortRepoEntriesWithinGroup(remainingRepoEntries)),
     0
   )
+}
+
+/** The same group parents used by section emission, including missing-parent roots. */
+export function getProjectGroupOccurrencePaths(projectGroups: readonly ProjectGroup[]) {
+  const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
+  const paths = new Map<string, OccurrenceSectionPath>()
+  for (const group of projectGroups) {
+    const pending: ProjectGroup[] = []
+    const seen = new Set<string>()
+    let current: ProjectGroup | undefined = group
+    while (current && !paths.has(current.id) && !seen.has(current.id)) {
+      seen.add(current.id)
+      pending.push(current)
+      current = current.parentGroupId ? groupsById.get(current.parentGroupId) : undefined
+    }
+    let parent = current ? paths.get(current.id) : undefined
+    for (let index = pending.length - 1; index >= 0; index -= 1) {
+      const entry = pending[index]
+      const path: OccurrenceSectionPath = { key: getProjectGroupHeaderKey(entry.id), parent }
+      paths.set(entry.id, path)
+      parent = path
+    }
+  }
+  return paths
 }

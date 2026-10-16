@@ -1,10 +1,7 @@
 import { resolveOwner } from '@/lib/resolve-owner'
 import type { WorktreeOperationRouteState } from '@/lib/worktree-operation-route'
-import {
-  hostRouteForAuthority,
-  type HostRoute,
-  type RuntimeClientTarget
-} from '@/runtime/runtime-client-target'
+import { hostRouteForAuthority, type HostRoute } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { isRuntimeOwnedSshTargetId, parseExecutionHostId } from '../../../../shared/execution-host'
 import {
   authorityKey,

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import {
   TerminalStreamOpcode,
   encodeTerminalStreamJson
@@ -21,25 +20,9 @@ export async function initializeMultiplexStream(
   ptyId: string,
   onInstalled: (stream: TerminalMultiplexStream) => void
 ): Promise<TerminalMultiplexStream | null> {
-  const { runtime, connectionId, streams, sourceRangeRegistry, registerBinaryStreamHandler } = state
+  const { runtime, connectionId, streams, registerBinaryStreamHandler } = state
   const isMobile = request.client?.type === 'mobile'
   const remoteDesktopSubscriptionKey = `multiplex:${connectionId}:${request.streamId}`
-  const streamGeneration = randomUUID()
-  const requestedSourceRangeConsumer =
-    request.capabilities?.ackOutput === 1 && request.capabilities?.ackOutputSourceRanges === 1
-  const sourceRangeLedger = requestedSourceRangeConsumer
-    ? sourceRangeRegistry.open(streamGeneration)
-    : null
-  const sourceRangeConsumerAttached =
-    sourceRangeLedger !== null &&
-    runtime.attachRemoteTerminalSourceRangeConsumer({
-      ptyId,
-      consumerId: remoteDesktopSubscriptionKey,
-      streamGeneration
-    })
-  if (!sourceRangeConsumerAttached) {
-    sourceRangeLedger?.close()
-  }
   const stream: TerminalMultiplexStream = {
     streamId: request.streamId,
     terminal: request.terminal,
@@ -47,11 +30,6 @@ export async function initializeMultiplexStream(
     client: request.client,
     isMobile,
     ackOutput: request.capabilities?.ackOutput === 1,
-    ackOutputSourceRanges: sourceRangeConsumerAttached,
-    streamGeneration,
-    sourceRangeLedger: sourceRangeConsumerAttached ? sourceRangeLedger : null,
-    sourceRangeConsumerAttached,
-    sourceRangeReplacement: null,
     ackInFlightBytes: 0,
     ackWindowBytes: TERMINAL_MULTIPLEX_ACK_STREAM_INITIAL_WINDOW_BYTES,
     supportsOutputPause: request.capabilities?.outputPause === 1,

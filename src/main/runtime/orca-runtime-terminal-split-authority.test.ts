@@ -298,7 +298,9 @@ describe('remote runtime terminal split authority', () => {
     expect(harness.revealTerminalSession).not.toHaveBeenCalled()
   })
 
-  it('splits a persisted tab without consulting an unmounted host renderer', async () => {
+  // STA-9417: the window's graph lags a tab it already holds, so the split is offered regardless;
+  // a window without the tab rejects it and the persisted split stands.
+  it('splits a persisted tab the window has not listed, and still offers it to the window', async () => {
     const harness = createHarness()
 
     const outcome = await harness.runtime
@@ -312,7 +314,14 @@ describe('remote runtime terminal split authority', () => {
     })
     expect.soft(harness.spawn).toHaveBeenCalledTimes(1)
     expect.soft(harness.kill).not.toHaveBeenCalled()
-    expect.soft(harness.revealTerminalSession).not.toHaveBeenCalled()
+    expect.soft(harness.revealTerminalSession).toHaveBeenCalledWith(
+      WORKTREE_ID,
+      expect.objectContaining({
+        ptyId: SPLIT_PTY_ID,
+        tabId: TAB_ID,
+        splitFromLeafId: SOURCE_LEAF_ID
+      })
+    )
     const persistedLayout = harness.getSession().terminalLayoutsByTabId[TAB_ID]
     expect(persistedLayout).toMatchObject({
       root: { type: 'split', direction: 'vertical' },
@@ -328,6 +337,29 @@ describe('remote runtime terminal split authority', () => {
       )
     expect(siblingSurfaces).toHaveLength(2)
     expect(siblingSurfaces.every((tab) => tab.parentLayout?.root?.type === 'split')).toBe(true)
+  })
+
+  it("gives a split the host's account env, under the caller's own env", async () => {
+    const harness = createHarness()
+    harness.runtime.setHostAccountLaunchEnv({
+      wslDistro: 'Ubuntu',
+      claude: {},
+      terminal: { CODEX_HOME: '/home/u/.orca/codex/b', ORCA_CLAUDE_PROFILE_POINTER: '~/p' }
+    })
+
+    await harness.runtime.splitTerminal(harness.handle, {
+      direction: 'vertical',
+      env: { ORCA_CLAUDE_PROFILE_POINTER: '~/caller' }
+    })
+
+    expect(harness.spawn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({
+          CODEX_HOME: '/home/u/.orca/codex/b',
+          ORCA_CLAUDE_PROFILE_POINTER: '~/caller'
+        })
+      })
+    )
   })
 
   it('rejects an unowned split source before spawning a PTY', async () => {

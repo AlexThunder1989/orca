@@ -13,6 +13,7 @@ import type {
   OrcadMigrationSnapshotUploadState,
   OrcadMigrationTerminalScrollbackSnapshot
 } from './orcad-migration-scrollback'
+import type { OrcadMigrationBlobUploadState } from './orcad-migration-blob-transfer'
 
 export {
   MAX_ORCAD_MIGRATION_FOLDER_WORKSPACES,
@@ -35,11 +36,30 @@ export {
 } from './orcad-migration-staged-catalog-validation'
 import { isRecord } from './orcad-migration-manifest-fields'
 
-export type OrcadMigrationManifestSource = {
+/** The relay-era SSH source: on the wire it never carries `kind` (see orcad-migration-source-kind). */
+export type OrcadMigrationSshManifestSource = {
   sshTargetId: string
   sshTargetGeneration: number | null
   targetLabel: string
 }
+
+/**
+ * Local WSL projects on this desktop, moving to the orcad that runs inside their distro. Scope is
+ * explicit so a destination never infers it from paths, and `generation` orders delta moves.
+ */
+export type OrcadMigrationLocalWslManifestSource = {
+  kind: 'local-wsl'
+  distro: string
+  /** The distro's registry id, when known: a re-registered distro of the same name is another one. */
+  distroGuid?: string
+  scopeRepoIds: string[]
+  scopeFolderWorkspaceIds: string[]
+  generation: number
+}
+
+export type OrcadMigrationManifestSource =
+  | OrcadMigrationSshManifestSource
+  | OrcadMigrationLocalWslManifestSource
 
 export type OrcadMigrationCatalogPayload = {
   repositories: Repo[]
@@ -133,6 +153,8 @@ export type OrcadMigrationCatalogState =
       manifestSha256: string
       stagedAt: string
       snapshotUploads?: OrcadMigrationSnapshotUploadState[]
+      /** Blobs staged so far; absent from hosts without the blob channel. */
+      blobUploads?: OrcadMigrationBlobUploadState[]
     }
   | {
       state: 'committed'

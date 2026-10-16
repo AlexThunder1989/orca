@@ -6,12 +6,19 @@ import { NativeChatImageAttachmentPreview } from './NativeChatImageAttachmentPre
 import type { NativeChatComposerImageAttachment } from './NativeChatComposerField'
 
 const mocks = vi.hoisted(() => ({
-  useLocalImageSrc: vi.fn()
+  useLocalImageSrc: vi.fn(),
+  getConnectionIdForFile: vi.fn(() => {
+    throw new Error('Image preview fixtures must not resolve editor file connections')
+  })
 }))
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, options?: Record<string, string>) =>
     fallback.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => options?.[name] ?? '')
+}))
+
+vi.mock('@/lib/connection-context', () => ({
+  getConnectionIdForFile: mocks.getConnectionIdForFile
 }))
 
 vi.mock('@/components/editor/useLocalImageSrc', () => ({
@@ -22,6 +29,8 @@ afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   mocks.useLocalImageSrc.mockReset()
+  expect(mocks.getConnectionIdForFile).not.toHaveBeenCalled()
+  mocks.getConnectionIdForFile.mockClear()
 })
 
 function renderPreview(

@@ -200,6 +200,14 @@ export class StructuredAgentSessionAdapterRouter implements StructuredAgentSessi
     this.requireAgent(input.identity).adapter.providerHistoryWindow?.(input) ??
     Promise.resolve(null)
 
+  copyConversation: NonNullable<StructuredAgentSessionAdapter['copyConversation']> = (input) => {
+    const { adapter } = this.requireAgent(input.identity)
+    if (!adapter.copyConversation) {
+      return Promise.reject(new Error(`${input.identity.agent} cannot copy a conversation`))
+    }
+    return adapter.copyConversation(input)
+  }
+
   closeSession = (sessionId: string): Promise<boolean> =>
     this.stopSession(sessionId, (adapter) => adapter.closeSession)
 

@@ -3,8 +3,10 @@ import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import CodexRestartChip from '../CodexRestartChip'
 import { CodexSharedServerBanner } from './CodexSharedServerBanner'
 import { ClaudeOldTerminalBanner } from './ClaudeOldTerminalBanner'
+import { NewerDaemonHoldBanner } from './NewerDaemonHoldBanner'
 import { TerminalSshReconnectOverlay } from './TerminalSshReconnectOverlay'
-import { TerminalRemoteRuntimeReconnectBanner } from './TerminalRemoteRuntimeReconnectBanner'
+import { useWslHostUnavailableReason } from './use-wsl-host-unavailable-reason'
+import { DelayedRemoteRuntimeReconnectBanner } from './TerminalRemoteRuntimeReconnectBanner'
 import { TerminalProcessExitOverlay } from './TerminalProcessExitOverlay'
 import { MobileDriverOverlay } from './MobileDriverOverlay'
 import { getDriverForPty } from '@/lib/pane-manager/mobile-driver-state'
@@ -59,6 +61,11 @@ export function TerminalPaneCodexRestartPortals({
             <ClaudeOldTerminalBanner
               key={`claude-old-terminal-${pane.id}-${ptyId}`}
               ptyId={ptyId}
+              tabId={tabId}
+              leafId={pane.leafId}
+            />
+            <NewerDaemonHoldBanner
+              key={`newer-daemon-hold-${pane.id}-${ptyId}`}
               tabId={tabId}
               leafId={pane.leafId}
             />
@@ -154,6 +161,7 @@ export function TerminalPaneRecoveryPortals({
 }): React.JSX.Element | null {
   const { managedPanes, paneTransportsRef, ptyRecoveryStatesByPaneId, showSshReconnectOverlay } =
     controller
+  const wslHostUnavailable = useWslHostUnavailableReason(controller.worktreeId)
   if (showSshReconnectOverlay) {
     return null
   }
@@ -165,10 +173,13 @@ export function TerminalPaneRecoveryPortals({
           return null
         }
         return createPortal(
-          <TerminalRemoteRuntimeReconnectBanner
-            key={`remote-runtime-reconnect-${pane.id}-${recoveryState.epoch}`}
+          <DelayedRemoteRuntimeReconnectBanner
+            // Why per pane, not per epoch: a Reconnect click opens a new epoch and must not hide the banner again.
+            key={`remote-runtime-reconnect-${pane.id}`}
+            epoch={recoveryState.epoch}
             phase={recoveryState.phase}
             onReconnect={() => paneTransportsRef.current.get(pane.id)?.retryRecovery?.()}
+            wslHostUnavailable={wslHostUnavailable}
           />,
           pane.container,
           `remote-runtime-reconnect-${pane.id}`

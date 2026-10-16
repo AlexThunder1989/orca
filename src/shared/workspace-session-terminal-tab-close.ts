@@ -8,8 +8,9 @@ export type WorkspaceSessionTerminalTabCloseResult = {
   pinned: boolean
 }
 
-function pickNextActiveTab(
-  group: TabGroup,
+/** The tab a group shows after `closingIds` leave it: most recent remaining, else the closed tab's right neighbour, else the last. */
+export function pickNextActiveTabAfterClose(
+  group: Pick<TabGroup, 'tabOrder' | 'recentTabIds'>,
   closingIds: ReadonlySet<string>,
   remaining: readonly string[],
   remainingIds: ReadonlySet<string>
@@ -211,7 +212,7 @@ export function closeTerminalTabInWorkspaceSession(
       const tabOrder = group.tabOrder.filter((id) => !closedVisibleIds.has(id))
       const remainingIds = new Set(tabOrder)
       const activeTabId = closedVisibleIds.has(group.activeTabId ?? '')
-        ? pickNextActiveTab(group, closedVisibleIds, tabOrder, remainingIds)
+        ? pickNextActiveTabAfterClose(group, closedVisibleIds, tabOrder, remainingIds)
         : group.activeTabId && remainingIds.has(group.activeTabId)
           ? group.activeTabId
           : (tabOrder[0] ?? null)

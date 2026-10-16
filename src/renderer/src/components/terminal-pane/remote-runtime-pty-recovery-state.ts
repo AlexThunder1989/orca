@@ -95,13 +95,15 @@ export class RemoteRuntimePtyRecoveryState {
     return this.phase !== 'disposed' && epoch === this.epoch
   }
 
-  schedule(epoch: number, retry: (epoch: number) => void): boolean {
+  // Why the override: a caller pacing its own repeats (a flapping stream) outranks the per-epoch ladder.
+  schedule(epoch: number, retry: (epoch: number) => void, delayOverrideMs?: number): boolean {
     if (!this.isCurrent(epoch)) {
       return false
     }
     this.clearRetryTimer()
     this.phase = 'backoff'
     const delayMs =
+      delayOverrideMs ??
       REMOTE_RUNTIME_RECOVERY_DELAYS_MS[
         Math.min(this.attempt, REMOTE_RUNTIME_RECOVERY_DELAYS_MS.length - 1)
       ]

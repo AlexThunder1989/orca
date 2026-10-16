@@ -10,13 +10,13 @@ import { getRepoHostIdentity } from '../../store/slices/repo-host-identity'
 import { getSettingsEntryHostSelection, getSettingsProjectHostRepo } from './settings-project-list'
 import type { SettingsStoreModel } from './use-settings-store-model'
 import type { SettingsNavigationModel } from './use-settings-navigation-model'
-import { getSettingsHostScopeEnvironmentId } from './settings-host-scope'
+import { runtimeTargetEnvironmentId } from '@/runtime/runtime-client-target'
 
 export function useSettingsTerminalModel(
   model: SettingsStoreModel,
   navigation: SettingsNavigationModel
 ) {
-  const scopeEnvironmentId = getSettingsHostScopeEnvironmentId(model.settingsHostScope)
+  const scopeEnvironmentId = runtimeTargetEnvironmentId(model.settingsHostScope.target)
   const windowsTerminalCapabilityOwnerKey = useWindowsTerminalCapabilityOwnerKey(scopeEnvironmentId)
   const runtimeTarget = model.settingsHostScope.target
   const capabilityLoadTarget = useMemo(

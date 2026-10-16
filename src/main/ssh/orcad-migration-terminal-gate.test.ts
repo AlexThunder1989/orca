@@ -24,7 +24,6 @@ const UNRESOLVED: LeaseRow[] = [
   { ptyId: 'exp', state: 'expired' },
   { ptyId: 'ter', state: 'terminated' }
 ]
-const CENSUS_STILL_RUNS = "the host's relays still run or may run terminals"
 
 describe('terminal gate characterization: census-only verdicts', () => {
   it.each([
@@ -39,29 +38,39 @@ describe('terminal gate characterization: census-only verdicts', () => {
     ).resolves.toEqual(expected)
   })
 
+  // COMPAT(legacy-relay-bridge): relay terminals no longer block; their leases go to the bridge.
   it.each([['live' as const], ['unverifiable' as const]])(
-    'a %s census decides over any lease, without ids',
-    async (verdict) => {
-      for (const leases of [[], MIXED, UNRESOLVED]) {
+    'a %s census leaves every unterminated lease to the bridge',
+    async (relayVerdict) => {
+      for (const [leases, bridgedPtyIds] of [
+        [[], []],
+        [MIXED, ['att', 'det', 'exp']],
+        [UNRESOLVED, ['det', 'exp']]
+      ] as const) {
         await expect(
-          assessOrcadMigrationTerminals(store(leases), 'ssh-1', async () => ({
-            verdict,
+          assessOrcadMigrationTerminals(store([...leases]), 'ssh-1', async () => ({
+            verdict: relayVerdict,
             count: 2
           }))
-        ).resolves.toEqual({ verdict, ptyIds: [], reason: CENSUS_STILL_RUNS, hostTerminals: 2 })
+        ).resolves.toEqual({
+          verdict: 'bridged',
+          relayVerdict,
+          bridgedPtyIds: [...bridgedPtyIds],
+          hostTerminals: 2
+        })
       }
     }
   )
 
-  it('a census that throws is unverifiable, never exited', async () => {
+  it('a census that throws is bridged as unverifiable, never exited', async () => {
     await expect(
       assessOrcadMigrationTerminals(store(MIXED), 'ssh-1', async () => {
         throw new Error('connect refused')
       })
     ).resolves.toEqual({
-      verdict: 'unverifiable',
-      ptyIds: [],
-      reason: CENSUS_STILL_RUNS,
+      verdict: 'bridged',
+      relayVerdict: 'unverifiable',
+      bridgedPtyIds: ['att', 'det', 'exp'],
       hostTerminals: 0
     })
   })
@@ -152,5 +161,42 @@ describe('acting on a terminal proof', () => {
         proof
       )
     ).toBe(proof)
+  })
+})
+
+// COMPAT(legacy-relay-bridge): the leases a bridged conversion recorded never read as new terminals.
+describe('a bridged conversion under its fence', () => {
+  const bridged = {
+    verdict: 'bridged' as const,
+    relayVerdict: 'live' as const,
+    bridgedPtyIds: ['att', 'det'],
+    hostTerminals: 1
+  }
+
+  it('accounts for the leases it handed the bridge', () => {
+    const leases = store([
+      { ptyId: 'att', state: 'attached' },
+      { ptyId: 'det', state: 'detached' },
+      { ptyId: 'ter', state: 'terminated' }
+    ])
+    expect(confirmOrcadMigrationTerminalsUnderFence(leases, 'ssh-1', bridged)).toBe(bridged)
+  })
+
+  it('still refuses a lease that appeared after the proof', () => {
+    const leases = store([
+      { ptyId: 'att', state: 'attached' },
+      { ptyId: 'new', state: 'attached' }
+    ])
+    expect(confirmOrcadMigrationTerminalsUnderFence(leases, 'ssh-1', bridged)).toMatchObject({
+      verdict: 'live',
+      ptyIds: ['new']
+    })
+  })
+
+  it('retires nothing it bridged', () => {
+    const leases = store([{ ptyId: 'att', state: 'attached' }])
+    const markSshRemotePtyLease = vi.fn()
+    retireProvenExitedLeases({ ...leases, markSshRemotePtyLease }, 'ssh-1', bridged)
+    expect(markSshRemotePtyLease).not.toHaveBeenCalled()
   })
 })

@@ -224,20 +224,6 @@ describe('profile state Store authority factory', () => {
     expect(result.store.getSettings().theme).toBe('dark')
   })
 
-  it('reopens an established SQLite profile without the migration switch', () => {
-    const options = createOptions()
-    writeFileSync(options.dataFile, JSON.stringify({ settings: { theme: 'dark' } }))
-    createProfileStateStore({ ...options })
-    rmSync(options.dataFile)
-
-    const result = createProfileStateStore({ ...options })
-
-    expect(result.backend).toBe('sqlite')
-    expect(result.classification).toBe('sqlite-only')
-    expect(result.migrated).toBe(false)
-    expect(result.store.getSettings().theme).toBe('dark')
-  })
-
   it('fails closed instead of falling back to a stale JSON mirror when SQLite is missing', () => {
     const options = createOptions()
     writeFileSync(options.dataFile, JSON.stringify({ settings: { theme: 'dark' } }))

@@ -234,7 +234,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
           return updateEphemeralVmRuntimeStatus(userDataPath, result.runtime.id, {
             connectionMode: 'ssh',
             sshTargetId: ssh.targetId,
-            ...(ssh.environmentId ? { runtimeEnvironmentId: ssh.environmentId } : {})
+            runtimeEnvironmentId: ssh.environmentId
           })
         } catch (error) {
           updateEphemeralVmRuntimeStatus(userDataPath, result.runtime.id, {

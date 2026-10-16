@@ -152,7 +152,15 @@ export function preflightElectronServe(
       }
     }
   }
-  const deps = options.deps ?? DEFAULT_DEPS
+  return refuseIfProfileServed(args, userDataPath, options.deps)
+}
+
+/** The runtime-neutral half: refuse with exit 3 while another Orca serves or may serve this profile. */
+export function refuseIfProfileServed(
+  args: ElectronServePreflightArgs,
+  userDataPath: string,
+  deps: PreflightDeps = DEFAULT_DEPS
+): null | Promise<number | null> {
   const metadata = deps.readMetadata(userDataPath)
   if (!metadata) {
     return null

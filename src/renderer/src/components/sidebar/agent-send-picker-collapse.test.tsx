@@ -6,7 +6,6 @@ import { makeRepo, makeWorktree } from './worktree-list-lineage-card-test-fixtur
 import { useEffectiveCollapsedGroups } from './worktree-list/listing/use-collapsed-groups'
 import { useSidebarSectionRows } from './worktree-list/listing/use-section-rows'
 import { getWorktreeLineageGroupKey } from './worktree-list/grouping/group-keys'
-import { getWorktreeLineageAncestors } from './worktree-lineage-projection'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { WorktreeGroupBy } from './worktree-list/grouping/row-types'
@@ -110,11 +109,6 @@ for (const hostId of ['ssh:builder', 'runtime:builder'] as const) {
     expect(result.current.has('host:local')).toBe(true)
     const rows = sections(hostId, 'none', worktrees, result.current)
     expect(rows.some((row) => row.type === 'host-header' && row.hostId === hostId)).toBe(true)
-    expect(
-      sections(hostId, 'none', worktrees, new Set()).some(
-        (row) => row.type === 'item' && row.worktree.id === remote.id
-      )
-    ).toBe(true)
     expect(rows.some((row) => row.type === 'item' && row.worktree.id === remote.id)).toBe(true)
   })
 }
@@ -139,18 +133,12 @@ for (const hostId of ['local', 'ssh:builder', 'runtime:builder'] as const) {
     }
     const worktreeLineageById = { [child.id]: lineage }
     const worktreeMap = new Map(worktrees.map((worktree) => [worktree.id, worktree]))
-    expect(getWorktreeLineageAncestors(child, worktreeLineageById, worktreeMap)).toEqual([parent])
     const collapsedGroups = new Set([getWorktreeLineageGroupKey(parent)])
     expect(
       sections(hostId, 'none', worktrees, collapsedGroups, worktreeLineageById).some(
         (row) => row.type === 'item' && row.worktree.id === child.id
       )
     ).toBe(false)
-    expect(
-      sections(hostId, 'none', worktrees, new Set(), worktreeLineageById).some(
-        (row) => row.type === 'item' && row.worktree.id === child.id
-      )
-    ).toBe(true)
     const { result } = renderHook(() =>
       useEffectiveCollapsedGroups({
         hostScopedGroups: true,
@@ -178,12 +166,13 @@ for (const hostId of ['local', 'ssh:builder', 'runtime:builder'] as const) {
   })
 }
 
-it.each([true, false])('reveals ancestors with pinned parent visible=%s', (visible) => {
+it.each([true, false])('reveals the target with pinned ancestors visible=%s', (visible) => {
   const { local, remote, repoMap } = setup('ssh:builder')
   const root = { ...remote, instanceId: 'root-instance', isPinned: true }
   const parent = { ...remote, id: 'parent', instanceId: 'parent-instance', isPinned: false }
   const child = { ...remote, id: 'child', instanceId: 'child-instance', isPinned: false }
   const worktrees = [local, root, parent, child]
+  const visibleWorktrees = visible ? worktrees : [local, child]
   const lineage = (worktree: typeof child, ancestor: typeof root): WorktreeLineage => ({
     worktreeId: worktree.id,
     worktreeInstanceId: worktree.instanceId,
@@ -193,6 +182,7 @@ it.each([true, false])('reveals ancestors with pinned parent visible=%s', (visib
     capture: { source: 'orchestration-context', confidence: 'explicit' },
     createdAt: 1
   })
+  const worktreeLineageById = { [parent.id]: lineage(parent, root), [child.id]: lineage(child, parent) }
   const collapsedGroups = new Set([
     'host:ssh:builder',
     'lineage:ssh:builder|remote',
@@ -213,13 +203,10 @@ it.each([true, false])('reveals ancestors with pinned parent visible=%s', (visib
         groupBy: 'none',
         pinnedDisplayPolicy: 'single-location',
         worktrees,
-        visibleWorktrees: visible ? worktrees : [local, child],
+        visibleWorktrees,
         repoMap,
         worktreeMap: new Map(worktrees.map((worktree) => [worktree.id, worktree])),
-        worktreeLineageById: {
-          [parent.id]: lineage(parent, root),
-          [child.id]: lineage(child, parent)
-        },
+        worktreeLineageById,
         prCache: null,
         workspaceStatuses,
         settings,
@@ -235,9 +222,15 @@ it.each([true, false])('reveals ancestors with pinned parent visible=%s', (visib
       visible ? 'all:host:ssh:builder' : 'pinned:host:ssh:builder',
       'all',
       'host:local',
-      'lineage:local|parent'
+      'lineage:local|parent',
+      ...(visible ? [] : ['lineage:ssh:builder|remote', 'lineage:ssh:builder|parent'])
     ].sort()
   )
+  expect(
+    sections('ssh:builder', 'none', visibleWorktrees, result.current, worktreeLineageById).some(
+      (row) => row.type === 'item' && row.worktree.id === child.id
+    )
+  ).toBe(true)
   expect(collapsedGroups.size).toBe(8)
   rerender({ targetId: null })
   expect(result.current).toBe(collapsedGroups)

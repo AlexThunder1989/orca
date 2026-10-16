@@ -4,7 +4,6 @@ import type { ProjectGroupImportResult } from '../../../../shared/project-group-
 import type { WorktreeFetchOptions } from '@/store/slices/worktree-helpers'
 import { useAddRepoNestedImportFlow } from './useAddRepoNestedImportFlow'
 import { useAddRepoNestedReviewState } from './useAddRepoNestedReviewState'
-import { useAddRepoRemoteNestedScan } from './use-add-repo-remote-nested-scan'
 import type { AddRepoDialogStep } from './add-repo-dialog-types'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 
@@ -50,16 +49,11 @@ export function useAddRepoNestedReviewController({
     | 'handleOpenNestedRootFolder'
     | 'resetNestedImportFlow'
     | 'trackNestedBackAction'
-  > &
-  ReturnType<typeof useAddRepoRemoteNestedScan> {
+  > {
   const review = useAddRepoNestedReviewState({
     activeRuntimeEnvironmentId: reviewRuntimeEnvironmentId,
     cancelNestedRepoScan,
     setStep
-  })
-  const remote = useAddRepoRemoteNestedScan({
-    setActiveNestedScanId: review.setActiveNestedScanId,
-    showNestedRepoReview: review.showNestedRepoReview
   })
   const imports = useAddRepoNestedImportFlow({
     activeRuntimeEnvironmentId,
@@ -78,5 +72,5 @@ export function useAddRepoNestedReviewController({
     nestedRuntimeEnvironmentId: review.nestedRuntimeEnvironmentId,
     getNestedRepoRuntimeKind: review.getNestedRepoRuntimeKind
   })
-  return { ...review, ...remote, ...imports }
+  return { ...review, ...imports }
 }

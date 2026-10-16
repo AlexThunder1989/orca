@@ -11,7 +11,7 @@ import {
 } from '../slices/project-group-owner-routing'
 import { findRepoForHost, repoMatchesHostIdentity } from '../slices/repo-host-identity'
 import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
-import { runtimeTargetForOwnerHostId } from '../../runtime/runtime-client-target'
+import { ipcOrRuntimeTargetForHostId } from '../../runtime/runtime-client-target'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import type { ProjectRemovalFailure, RepoSlice } from '../repos/repo-state'
 import { mergeProjectCompatibilityForHostRepoChange } from '../repos/repo-catalog-identity'
@@ -33,7 +33,7 @@ export function createProjectGroupMutationActions(
     createProjectGroup: async (name, hostId) => {
       try {
         // Why: a new group lands on the host of the project that seeds it, not the focused one.
-        const target = runtimeTargetForOwnerHostId(hostId)
+        const target = ipcOrRuntimeTargetForHostId(hostId)
         if (!target) {
           return null
         }
@@ -237,7 +237,7 @@ export function createProjectGroupMutationActions(
     moveProjectToGroup: async (projectId, groupId, order, hostId) => {
       try {
         const repo = findRepoForHost(get().repos, projectId, { settings: get().settings, hostId })
-        const target = repo ? runtimeTargetForOwnerHostId(getRepoExecutionHostId(repo)) : null
+        const target = repo ? ipcOrRuntimeTargetForHostId(getRepoExecutionHostId(repo)) : null
         if (!target) {
           return false
         }

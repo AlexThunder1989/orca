@@ -1,4 +1,3 @@
-import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import type {
   OrcadMigrationCatalogPayload,
   OrcadMigrationManifestSource
@@ -18,20 +17,20 @@ import {
   unqualifyOrcadMigrationOwnerKey
 } from './orcad-source-scope'
 import {
-  countUnrepresentableMarkdownState,
-  countUnsupportedSessionState,
+  collectUnsupportedSessionItems,
   projectDormantSessionFocus,
   projectSessionToDestination,
-  transferableSleepingAgentSession
+  transferableSleepingAgentSession,
+  worktreeLabel
 } from './orcad-source-workspace-session-eligibility'
+import { withoutLeftBehindSessionRows } from './orcad-source-left-behind-session-rows'
 import {
   collectOwnedTerminalTabIds,
   dropOrcadMigrationTerminalBindings
 } from './orcad-source-workspace-session-layout'
-import {
-  mergeSessionFragments,
-  sessionPartitions
-} from './orcad-source-workspace-session-fragments'
+import { mergeSessionFragments } from './orcad-source-workspace-session-fragments'
+import { hasClosedTerminalTabRecord } from '../../../shared/closed-terminal-tab-tombstones'
+import { orcadMigrationSessionPartitions } from './orcad-source-session-partitions'
 import {
   hasDuplicateOrcadMigrationScrollbackDescriptors,
   projectOrcadMigrationSessionScrollback
@@ -40,8 +39,11 @@ import {
 export type OrcadMigrationSourceWorkspaceSessionInspection = {
   payload: WorkspaceSessionState | undefined
   snapshots: OrcadMigrationTerminalScrollbackSnapshot[]
-  blockedCount: number
+  /** Each names what blocks and how to clear it. */
+  blockedItems: string[]
 }
+
+const UNREADABLE_SESSION = 'saved tabs Orca could not read'
 
 /** Fails closed: a session shape no collector expects blocks the move instead of failing connect. */
 export function collectOrcadMigrationSourceWorkspaceSession(
@@ -54,7 +56,7 @@ export function collectOrcadMigrationSourceWorkspaceSession(
     return collectWorkspaceSession(state, source, catalog, storage)
   } catch (error) {
     console.warn('[migration] Unreadable workspace session blocks the move:', error)
-    return { payload: undefined, snapshots: [], blockedCount: 1 }
+    return { payload: undefined, snapshots: [], blockedItems: [UNREADABLE_SESSION] }
   }
 }
 
@@ -67,18 +69,28 @@ function collectWorkspaceSession(
   const sourceScope = createOrcadMigrationSourceScope({ source, catalog, repos: state.repos })
   const fragments: WorkspaceSessionState[] = []
   const snapshots: OrcadMigrationTerminalScrollbackSnapshot[] = []
-  let blockedCount = 0
-  for (const [partitionId, session] of sessionPartitions(state, LOCAL_EXECUTION_HOST_ID)) {
-    const scope = orcadMigrationPartitionScope(sourceScope, partitionId)
-    const sourceHostPartition = partitionId === scope.hostId
-    const terminalTabIds = collectOwnedTerminalTabIds(session, scope)
-    blockedCount += countUnsupportedSessionState(
-      session,
-      scope,
-      sourceHostPartition,
-      terminalTabIds
+  const blockedItems: string[] = []
+  const partitions = orcadMigrationSessionPartitions(state, sourceScope).map(
+    ([partitionId, saved]) => {
+      const scope = orcadMigrationPartitionScope(sourceScope, partitionId)
+      const session = withoutLeftBehindSessionRows(saved, scope)
+      return { session, scope, terminalTabIds: collectOwnedTerminalTabIds(session, scope) }
+    }
+  )
+  const sourceTerminalTabIds = new Set(
+    partitions.flatMap(({ terminalTabIds }) => [...terminalTabIds])
+  )
+  for (const { session, scope, terminalTabIds } of partitions) {
+    const sourceHostPartition = scope.partitionHostId === scope.hostId
+    blockedItems.push(
+      ...collectUnsupportedSessionItems(
+        session,
+        scope,
+        sourceHostPartition,
+        terminalTabIds,
+        sourceTerminalTabIds
+      )
     )
-    blockedCount += countUnrepresentableMarkdownState(session, scope, sourceHostPartition)
     const fragment = extractSessionOwnersForTransfer(session, {
       mapOwnerKey: (ownerKey) =>
         orcadMigrationOwnerMatchesScope(ownerKey, scope)
@@ -109,19 +121,32 @@ function collectWorkspaceSession(
         projectSessionToDestination(fragment, scope),
         storage
       )
-      blockedCount += projected.blockedCount
+      blockedItems.push(...projected.blockedItems)
       snapshots.push(...projected.snapshots)
       fragments.push(projected.session)
     }
   }
   if (hasDuplicateOrcadMigrationScrollbackDescriptors(snapshots)) {
-    blockedCount += 1
+    blockedItems.push('terminal history saved twice for one pane')
   }
-  if (blockedCount > 0 || fragments.length === 0) {
-    return { payload: undefined, snapshots: [], blockedCount }
+  if (blockedItems.length > 0 || fragments.length === 0) {
+    return { payload: undefined, snapshots: [], blockedItems }
   }
-  const merged = mergeSessionFragments(fragments)
-  return merged
-    ? { payload: merged, snapshots, blockedCount: 0 }
-    : { payload: undefined, snapshots: [], blockedCount: 1 }
+  const closedTabIds = new Set(
+    partitions.flatMap(({ session }) =>
+      Object.keys(session.closedTerminalTabTombstonesByTabId ?? {}).filter((tabId) =>
+        hasClosedTerminalTabRecord(session.closedTerminalTabTombstonesByTabId, tabId)
+      )
+    )
+  )
+  const merged = mergeSessionFragments(fragments, closedTabIds)
+  return merged.session
+    ? { payload: merged.session, snapshots, blockedItems: [] }
+    : {
+        payload: undefined,
+        snapshots: [],
+        blockedItems: merged.conflicts.map(
+          (ownerKey) => `two different saved copies of the tabs in ${worktreeLabel(ownerKey)}`
+        )
+      }
 }

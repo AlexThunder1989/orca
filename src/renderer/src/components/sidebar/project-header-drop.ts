@@ -44,20 +44,6 @@ export function getSidebarOrderedRepoHeaderIdsByBucket(
   return buckets
 }
 
-export function getLogicalRepoOrderRankById(
-  orderedRepoIds: readonly string[]
-): Map<string, number> {
-  const rankById = new Map<string, number>()
-  orderedRepoIds.forEach((repoId, index) => {
-    // Why: paired hosts can contribute the same logical project ID; its merged
-    // header must anchor to the first occurrence instead of whichever host loaded last.
-    if (!rankById.has(repoId)) {
-      rankById.set(repoId, index)
-    }
-  })
-  return rankById
-}
-
 export function getProjectGroupOrderForSidebarDrop(args: {
   siblings: readonly Repo[]
   dropIndex: number

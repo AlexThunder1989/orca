@@ -71,9 +71,8 @@ async function launchHomes(f: ReturnType<typeof coveredAccount>) {
   const chatEnv: Record<string, string> = {}
   return {
     terminal: (await f.router.prepareLaunch()).configDir,
-    terminalEnv: withClaudeProfileTerminalEnv<Record<string, string>>({}, null, {
-      runtime: 'host'
-    }).CLAUDE_CONFIG_DIR,
+    terminalEnv: withClaudeProfileTerminalEnv<Record<string, string>>({}, { runtime: 'host' })
+      .CLAUDE_CONFIG_DIR,
     chat: await resolveClaudeStructuredLaunchHome(f.router, chatEnv, '/recorded'),
     chatEnv: chatEnv.CLAUDE_CONFIG_DIR,
     chatRecord: resolveStructuredClaudeAccountHomePath({

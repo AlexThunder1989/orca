@@ -7,17 +7,8 @@ export function installMultiplexCleanup(state: TerminalMultiplexConnection): voi
     if (!stream) {
       return
     }
-    const replacement = stream.sourceRangeReplacement
-    stream.sourceRangeReplacement = null
-    if (replacement) {
-      runtime.rollbackRemoteTerminalSourceRangeReplacement(
-        replacement,
-        'stream-detached-replacement-aborted'
-      )
-    }
     stream.outputBatcher.flush()
     stream.outputBatcher.dispose()
-    state.detachSourceRangeConsumer(stream, 'stream-detached')
     state.ackTotalInFlightBytes = Math.max(0, state.ackTotalInFlightBytes - stream.ackInFlightBytes)
     stream.ackInFlightBytes = 0
     stream.ackPendingOutput = []

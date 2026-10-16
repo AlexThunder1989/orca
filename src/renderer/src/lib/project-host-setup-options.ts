@@ -49,6 +49,12 @@ export type ReadyProjectHostSetupOption = Extract<ProjectHostSetupOption, { kind
 
 export type NeedsSetupProjectHostOption = Extract<ProjectHostSetupOption, { kind: 'needs-setup' }>
 
+export function getProjectHostSetupSelectionKey(
+  option: Pick<ProjectHostSetupOption, 'id' | 'hostId'>
+): string {
+  return JSON.stringify([option.id, option.hostId])
+}
+
 type BuildReadySetupOptionsInput = {
   projectId: string
   projectHostSetups: readonly ProjectHostSetup[]

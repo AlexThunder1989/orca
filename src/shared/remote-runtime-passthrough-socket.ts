@@ -1,14 +1,11 @@
 import WebSocket from 'ws'
-import type { PairingOffer } from './pairing'
+import type { PairedRuntimeConnection } from './paired-runtime-connection'
 import type { RuntimeCapability } from './protocol-version'
-import { decrypt, decryptBytes, encrypt } from './e2ee-crypto'
 import {
-  classifyRemoteRuntimeReadyFrame,
   formatRemoteRuntimeCloseMessage,
-  parseRemoteRuntimeAuthenticatedFrame
+  sendRemoteRuntimeTokenAuth
 } from './remote-runtime-client-handshake'
 import { RemoteRuntimeClientError } from './remote-runtime-client-error'
-import { serializeRemoteRuntimePayload } from './remote-runtime-memory-limits'
 import { openRemoteRuntimeWebSocket } from './remote-runtime-request-websocket'
 import { closeRemoteRuntimeSocket } from './remote-runtime-socket-close'
 import {
@@ -36,18 +33,18 @@ export type RemoteRuntimePassthroughCallbacks = {
  * socket and fails on any other, while a relay forwards whatever its client multiplexes.
  */
 export function openRemoteRuntimePassthroughSocket(
-  pairing: PairingOffer,
+  connection: PairedRuntimeConnection,
   clientCapabilities: readonly RuntimeCapability[],
   callbacks: RemoteRuntimePassthroughCallbacks,
   options: RemoteRuntimeSocketLivenessOptions & { timeoutMs: number }
 ): Promise<RemoteRuntimePassthroughSocket> {
   return new Promise((resolve, reject) => {
     let state: 'awaiting_ready' | 'awaiting_authenticated' | 'ready' | 'ended' = 'awaiting_ready'
-    const opened = openRemoteRuntimeWebSocket(pairing, {
+    const opened = openRemoteRuntimeWebSocket(connection, {
       onTextFrame: (_ws, frame) => onTextFrame(frame),
       onBinaryFrame: (_ws, frame) => {
         liveness.noteActivity()
-        const bytes = state === 'ready' ? decryptBytes(frame, sharedKey) : null
+        const bytes = state === 'ready' ? handshake.channel.openBinary(frame) : null
         if (!bytes) {
           end(protocolError('Remote Orca runtime returned an unreadable binary frame.'))
           return
@@ -69,7 +66,7 @@ export function openRemoteRuntimePassthroughSocket(
       reject(opened.error)
       return
     }
-    const { ws, sharedKey, cleanup } = opened.socket
+    const { ws, handshake, cleanup } = opened.socket
     const outbound = new RemoteRuntimeSubscriptionOutbound({ fail: (error) => end(error) })
     const timeout = setTimeout(
       () =>
@@ -123,24 +120,27 @@ export function openRemoteRuntimePassthroughSocket(
     function onTextFrame(frame: string): void {
       liveness.noteActivity()
       if (state === 'awaiting_ready') {
-        if (classifyRemoteRuntimeReadyFrame(frame) !== 'ready') {
+        if (handshake.acceptReadyText(frame) !== 'accepted') {
           end(protocolError('Remote Orca runtime returned an invalid E2EE handshake frame.'))
           return
         }
         state = 'awaiting_authenticated'
-        ws.send(
-          encrypt(
-            serializeRemoteRuntimePayload({
-              type: 'e2ee_auth',
-              deviceToken: pairing.deviceToken,
-              clientCapabilities
-            }),
-            sharedKey
-          )
-        )
+        void sendRemoteRuntimeTokenAuth({
+          handshake,
+          deviceToken: connection.credential.deviceToken,
+          clientCapabilities,
+          stillAwaiting: () => state === 'awaiting_authenticated',
+          send: (authFrame) => ws.send(authFrame),
+          fail: (error) =>
+            end(
+              error instanceof RemoteRuntimeClientError
+                ? error
+                : new RemoteRuntimeClientError('invalid_argument', String(error))
+            )
+        })
         return
       }
-      const plaintext = decrypt(frame, sharedKey)
+      const plaintext = handshake.channel.openText(frame)
       if (plaintext === null) {
         end(protocolError('Remote Orca runtime returned an undecryptable frame.'))
         return
@@ -149,10 +149,10 @@ export function openRemoteRuntimePassthroughSocket(
         callbacks.onText(plaintext)
         return
       }
-      const authenticated = parseRemoteRuntimeAuthenticatedFrame(plaintext)
+      const authenticated = handshake.classifyAuthReply(plaintext)
       if (authenticated.kind !== 'authenticated') {
         end(
-          authenticated.kind === 'rejected' && authenticated.unauthorized
+          authenticated.kind === 'rejected' && authenticated.errorCode === 'unauthorized'
             ? new RemoteRuntimeClientError(
                 'unauthorized',
                 'Remote Orca runtime rejected the pairing token.'
@@ -166,7 +166,7 @@ export function openRemoteRuntimePassthroughSocket(
       resolve({
         send: (plaintext) =>
           state === 'ready' && ws.readyState === WebSocket.OPEN
-            ? outbound.enqueueRequest(ws, encrypt(plaintext, sharedKey))
+            ? outbound.enqueueRequest(ws, handshake.channel.sealText(plaintext))
             : false,
         close: () => end(null)
       })

@@ -8,6 +8,7 @@ import {
   stopManagedOrcadEnvironment,
   updateManagedOrcadEnvironment
 } from '../ssh/orcad-runtime-lifecycle'
+import { getOrcadSshDeployment } from '../../shared/runtime-environments'
 import type { ManagedServerActions } from '../runtime/managed-server-actions-registry'
 import {
   retireRemovedRuntimeEnvironment,
@@ -45,7 +46,7 @@ export function createManagedOrcadActions(
         await options.invalidateTransport(result.environment.id)
       }
       if (result.outcome !== 'deferred') {
-        const targetId = result.environment.orcadDeployment?.sshTargetId
+        const targetId = getOrcadSshDeployment(result.environment)?.sshTargetId
         if (targetId) {
           options.clearHostServerNotes(targetId, result.environment.id)
         }

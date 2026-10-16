@@ -16,11 +16,12 @@ import {
 } from '../provisioned-root-checkout'
 import { gitExecFileAsync } from '../git/runner'
 import type { RuntimeStore } from './runtime-store-contract'
+import { assertWslMoveRepoWritable } from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
 
 export type RuntimeProvisionedRootRequest = ProvisionedRootRequest & { expectedPath: string }
 
 export type RuntimeProvisionedRootPorts = {
-  store: ProvisionedRootMetaStore & Pick<RuntimeStore, 'setWorktreeMeta'>
+  store: ProvisionedRootMetaStore & Pick<RuntimeStore, 'getRepo' | 'setWorktreeMeta'>
   resolveRepo: (selector: string) => Promise<Repo>
   listWorktrees: (repoPath: string) => Promise<GitWorktreeInfo[]>
   isSparseCheckoutEnabled: (checkoutPath: string) => Promise<boolean>
@@ -41,6 +42,7 @@ export async function adoptRuntimeProvisionedRoot(
   if (isFolderRepo(repo) || getRepoSshConnectionId(repo)) {
     throw new Error('Provisioned-root adoption requires a Git checkout on this host.')
   }
+  assertWslMoveRepoWritable(ports.store, repo)
   if (!provisionedRootPathsEqual(repo.path, request.expectedPath)) {
     throw new Error('The recipe projectRoot does not match the imported Git checkout root.')
   }

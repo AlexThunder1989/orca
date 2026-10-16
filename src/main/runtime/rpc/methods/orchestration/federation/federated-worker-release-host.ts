@@ -8,7 +8,7 @@ import {
   captureWorkerOutputArchive,
   summarizeWorkerOutputArchive
 } from '../../../../orchestration/worker-output-archive'
-import type { OrcaRuntimeService } from '../../../../orca-runtime'
+import type { WorkerTerminalReleaseRuntime } from '../../../../orchestration/worker-terminal-release-runtime'
 import { readArchivedWorkerOutput } from '../worker/worker-archive-read'
 import {
   archiveSummary,
@@ -23,7 +23,7 @@ import {
 } from '../worker/worker-release-close-error'
 
 export async function readRemoteAttachmentArchive(args: {
-  runtime: OrcaRuntimeService
+  runtime: WorkerTerminalReleaseRuntime
   attachment: RemoteDispatchAttachmentRow
   source?: 'auto' | 'transcript' | 'terminal'
   cursor?: string | number
@@ -53,7 +53,7 @@ export async function readRemoteAttachmentArchive(args: {
 }
 
 export async function releaseRemoteAttachment(args: {
-  runtime: OrcaRuntimeService
+  runtime: WorkerTerminalReleaseRuntime
   attachment: RemoteDispatchAttachmentRow
   observation: Awaited<ReturnType<typeof inspectRemoteAttachment>>
   mode?: 'interactive' | 'recovery'
@@ -267,7 +267,7 @@ export async function releaseRemoteAttachment(args: {
 }
 
 function remoteAttachmentLeaseIsCurrent(
-  runtime: OrcaRuntimeService,
+  runtime: WorkerTerminalReleaseRuntime,
   attachment: RemoteDispatchAttachmentRow,
   observation: Awaited<ReturnType<typeof inspectRemoteAttachment>>,
   resource: WorkerTerminalResourceRow

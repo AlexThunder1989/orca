@@ -6,9 +6,6 @@ import type { OrcadSshProvisioningIntent } from './orcad-ssh-provisioning'
 export const MIN_SSH_RELAY_GRACE_PERIOD_SECONDS = 60
 export const MAX_SSH_RELAY_GRACE_PERIOD_SECONDS = 7 * 24 * 60 * 60
 export const LEGACY_DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS = 3 * 60 * 60
-export const DEFAULT_BOUNDED_SSH_RELAY_GRACE_PERIOD_SECONDS = 24 * 60 * 60
-export const DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS = 0
-export const SSH_RELAY_CONFIGURE_GRACE_TIME_METHOD = 'relay.configureGraceTime'
 
 /**
  * Which runtime executes the SSH relay. `pinned-node` runs the D6 ladder on Orca's uploaded Node and
@@ -283,6 +280,13 @@ export type SshManagedServerUpdateNote = {
   detail?: string
 }
 
+/** A project the server already held at the same host path: this desktop uses the server's now. */
+export type SshManagedServerLinkedProject = {
+  path: string
+  /** This desktop's automations on it, which stay behind with its tabs. */
+  automations: number
+}
+
 /** A managed server that did not answer and was not proven serving, with why (and orcad.log's tail). */
 export type SshManagedServerServingNote = { state: 'unverifiable'; detail: string }
 
@@ -305,6 +309,8 @@ export type SshManagedServerStatus =
       update?: SshManagedServerUpdateNote
       /** Set when the server did not answer and no start brought it up; never a terminal verdict. */
       serving?: SshManagedServerServingNote
+      /** Set on the connect that moved this host's projects, when some were linked instead. */
+      linked?: SshManagedServerLinkedProject[]
     }
   | { kind: 'setting-up'; phase: (typeof SSH_MANAGED_SERVER_PHASES)[number] }
   /** `detail` names the blocker for a refusal, or why orcad can't run on the host. */
@@ -314,10 +320,10 @@ export type SshManagedServerStatus =
       detail?: string
       /** Relay terminals still running, when that is what keeps the host on the relay. */
       terminals?: number
-      /** Show the one-time offer to move now, restarting those terminals. */
-      offerMove?: boolean
       /** Those terminals belong to another Orca desktop or session, so this one offers no move. */
       terminalsElsewhere?: boolean
+      /** A move to the managed server stopped short and keeps the host locked until it resumes. */
+      held?: true
     }
 
 /** Plain SSH terminals and SFTP browsing only; `reason` is the ladder's classified cause. */

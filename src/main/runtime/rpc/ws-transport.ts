@@ -4,6 +4,7 @@ import { createServer as createHttpServer, type Server as HttpServer } from 'nod
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { RpcTransport } from './transport'
 import { createStaticWebClientHandler } from './static-web-client-handler'
+import { hasWebClientUpgradeMarker } from '../../../shared/web-origin-security'
 import {
   attachNodeWebSocketLifecycle,
   clearNodeWebSocketPreAuthTimer,
@@ -59,6 +60,7 @@ export class WebSocketTransport implements RpcTransport {
   private readonly fallbackLadder: readonly number[]
   private persistedFallbackBindFailed = false
   private httpServer: HttpsServer | HttpServer | null = null
+  private readonly webPages = new WeakMap<WebSocket, { webOrigin?: string; webClient: true }>()
   private wss: WebSocketServer | null = null
   private messageHandler: WebSocketMessageHandler | null = null
   private connectionCloseHandler: WebSocketConnectionCloseHandler | null = null
@@ -108,6 +110,11 @@ export class WebSocketTransport implements RpcTransport {
   // Why: pass the closing `ws` and whether other sockets share its client id (the device id), so client-scoped teardown fires only on the last disconnect.
   onConnectionClose(handler: WebSocketConnectionCloseHandler): void {
     this.connectionCloseHandler = handler
+  }
+
+  /** The Orca web bundle that opened `ws` (it marks its upgrade), with its page origin. */
+  webPageOf(ws: WebSocket): { webOrigin?: string; webClient: true } | undefined {
+    return this.webPages.get(ws)
   }
 
   setClientId(ws: WebSocket, clientId: string): void {
@@ -213,10 +220,17 @@ export class WebSocketTransport implements RpcTransport {
       maxPayload: WEBSOCKET_TRANSPORT_MAX_MESSAGE_BYTES
     })
 
-    wss.on('connection', (ws) => {
+    wss.on('connection', (ws, request) => {
       if (wss.clients.size > WEBSOCKET_TRANSPORT_MAX_CONNECTIONS) {
         rejectNodeWebSocketOverCapacity(ws)
         return
+      }
+      if (hasWebClientUpgradeMarker(request.url)) {
+        const origin = request.headers.origin
+        this.webPages.set(ws, {
+          ...(typeof origin === 'string' ? { webOrigin: origin } : {}),
+          webClient: true
+        })
       }
       this.handleConnection(ws)
     })

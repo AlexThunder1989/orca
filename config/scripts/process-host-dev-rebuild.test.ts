@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url'
 import { runProcessSync } from '@orca/process-host'
 import { rolldown, watch } from 'rolldown'
 import type { Plugin, RolldownWatcher } from 'rolldown'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createProcessHostDevRebuildPlugin } from '../build-plugins/process-host-dev-rebuild'
 
 const realPackageDir = resolve('src/packages/process-host')
@@ -69,6 +69,7 @@ function fixture(): { root: string; packageDir: string; main: string } {
       extends: '../../../tsconfig.base.json',
       compilerOptions: {
         target: 'ES2022',
+        lib: ['ES2022'],
         module: 'Node16',
         moduleResolution: 'Node16',
         rootDir: 'src',
@@ -220,11 +221,30 @@ describe('External process-host development rebuilds', () => {
     const { root, packageDir, main } = fixture()
     const loadedVersions: number[] = []
     const watchSignals = new Set<string>()
+    const rebuildPlugin = createProcessHostDevRebuildPlugin(root)
+    const buildStart = rebuildPlugin.buildStart
+    if (typeof buildStart !== 'function') {
+      throw new Error('The process-host rebuild plugin must have a buildStart hook')
+    }
+    rebuildPlugin.buildStart = function (...args) {
+      const addWatchFile = this.addWatchFile.bind(this)
+      const registration = vi.spyOn(this, 'addWatchFile').mockImplementation((file) => {
+        addWatchFile(file)
+        if (basename(file) === 'source-directory-change') {
+          watchSignals.add(file)
+        }
+      })
+      try {
+        return buildStart.apply(this, args)
+      } finally {
+        registration.mockRestore()
+      }
+    }
     const watcher = watch({
       input: main,
       external: ['@orca/process-host'],
       plugins: [
-        createProcessHostDevRebuildPlugin(root),
+        rebuildPlugin,
         {
           name: 'fake-electron-reload',
           closeBundle() {
@@ -233,11 +253,6 @@ describe('External process-host development rebuilds', () => {
         }
       ],
       output: { file: join(root, 'out', 'main.cjs'), format: 'cjs' }
-    })
-    watcher.on('change', (file) => {
-      if (basename(file) === 'source-directory-change') {
-        watchSignals.add(file)
-      }
     })
     watchers.push(watcher)
     closeSuccessfulBundles(watcher)
@@ -260,6 +275,9 @@ describe('External process-host development rebuilds', () => {
     await expect.poll(() => loadedVersions.at(-1), { timeout: 15_000 }).toBe(5)
     expect(existsSync(join(packageDir, 'dist', 'features', 'new-feature.js'))).toBe(true)
     expect(watchSignals.size).toBe(1)
+    for (const signal of watchSignals) {
+      expect(existsSync(signal)).toBe(true)
+    }
 
     const failedAgain = nextEvent(watcher, 'ERROR')
     writeFileSync(

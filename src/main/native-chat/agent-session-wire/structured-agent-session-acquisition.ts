@@ -68,11 +68,13 @@ export async function acquireOwner(
     } catch (error) {
       throw new AgentSessionPreSpawnError(error)
     }
+    const permissionMode = await input.launchPermissionMode?.(record)
     const attempt = mintStructuredAgentSessionStartupAttempt({
       record,
       identity: journalIdentityFor(record, input.params),
       // Retries must recover the original reservation, not mint a second child.
       spawnToken,
+      ...(permissionMode ? { permissionMode } : {}),
       ...(input.eventSink ? { events: input.eventSink } : {}),
       ...(input.acquireSignal ? { signal: input.acquireSignal } : {}),
       optionRevision: input.optionRevision

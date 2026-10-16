@@ -88,28 +88,40 @@ export function bindProviderListeners(session: PtyIpcSession): void {
         return
       }
       const syntheticExit = session.consumeSyntheticKillExit(payload.id, payload.incarnationId)
-      if (!isLocalProvider) {
-        clearProviderPtyState(payload.id)
-        ptyOwnership.delete(payload.id)
-        if (syntheticExit) {
-          session.runtime?.markPtyStopRequested(payload.id)
+      // Main restarted the daemon: the pane outlives its process, for the runtime and the window.
+      const settleRestartStop = payload.replacedByRestart
+        ? session.runtime?.intentionalPtyStops?.mark(
+            payload.id,
+            'replaced',
+            payload.incarnationId ?? null
+          )
+        : undefined
+      try {
+        if (!isLocalProvider) {
+          clearProviderPtyState(payload.id)
+          ptyOwnership.delete(payload.id)
+          if (syntheticExit) {
+            session.runtime?.markPtyStopRequested(payload.id)
+          }
+          session.runtime?.onPtyExit(payload.id, payload.code, payload.incarnationId, {
+            providerExitObserved: true,
+            ...(payload.cause ? { cause: payload.cause } : {})
+          })
         }
-        session.runtime?.onPtyExit(payload.id, payload.code, payload.incarnationId, {
-          providerExitObserved: true,
-          ...(payload.cause ? { cause: payload.cause } : {})
+        // The control reply can overtake stream data; the physical exit must retire that late output.
+        if (syntheticExit) {
+          return
+        }
+        // Why not the whole payload: the exit cause is a main-process fact for the
+        // runtime's records; the renderer's pty:exit contract stays as it was.
+        session.sendPtyExitToRenderer({
+          id: payload.id,
+          code: payload.code,
+          ...(payload.incarnationId ? { incarnationId: payload.incarnationId } : {})
         })
+      } finally {
+        settleRestartStop?.(true)
       }
-      // The control reply can overtake stream data; the physical exit must retire that late output.
-      if (syntheticExit) {
-        return
-      }
-      // Why not the whole payload: the exit cause is a main-process fact for the
-      // runtime's records; the renderer's pty:exit contract stays as it was.
-      session.sendPtyExitToRenderer({
-        id: payload.id,
-        code: payload.code,
-        ...(payload.incarnationId ? { incarnationId: payload.incarnationId } : {})
-      })
     })
   )
 }

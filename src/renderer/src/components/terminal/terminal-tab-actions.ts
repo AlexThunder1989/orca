@@ -1,13 +1,9 @@
 import { useAppStore } from '@/store'
-import {
-  closeWebRuntimeSessionTab,
-  isWebRuntimeSessionActive,
-  toHostSessionTabId
-} from '@/runtime/web-runtime-session'
-import {
-  getLatestWebSessionTabsPublicationEpoch,
-  resolveHostSessionTabIdForWebSessionTab
-} from '@/runtime/web-session-tabs-sync'
+import { closeWebRuntimeSessionTab } from '@/runtime/web-runtime-session-tab-lifecycle'
+import { isWebRuntimeSessionActive } from '@/runtime/web-runtime-session-environment'
+import { toHostSessionTabId } from '../../../../shared/terminal-surface-id'
+import { getLatestWebSessionTabsPublicationEpoch } from '@/runtime/web-session-tabs-sync/tracking-lifecycle'
+import { resolveHostSessionTabIdForWebSessionTab } from '@/runtime/web-session-tabs-sync/tracking-mappings'
 import { resolveTerminalCloseRoute } from '@/lib/terminal-close-route'
 import {
   guardPinnedTabClose,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { createDaemonActiveProviderFixtures } from './pty-ipc-daemon-provider-fixtures'
-import { registerPtyHandlers } from './pty'
+import { registerPtyHandlers } from './pty/register-handlers'
 import { isCommandOnPath } from './preflight-command-exec'
 import { detectWslCommandsOnPath } from './preflight-wsl-agent-detection'
 import type * as FsPromises from 'node:fs/promises'
@@ -14,9 +14,9 @@ vi.mock('./preflight-command-exec', () => ({ isCommandOnPath: vi.fn() }))
 vi.mock('./local-agent-install-dir-detection', () => ({
   detectCommandsInInstallDirs: () => new Set()
 }))
-vi.mock('./preflight-wsl-agent-detection', () => ({ detectWslCommandsOnPath: vi.fn() }))
-const { mux } = vi.hoisted(() => ({ mux: vi.fn() }))
-vi.mock('../ssh/ssh-target-registry', () => ({ getActiveMultiplexer: mux }))
+vi.mock('./preflight-wsl-agent-detection', () => ({
+  detectWslCommandsOnPath: vi.fn()
+}))
 vi.mock('node:fs/promises', async (importOriginal) => ({
   ...(await importOriginal<typeof FsPromises>()),
   stat: vi.fn(async () => ({ isDirectory: () => true }))
@@ -76,7 +76,6 @@ describe('desktop Qoder execution-host selection', () => {
   beforeEach(() => {
     nativeProbe.mockReset().mockImplementation(async (cmd) => cmd === 'qodercli')
     wslProbe.mockReset().mockResolvedValue(new Set(['qoder']))
-    mux.mockReset()
   })
   async function spawn(args: Partial<PtySpawnIpcArgs> = {}, store?: Store) {
     const providerSpawn = setupDaemonAdapter()
@@ -171,7 +170,6 @@ describe('desktop Qoder execution-host selection', () => {
     expect(providerSpawn).toHaveBeenCalledWith(expect.objectContaining({ command: args.command }))
     expect(nativeProbe).not.toHaveBeenCalled()
     expect(wslProbe).not.toHaveBeenCalled()
-    expect(mux).not.toHaveBeenCalled()
   })
   it('uses the selected project WSL distro rather than installed native legacy', async () => {
     await withWin32Platform(async () => {

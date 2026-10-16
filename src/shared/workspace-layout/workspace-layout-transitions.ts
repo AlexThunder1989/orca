@@ -14,7 +14,9 @@ import {
 } from './workspace-layout-command-steps'
 import { updateLegacyPersistence } from './workspace-layout-legacy-persistence'
 import type { WorkspaceLayoutModel } from './workspace-layout-model'
-import { retireExitedSurface, withWorkspace, type ExitedSurface } from './workspace-layout-removal'
+import { renameEditorFiles, type EditorFileRename } from './workspace-layout-editor-rekey'
+import { applyProcessExit, type ProcessExitFacts } from './workspace-layout-process-exit'
+import { withWorkspace, type ExitedSurface } from './workspace-layout-removal'
 import { removeWorkspaces, renameWorkspace } from './workspace-layout-owner-transitions'
 
 export type LayoutTransition =
@@ -25,10 +27,11 @@ export type LayoutTransition =
       ptyId: string
       incarnationId?: string
     }
-  | { type: 'processExited'; surface: ExitedSurface }
+  | { type: 'processExited'; surface: ExitedSurface; exit: ProcessExitFacts }
   | { type: 'sshLeaseTerminated'; ptyIds: string[] }
   | { type: 'ownerRemoved'; workspaces: string[] }
   | { type: 'identityRenamed'; from: string; to: string }
+  | { type: 'editorFilesRenamed'; workspace: string; renames: EditorFileRename[] }
 
 function boundElsewhere(
   model: WorkspaceLayoutModel,
@@ -90,6 +93,8 @@ function applyTransition(
       return sshLeaseTerminated(model, transition.ptyIds)
     case 'ownerRemoved':
       return applied(removeWorkspaces(model, transition.workspaces))
+    case 'editorFilesRenamed':
+      return renameEditorFiles(model, transition.workspace, transition.renames)
     case 'identityRenamed': {
       const renamedModel = renameWorkspace(model, transition.from, transition.to)
       return renamedModel ? applied(renamedModel) : refuse('workspace_exists')
@@ -102,11 +107,7 @@ export function applyLayoutTransition(
   transition: LayoutTransition
 ): Applied {
   if (transition.type === 'processExited') {
-    const retired = retireExitedSurface(model, transition.surface)
-    // An accepted exit advances the revision even when its pane was already gone, as today.
-    return applied(
-      retired ? updateLegacyPersistence(model, retired, [transition.surface.worktreeId]) : model
-    )
+    return applyProcessExit(model, transition.surface, transition.exit)
   }
   const result = applyTransition(model, transition)
   return result.ok ? { ...result, model: updateLegacyPersistence(model, result.model) } : result

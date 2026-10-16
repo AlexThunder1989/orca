@@ -78,7 +78,8 @@ export type StructuredLaunchHostSeedListener = (seedOptions: LaunchSeed) => void
 
 export async function launchStructuredAgentSession(
   intent: StructuredAgentSessionLaunchIntent,
-  onHostSeed?: StructuredLaunchHostSeedListener
+  onHostSeed?: StructuredLaunchHostSeedListener,
+  priorCreateOutcomeUnknown = false
 ): Promise<StructuredAgentLaunchReceipt> {
   const hostSeed = await requireHostCreateSupport(intent)
   if (intent.target.kind !== 'local') {
@@ -119,8 +120,18 @@ export async function launchStructuredAgentSession(
   if (!result.ok) {
     const { code, message, ownerVerdict } = result.refusal
     const refusal = readAgentSessionRefusalReference(result.refusal)
-    // A failed operation whose provider is proven gone is a failure a new operation may retry.
-    if (!isDefinitiveAgentSessionCreateRefusal(code) && ownerVerdict !== 'exited') {
+    const transcriptRefusedBeforeCommit =
+      !priorCreateOutcomeUnknown &&
+      result.refusal.createAttemptRefusedBeforeCommit === true &&
+      refusal?.code === 'agent_session_identity_required' &&
+      (refusal.details?.reason === 'transcriptNotFound' ||
+        refusal.details?.reason === 'transcriptUnreadable')
+    // A proven precommit transcript refusal lets a new operation retry.
+    if (
+      !transcriptRefusedBeforeCommit &&
+      !isDefinitiveAgentSessionCreateRefusal(code) &&
+      ownerVerdict !== 'exited'
+    ) {
       // Keep the focus intent: the session may exist, and recovery still has to adopt it.
       throw new StructuredAgentSessionCreateUnknownOutcomeError(message, code, refusal)
     }

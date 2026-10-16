@@ -1,5 +1,5 @@
 import type { AppState } from '@/store/types'
-import { sshConnectFailureText } from '@/components/settings/ssh-host-server-status-copy'
+import { sshConnectFailureText } from '@/ssh/ssh-host-server-status-copy'
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import {
   resolveWorktreeHostConnection,
@@ -33,7 +33,7 @@ function reconnectErrorText(
   if (error === null || environmentId !== null) {
     return error
   }
-  return sshConnectFailureText({}, state.sshConnectionStates.get(targetId), error)
+  return sshConnectFailureText(state.sshConnectionStates.get(targetId), error)
 }
 
 function computeTerminalPaneHostState(state: AppState, worktreeId: string): TerminalPaneHostState {

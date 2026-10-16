@@ -261,7 +261,7 @@ describe('the screen the catch-all paints for each shell state', () => {
   it('says the host is unreachable rather than that the screen is unavailable', async () => {
     const tree = await renderRoute({ kind: 'offline' })
     const text = textOf(tree)
-    expect(text).toContain('Connect to this host to download the workspace')
+    expect(text).toContain('Connect to this host to download the latest app')
     expect(text).not.toContain('This workspace screen is not available on this host.')
   })
 

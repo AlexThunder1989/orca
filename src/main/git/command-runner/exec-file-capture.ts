@@ -30,11 +30,18 @@ export async function execFileCaptureToTermination(
 ): Promise<{ stdout: string | Buffer; stderr: string | Buffer }> {
   // Spawn cost is reported by spawnProcess's observer, which runProcess goes
   // through; recording it again here would double-count every capture.
-  const pending = runProcess({
-    program: resolveSelectedLocalCommand(command, {
+  let program: string
+  try {
+    program = resolveSelectedLocalCommand(command, {
       env: options.env,
       cwd: typeof options.cwd === 'string' ? options.cwd : undefined
-    }),
+    })
+  } catch (error) {
+    options.onChildTerminated?.()
+    throw error
+  }
+  const pending = runProcess({
+    program,
     args,
     cwd: typeof options.cwd === 'string' ? options.cwd : undefined,
     env: options.env,
@@ -79,6 +86,7 @@ export async function execFileCaptureToTermination(
     code: result.code,
     killed: result.timedOut || result.signal !== null || options.signal?.aborted === true,
     signal: result.signal,
+    outputTruncated: result.outputTruncated,
     stdout,
     stderr
   })

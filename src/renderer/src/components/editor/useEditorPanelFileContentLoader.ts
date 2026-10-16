@@ -3,10 +3,10 @@ import type { OpenFile } from '@/store/slices/editor'
 import { getConnectionIdForFile, isWorktreeConnectionResolved } from '@/lib/connection-context'
 import { useAppStore } from '@/store'
 import { getDiskBaselineSignature } from './diff-content-signature'
-import { getRuntimeFileReadScope } from '@/runtime/runtime-file-client'
+import { getRuntimeFileReadScope } from '@/runtime/runtime-file-routing'
 import { readEditorCsvFileContent } from './csv/csv-file-content'
-import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-client'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { requireRuntimeTargetForFileOwner } from '@/lib/file-owner-runtime-target'
 import { findWorkspaceFileRoute } from '@/lib/runtime-workspace-file-route'
 import { selectWorktreeHostConnectionPhase } from '@/lib/worktree-host-connection-phase'
@@ -26,6 +26,7 @@ import { findRestoredEditorWorkspaceRuntimeOwner } from './restored-editor-works
 import type { RuntimeWorkspaceFileRoute } from '@/lib/runtime-workspace-file-route'
 import { editorTabFileAccess, isClientLocalReadOnlyTab } from '@/lib/local-file-access'
 import { isFloatingWorkspaceId } from '../../../../shared/floating-workspace-worktree'
+import { chatScratchFileAddress } from '@/runtime/runtime-chat-scratch-file-address'
 
 const inFlightFileReads = new Map<string, InFlightContentRead<FileContent>>()
 
@@ -185,7 +186,12 @@ export function useEditorPanelFileContentLoader({
               await reownRestoredFile(route, runtimeEnvironmentId ?? null)
               return
             }
-            if (runtimeEnvironmentId && !route && !restoredOpenFile.terminalArtifactGrantId) {
+            if (
+              runtimeEnvironmentId &&
+              !route &&
+              !restoredOpenFile.terminalArtifactGrantId &&
+              !chatScratchFileAddress(filePath)
+            ) {
               throw new Error('External local files are not available for remote workspaces.')
             }
             if (!externalSshOwnerId) {

@@ -1,7 +1,6 @@
 import { defineStreamingMethod } from '../../core'
 import { TerminalStreamOpcode } from '../../../../../shared/terminal-stream-protocol'
 import { TERMINAL_MULTIPLEX_ACK_TOTAL_INITIAL_WINDOW_BYTES } from '../../../../../shared/terminal-multiplex-flow-control'
-import { TerminalSourceRangeRegistry } from '../../terminal-source-range-registry'
 import { TerminalMultiplex } from '../../../../../shared/rpc-contract/terminal-stream-params'
 import type { TerminalMultiplexConnection } from './terminal-multiplex-connection'
 import type { TerminalMultiplexStream } from './terminal-stream-types'
@@ -40,7 +39,6 @@ export const TERMINAL_MULTIPLEX_METHODS = [
         closed: false,
         cursor: 0,
         streams: new Map<number, TerminalMultiplexStream>(),
-        sourceRangeRegistry: new TerminalSourceRangeRegistry(),
         pendingPtyWaitControllers: new Map<number, Set<AbortController>>(),
         ackTotalInFlightBytes: 0,
         ackTotalWindowBytes: TERMINAL_MULTIPLEX_ACK_TOTAL_INITIAL_WINDOW_BYTES,

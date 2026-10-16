@@ -21,6 +21,8 @@ import { paneBelongsToTabs } from '../../../shared/workspace-session-pane-owners
 export type OrcadMigrationSourceDependencyCensus = {
   totalCount: number
   counts: Record<OrcadMigrationDependencyKind, number>
+  /** For the kinds it can name: what blocks and how to clear it. */
+  names?: Partial<Record<OrcadMigrationDependencyKind, string[]>>
 }
 
 /** What still references the target that this manifest cannot carry. */
@@ -58,7 +60,11 @@ export function collectOrcadMigrationUntransferredDependencyCensus(
   }
   return {
     counts,
-    totalCount: ORCAD_MIGRATION_DEPENDENCY_KINDS.reduce((total, kind) => total + counts[kind], 0)
+    totalCount: ORCAD_MIGRATION_DEPENDENCY_KINDS.reduce((total, kind) => total + counts[kind], 0),
+    names:
+      dormant.blockedSessionItems.length > 0
+        ? { 'workspace-session': dormant.blockedSessionItems }
+        : {}
   }
 }
 

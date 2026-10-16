@@ -28,7 +28,9 @@ export const SESSION_TAB_METHODS = [
     handler: async (params, { runtime, pairedDeviceId, clientKind, clientCapabilities }) => {
       await restoreStructuredTabsIfSupported({ runtime, clientKind, clientCapabilities })
       return projectSessionTabsForClient(
-        await runtime.listMobileSessionTabs(params.worktree, pairedDeviceId),
+        await runtime.listMobileSessionTabs(params.worktree, pairedDeviceId, {
+          includeInitialSurfaceLaunch: true
+        }),
         clientKind,
         clientCapabilities
       )

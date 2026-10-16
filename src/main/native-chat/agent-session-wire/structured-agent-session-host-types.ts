@@ -26,6 +26,7 @@ import type { StructuredAgentSessionLogger } from './structured-agent-session-lo
 import type { StructuredAgentId } from '../../../shared/agent-session-provider-handle'
 import type { StructuredAgentRegistry } from './structured-agent-registry'
 import type { StructuredAgentSessionStartupLimits } from './structured-agent-session-startup-attempt-contract'
+import type { AgentChatPermissionMode } from '../../../shared/agent-chat-permission-mode'
 
 export type StructuredAgentSessionCaller = { callerKey: string }
 
@@ -73,6 +74,8 @@ export type StructuredAgentSessionProviderChild = StructuredAgentSessionProvider
   /** The queued message whose delivery started this child, fixed when the start is made; absent
    *  for any other start. In memory only: it tells a restart offer its own start from another. */
   readonly startedFor?: string
+  /** The permission mode it was launched with, in memory only; absent for an agent with none. */
+  readonly permissionMode?: AgentChatPermissionMode
   close?: StructuredAgentSessionChildClose
 }
 
@@ -110,6 +113,9 @@ export type StructuredAgentSessionHostSession = {
    *  observed exit. */
   child: StructuredAgentSessionProviderChild | null
   lastEndedChild?: StructuredAgentSessionEndedChild
+  /** Bumped by every signal that a generation ended, which can change what is current with no
+   *  journal row or lease write: readers key what they cache of current work on it. */
+  operationalRevision?: number
   /** Owned by one live restart action, so another caller cannot replace its progress. */
   restartResume?: NonNullable<AgentSessionStatusSummary['restartResume']> & { operationId: string }
 }

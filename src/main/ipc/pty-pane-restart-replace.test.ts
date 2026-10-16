@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { setupPtyIpcSuite, type PtyIpcSuiteFixtures } from './pty-ipc-test-harness'
 import { TerminalKilledError } from '../daemon/daemon-pty-lifecycle-errors'
 import { makePaneKey } from '../../shared/stable-pane-id'
-import { registerPtyHandlers, setLocalPtyProvider } from './pty'
+import { registerPtyHandlers } from './pty/register-handlers'
+import { setLocalPtyProvider } from './pty/provider/registry'
 import { TerminalIntentionalStops } from '../runtime/terminal-intentional-stops'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))

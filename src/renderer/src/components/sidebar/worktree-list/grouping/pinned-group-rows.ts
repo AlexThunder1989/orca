@@ -1,5 +1,5 @@
 import type { Repo } from '../../../../../../shared/repo-types'
-import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
+import type { WorktreeOccurrencePlan } from '../../../../../../shared/worktree-occurrence-plan'
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
@@ -23,10 +23,7 @@ export function emitPinnedGroup(
   importedWorktreesByRepo: ReadonlyMap<string, ImportedWorktreesCardCandidate>,
   allowImportedFallback: boolean,
   result: Row[],
-  lineageById: Record<string, WorktreeLineage>,
-  worktreeMap: Map<string, Worktree>,
-  nestLineage: boolean,
-  cyclicLineageIds: ReadonlySet<string>,
+  occurrencePlan: WorktreeOccurrencePlan<Worktree>,
   noticeHostContextLabelByRepoId?: ReadonlyMap<string, NoticeHostContext>,
   hostContextLabelByWorktreeIdentity?: ReadonlyMap<string, string>
 ): void {
@@ -77,13 +74,11 @@ export function emitPinnedGroup(
   }
 
   const firstItemIndex = result.length
-  appendWorktreeRows(result, pinnedSectionWorktrees, repoMap, lineageById, worktreeMap, {
-    nestLineage,
+  appendWorktreeRows(result, repoMap, occurrencePlan, {
     collapsedGroups,
     groupDepth: 0,
     sectionKey: PINNED_GROUP_KEY,
-    hostContextLabelByWorktreeIdentity,
-    cyclicLineageIds
+    hostContextLabelByWorktreeIdentity
   })
   if (!allowImportedFallback) {
     return

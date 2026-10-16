@@ -17,7 +17,6 @@ const {
   glabExecFileAsyncMock,
   gitExecFileAsyncMock,
   getUpstreamStatusMock,
-  getSshGitProviderMock,
   getEnterpriseGitHubRepoSlugMock
 } = vi.hoisted(() => ({
   createGitHubPullRequestMock: vi.fn(),
@@ -36,7 +35,6 @@ const {
   glabExecFileAsyncMock: vi.fn(),
   gitExecFileAsyncMock: vi.fn(),
   getUpstreamStatusMock: vi.fn(),
-  getSshGitProviderMock: vi.fn(),
   getEnterpriseGitHubRepoSlugMock: vi.fn()
 }))
 
@@ -105,9 +103,9 @@ vi.mock('../gitlab/gl-utils', () => ({
 
 vi.mock('../git/upstream', () => ({ getUpstreamStatus: getUpstreamStatusMock }))
 
-vi.mock('../providers/ssh-git-dispatch', () => ({ getSshGitProvider: getSshGitProviderMock }))
-
-vi.mock('./hosted-review', () => ({ getHostedReviewForBranch: getHostedReviewForBranchMock }))
+vi.mock('./hosted-review', () => ({
+  getHostedReviewForBranch: getHostedReviewForBranchMock
+}))
 
 import { createHostedReview, getHostedReviewCreationEligibility } from './hosted-review-creation'
 import { baseRefExistsOnRemote } from './hosted-review-creation-git-state'
@@ -141,7 +139,6 @@ function resetMocks(): void {
     glabExecFileAsyncMock,
     gitExecFileAsyncMock,
     getUpstreamStatusMock,
-    getSshGitProviderMock,
     getEnterpriseGitHubRepoSlugMock
   ]) {
     mock.mockReset()
@@ -769,7 +766,6 @@ describe('getHostedReviewCreationEligibility', () => {
         stderr: ''
       }))
     }
-    getSshGitProviderMock.mockReturnValue(remoteGit)
 
     await expect(
       getHostedReviewCreationEligibility({

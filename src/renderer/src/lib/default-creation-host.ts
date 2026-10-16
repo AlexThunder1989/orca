@@ -1,14 +1,17 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import { getSettingsFocusedExecutionHostId } from '../../../shared/execution-host'
+import { ipcOrRuntimeTargetForHostId } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { taskSourceRuntimeTarget } from './task-source-runtime-target'
 
 type DefaultHostSettings = Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
 
-// The one read of the setting; the exported readers below are the sanctioned ways to reach it.
+// Projects the shared primitive; the exported readers below are the sanctioned ways to reach it.
 function readDefaultHost(settings: DefaultHostSettings): RuntimeClientTarget {
-  const environmentId = settings?.activeRuntimeEnvironmentId?.trim()
-  return environmentId ? { kind: 'environment', environmentId } : { kind: 'local' }
+  return (
+    ipcOrRuntimeTargetForHostId(getSettingsFocusedExecutionHostId(settings)) ?? { kind: 'local' }
+  )
 }
 
 /**

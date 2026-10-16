@@ -9,19 +9,12 @@ import type { LoadedWorkspaceLayout } from './workspace-layout-load-types'
 import type { WorkspaceLayout, WorkspaceLayoutModel } from './workspace-layout-model'
 import { checkPaneOwners, paneOwnerGroups } from './workspace-layout-rules'
 import type { PaneOwner, WorkspaceLayoutViolation } from './workspace-layout-rule-types'
+import { emptyLayoutViewRecord } from './workspace-layout-views'
 
 /** Nothing beside the layout: no view selection, facts or pass-through fields. */
 export function emptyLayoutBeside(): Omit<LoadedWorkspaceLayout, 'layout'> {
   return {
-    desktopView: {
-      activeRepoId: null,
-      activeWorktreeId: null,
-      activeTabId: null,
-      groups: {},
-      lastFocusedAt: {},
-      panes: {},
-      editorDrafts: {}
-    },
+    desktopView: emptyLayoutViewRecord(),
     facts: { tabLabels: {}, terminalRows: {}, scrollback: {}, browserTabs: {} },
     carried: {
       unownedTerminalLayouts: {},

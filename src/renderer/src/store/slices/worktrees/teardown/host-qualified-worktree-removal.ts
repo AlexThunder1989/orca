@@ -7,7 +7,7 @@
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
 import type { WorktreeSlice } from '../../worktree-helpers'
-import type { RuntimeClientTarget } from '../../../../runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import {
   getWorktreeOperationOwnerHostIds,

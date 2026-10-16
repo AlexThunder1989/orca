@@ -4,7 +4,7 @@ import type {
   StructuredPromptDeliveryResult
 } from '@/lib/structured-agent-session-launch-prompt'
 import type { StructuredAgentSessionResumeSource } from '../../../shared/structured-agent-session-create'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { StructuredLaunchAttempt } from './structured-agent-session-launch-request'
 import type { AgentLaunchRequestId } from './agent-launch-request-id'

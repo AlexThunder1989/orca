@@ -3,7 +3,7 @@ import { shouldRunSetupForCreate } from '../effective-hook-config'
 import { getEffectiveHooks } from '../hooks'
 import type { Repo } from '../../shared/repo-types'
 import type { Worktree } from '../../shared/worktree/types'
-import type { Store } from '../persistence'
+import type { RuntimeStore } from './runtime-store-contract'
 import {
   getLocalProjectGitExecOptions,
   getLocalProjectWorktreeGitOptions,
@@ -19,10 +19,14 @@ import type { RemoteFetchResult, RemoteTrackingBase } from './runtime-remote-fet
 import type { HostedReviewExecutionOptions } from '../source-control/hosted-review-git-options'
 import { hasLocalWorktreeBaseRef } from '../git/worktree-base-ref-probe'
 import { resolveRuntimeLocalWorktreeCreateCandidate } from './runtime-local-worktree-create-candidate'
-import { createRuntimeLocalGitWorktree } from './runtime-local-git-worktree-create'
+import {
+  createRuntimeLocalGitWorktree,
+  startRuntimeLocalBaseRefRefresh
+} from './runtime-local-git-worktree-create'
 import { resolveRuntimeLocalWorktreeCreateBase } from './runtime-local-worktree-create-base'
 import { materializeRuntimeLocalWorktree } from './runtime-local-worktree-materialization'
 import { resolveRuntimeSetupDecision } from './runtime-local-worktree-setup'
+import { WorktreeCreateSetupChoiceRefusedError } from './worktree-create-setup-choice-refusal'
 import type { PreparationRearmHolder } from '../worktree-create-preparation'
 import {
   localWorktreeCreateExecutionHost,
@@ -32,7 +36,7 @@ import {
 type RuntimeLocalWorktreeCreateArgs<T> = {
   request: RuntimeManagedWorktreeCreateArgs
   repo: Repo
-  store: Store
+  store: RuntimeStore
   createdWithAgent: RuntimeManagedWorktreeCreateArgs['createdWithAgent']
   hostedReviewExecutionContext?: HostedReviewExecutionOptions
   resolveRemoteTrackingBase: (
@@ -70,7 +74,17 @@ async function performRuntimeLocalWorktreeCreate<T>(args: RuntimeLocalWorktreeCr
   // Why before any git work: an `ask` repo with no decision must refuse with nothing created, as
   // the desktop create does; checked after the add, it left an orphan worktree behind.
   if (getEffectiveHooks(repo)?.scripts.setup) {
-    shouldRunSetupForCreate(repo, resolveRuntimeSetupDecision(request))
+    try {
+      shouldRunSetupForCreate(repo, resolveRuntimeSetupDecision(request))
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === 'Setup decision required for this repository'
+      ) {
+        throw new WorktreeCreateSetupChoiceRefusedError(error.message, { cause: error })
+      }
+      throw error
+    }
   }
   // Username and base resolution are independent read-only probes. Starting
   // both before awaiting removes one serial git/config round trip from create.
@@ -113,6 +127,14 @@ async function performRuntimeLocalWorktreeCreate<T>(args: RuntimeLocalWorktreeCr
     refreshRemoteTrackingBase: args.refreshRemoteTrackingBase,
     timing: args.timing
   })
+  const baseRefRefresh = startRuntimeLocalBaseRefRefresh({
+    repoPath: repo.path,
+    base,
+    localWorktreeGitOptions: worktreeGitOptions,
+    refreshRemoteTrackingBase: args.refreshRemoteTrackingBase,
+    fetchRemote: args.fetchRemote,
+    timing: args.timing
+  })
   const candidate = await args.timing.time('resolve_name', () =>
     resolveRuntimeLocalWorktreeCreateCandidate({
       request,
@@ -139,8 +161,7 @@ async function performRuntimeLocalWorktreeCreate<T>(args: RuntimeLocalWorktreeCr
     effectiveSanitizedName: candidate.effectiveSanitizedName,
     checkoutExistingBranch: candidate.checkoutExistingBranch,
     localWorktreeGitOptions: worktreeGitOptions,
-    refreshRemoteTrackingBase: args.refreshRemoteTrackingBase,
-    fetchRemote: args.fetchRemote,
+    baseRefRefresh,
     rearm: args.rearm,
     timing: args.timing
   })

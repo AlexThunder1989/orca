@@ -15,7 +15,7 @@ vi.mock('@/lib/connection-context', () => ({
   getConnectionId: mocks.getConnectionId
 }))
 
-vi.mock('@/runtime/runtime-file-client', () => ({
+vi.mock('@/runtime/runtime-file-search-client', () => ({
   searchRuntimeFiles: mocks.searchRuntimeFiles
 }))
 
@@ -187,6 +187,63 @@ describe('useFileSearchRunner result ownership', () => {
         executionHostId: 'local'
       }
     })
+  })
+
+  it.each([
+    ['local', 'local', null, false],
+    ['local regex', 'local', null, true],
+    ['SSH', 'ssh:ssh-target', 'ssh-target', false],
+    ['SSH regex', 'ssh:ssh-target', 'ssh-target', true],
+    ['paired host', 'runtime:search-runtime-a', null, false],
+    ['paired host regex', 'runtime:search-runtime-a', null, true]
+  ] as const)(
+    'preserves significant whitespace for %s searches',
+    async (_name, hostId, connectionId, useRegex) => {
+      const worktreeId = 'folder-a::/repo'
+      const { hook } = renderSearchRunner(
+        {
+          settings: {},
+          repos: [{ id: 'folder-a', kind: 'folder', connectionId }],
+          worktreesByRepo: {
+            'folder-a': [{ id: worktreeId, repoId: 'folder-a', hostId }]
+          },
+          fileSearchStateByWorktree: { [worktreeId]: { useRegex } }
+        },
+        worktreeId
+      )
+      mocks.getConnectionId.mockReturnValue(connectionId)
+
+      for (const query of [' needle ', ' needle', 'needle ', '\tneedle\t']) {
+        await act(async () => {
+          hook.result.current.executeSearch(query)
+          await vi.advanceTimersByTimeAsync(300)
+        })
+        expect(mocks.searchRuntimeFiles).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            target:
+              hostId === 'runtime:search-runtime-a'
+                ? { kind: 'environment', environmentId: 'search-runtime-a' }
+                : { kind: 'local' },
+            connectionId: connectionId ?? undefined
+          }),
+          expect.objectContaining({ query, useRegex, wholeWord: false }),
+          expect.any(AbortSignal)
+        )
+      }
+    }
+  )
+
+  it.each(['', ' ', '\t \t'])('keeps a blank query %j from starting a search', async (query) => {
+    const { hook, updates } = renderSearchRunner(
+      { settings: {}, repos: [], worktreesByRepo: {}, fileSearchStateByWorktree: {} },
+      'folder:search-root'
+    )
+    await act(async () => {
+      hook.result.current.executeSearch(query)
+      await vi.advanceTimersByTimeAsync(300)
+    })
+    expect(mocks.searchRuntimeFiles).not.toHaveBeenCalled()
+    expect(updates).toContainEqual({ results: null, resultOwner: null, loading: false })
   })
 
   it('shows an active failure and clears it when the next search succeeds or is empty', async () => {

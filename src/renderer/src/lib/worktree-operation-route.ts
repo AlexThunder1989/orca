@@ -21,8 +21,6 @@ import {
   type FolderWorkspaceRuntimeOwnerState
 } from './folder-workspace-runtime-owner'
 
-export { resolveExplicitWorktreeOperationRouteResult } from './worktree-operation-catalog-route'
-
 export type WorktreeOperationRoute = {
   executionHostId: ExecutionHostId | null
   runtimeEnvironmentId: string | null

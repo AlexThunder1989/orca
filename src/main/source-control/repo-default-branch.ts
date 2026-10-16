@@ -1,7 +1,6 @@
 import { resolveDefaultBaseRefViaExec } from '../git/repo'
 import { resolveRemoteHeadBranchViaExec, type GitExec } from '../../shared/git-default-base-ref'
 import { gitExecFileAsync } from '../git/runner'
-import { getSshGitProvider, getSshGitProviderGeneration } from '../providers/ssh-git-dispatch'
 import { getRepoExecutionHostId } from '../../shared/execution-host'
 import { hostedReviewRepoScope, scopeGeneration } from './hosted-review-scope-generations'
 import type { HostedReviewLocalGitOptions } from './hosted-review-git-options'
@@ -31,12 +30,7 @@ function getRepoDefaultBranchCacheKey(
     ? `ssh:${connectionId}`
     : `local:${localGitOptions.wslDistro ?? 'host'}`
   const scope = hostedReviewRepoScope(repoPath, getRepoExecutionHostId({ connectionId }))
-  return [
-    runtimeKey,
-    repoPath,
-    scopeGeneration(scope),
-    connectionId ? getSshGitProviderGeneration(connectionId) : 0
-  ].join('\0')
+  return [runtimeKey, repoPath, scopeGeneration(scope)].join('\0')
 }
 
 function pruneRepoDefaultBranchCache(now: number): void {
@@ -54,36 +48,30 @@ function pruneRepoDefaultBranchCache(now: number): void {
   }
 }
 
-/** Git over the transport the hosted-review call uses; null when the SSH provider is gone. */
+/** Local git for the hosted-review call; null for an SSH repo, which this process cannot reach. */
 function createRepoGitExec(
   repoPath: string,
   connectionId: string | null | undefined,
   localGitOptions: HostedReviewLocalGitOptions
 ): GitExec | null {
-  const provider = connectionId ? getSshGitProvider(connectionId) : null
-  if (connectionId && !provider) {
-    // Why: a dropped SSH provider must not fall back to local git — the
-    // repoPath is remote, so a local run could answer for the wrong repo.
+  if (connectionId) {
+    // Why: the repoPath is remote, so a local run could answer for the wrong repo.
     return null
   }
   const resolutionDeadline = Date.now() + REPO_DEFAULT_BRANCH_RESOLUTION_BUDGET_MS
   // Why: the resolver can try five refs; share one deadline so an unhealthy
-  // local/WSL/SSH host cannot multiply the refresh delay per fallback probe.
+  // local/WSL host cannot multiply the refresh delay per fallback probe.
   return (argv) => {
     const timeoutMs = resolutionDeadline - Date.now()
     if (timeoutMs <= 0) {
       return Promise.reject(new Error('Default branch resolution timed out.'))
     }
-    return provider
-      ? provider.exec(argv, repoPath, { timeoutMs })
-      : gitExecFileAsync(argv, {
-          cwd: repoPath,
-          ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {}),
-          ...(localGitOptions.admissionTier
-            ? { admissionTier: localGitOptions.admissionTier }
-            : {}),
-          timeout: timeoutMs
-        })
+    return gitExecFileAsync(argv, {
+      cwd: repoPath,
+      ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {}),
+      ...(localGitOptions.admissionTier ? { admissionTier: localGitOptions.admissionTier } : {}),
+      timeout: timeoutMs
+    })
   }
 }
 

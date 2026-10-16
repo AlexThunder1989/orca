@@ -34,6 +34,7 @@ vi.mock('./daemon-endpoint-adoption', () => ({
   reconcileDaemonPidOwnership: vi.fn()
 }))
 vi.mock('./daemon-launched-child', () => ({
+  DAEMON_CHILD_STARTUP_TIMEOUT_MS: 10_000,
   DaemonEndpointUnavailableError: class extends Error {},
   launchDaemonChild: harness.launchDaemonChild,
   terminateLaunchedDaemonChild: vi.fn()

@@ -188,7 +188,7 @@ describe('structured agent session launch', () => {
     try {
       expect(
         createStructuredAgentSessionLaunchIntent('workspace-1', 'codex', 'local').seedOptions
-      ).toEqual({ model: 'gpt-5.5' })
+      ).toEqual({ model: 'gpt-5.5', permissionMode: 'ask' })
       expect(
         createStructuredAgentSessionLaunchIntent('workspace-1', 'codex', 'runtime:server-1')
           .seedOptions
@@ -317,7 +317,7 @@ describe('structured agent session launch', () => {
       })
     try {
       expect(restore('runtime:server-1').seedOptions).toEqual({ model: 'opus' })
-      expect(restore('local').seedOptions).toEqual({ model: 'sonnet' })
+      expect(restore('local').seedOptions).toEqual({ model: 'sonnet', permissionMode: 'ask' })
     } finally {
       useAppStore.setState({ settings })
     }
@@ -497,23 +497,6 @@ describe('structured agent session launch', () => {
     ).catch((caught: unknown) => caught)
 
     expect(error).toBeInstanceOf(StructuredAgentSessionCreateUnknownOutcomeError)
-  })
-
-  it('preserves a definitive refusal code for the fallback path', async () => {
-    mockSupportedCreate(() => ({
-      ok: false,
-      refusal: {
-        code: 'structured_agent_session_unsupported',
-        message: 'Structured chat is unavailable.'
-      }
-    }))
-
-    const error = await launchStructuredAgentSession(
-      createStructuredAgentSessionLaunchIntent('workspace-unsupported', 'codex')
-    ).catch((caught: unknown) => caught)
-
-    expect(error).toBeInstanceOf(StructuredAgentSessionCreateRefusalError)
-    expect(error).toMatchObject({ code: 'structured_agent_session_unsupported' })
   })
 
   it.each(['method_not_found', 'structured_agent_session_unsupported'])(

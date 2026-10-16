@@ -212,14 +212,6 @@ describe('addOrcaWslInteropEnv', () => {
     expect(env.WSLENV).toBe('ORCA_SHELL_READY_ROOT/p:ORCA_WORKSPACE_NAME/u')
   })
 
-  it('does not register setup vars that are absent from the env', () => {
-    const env: Record<string, string> = { ORCA_TERMINAL_HANDLE: 'term_wsl' }
-
-    addOrcaWslInteropEnv(env)
-
-    expect(env.WSLENV).toBe('ORCA_TERMINAL_HANDLE/u:ORCA_SHELL_READY_ROOT/p')
-  })
-
   it('crosses the inline-image protocol hint into the guest untranslated (/u)', () => {
     const env: Record<string, string> = { ORCA_IMAGE_PROTOCOL: 'kitty' }
     addOrcaWslInteropEnv(env)

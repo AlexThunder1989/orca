@@ -8,11 +8,16 @@ export type UseNativeChatComposerPasteArgs = {
   /** Re-read after awaits so a mid-paste disable guards the composer. */
   disabled: boolean
   caret: number
-  /** Resolved at paste time: SSH panes must save the clipboard image on the
-   *  remote host, or the attached path names a file the agent cannot read. */
+  /** Resolved at paste time: a remote pane must save the clipboard image on its
+   *  host, or the attached path names a file the agent cannot read. */
   resolveAttachmentOwner: () => NativeChatAttachmentOwner
   attachResolvedPaths: (paths: string[], connectionId?: string | null) => void
-  beginPendingImageAttachment: (previewUrl?: string, pendingName?: string) => string | null
+  /** `serverOwned`: an image the paste saved on the remote target's own server, not a client file. */
+  beginPendingImageAttachment: (
+    previewUrl?: string,
+    pendingName?: string,
+    serverOwned?: boolean
+  ) => string | null
   resolvePendingImageAttachment: (id: string, path: string, connectionId?: string | null) => void
   /** Supplies a pending chip's thumbnail. */
   revealPendingImageAttachment?: (id: string, previewUrl?: string) => void

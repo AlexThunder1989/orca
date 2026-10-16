@@ -22,10 +22,9 @@ import {
   ORCAD_RUNTIMES_DIRNAME,
   orcadNodeRuntimeExecutable
 } from '../../shared/orcad-artifacts'
-import type { SshConnection } from './ssh-connection'
+import type { OrcadHostTransport } from './orcad-host-transport'
 import { shellEscape } from './ssh-connection-utils'
-import { execCommand } from './ssh-relay-deploy-helpers'
-import { isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
+import { execCommand, isUnconfirmedSshCommandTermination } from './ssh-relay-exec-command'
 import { uploadRelayDirectory } from './ssh-relay-install-transfers'
 import {
   isWindowsRemoteHost,
@@ -114,7 +113,7 @@ export function nodeRuntimeStageDir(
 }
 
 // Why both tools: GNU/busybox ship sha256sum, macOS ships shasum; either prints the digest first.
-function sha256Of(path: string): string {
+export function remoteSha256Command(path: string): string {
   return `{ sha256sum ${path} 2>/dev/null || shasum -a 256 ${path}; } | cut -d' ' -f1`
 }
 
@@ -131,7 +130,7 @@ export function probeRemoteNodeRuntimeCommand(
   const verified = shellEscape(joinRemotePath(host, runtimeDir, VERIFIED_MARKER))
   return (
     `if [ -f ${verified} ] && [ -x ${executable} ] && ` +
-    `[ "$(${sha256Of(executable)})" = ${shellEscape(pinnedNodeRuntimeAsset(target).executableSha256)} ]; ` +
+    `[ "$(${remoteSha256Command(executable)})" = ${shellEscape(pinnedNodeRuntimeAsset(target).executableSha256)} ]; ` +
     `then echo ${REMOTE_NODE_RUNTIME_READY}; else echo ${REMOTE_NODE_RUNTIME_MISSING}; fi`
   )
 }
@@ -192,7 +191,7 @@ export function promoteRemoteNodeRuntimeCommand(
   return [
     `cd ${stage} || exit 1`,
     `tar -xzf ${shellEscape(joinRemotePath(host, args.stageDir, args.archive))} ${shellEscape(member)} || { echo ORCA_NODE_RUNTIME_EXTRACT_FAILED; exit 1; }`,
-    `[ "$(${sha256Of(extracted)})" = ${shellEscape(asset.executableSha256)} ] || { echo ORCA_NODE_RUNTIME_HASH_MISMATCH; exit 1; }`,
+    `[ "$(${remoteSha256Command(extracted)})" = ${shellEscape(asset.executableSha256)} ] || { echo ORCA_NODE_RUNTIME_HASH_MISMATCH; exit 1; }`,
     `chmod 755 ${extracted}`,
     // Why run it: executing is the only reliable check for noexec mounts and a wrong libc.
     // Exit 0 on refusal so the caller receives the loader's words to classify, not a bare exit 1.
@@ -253,7 +252,7 @@ export type EnsuredRemoteNodeRuntime = {
  * when needed, and returns its executable and whether this call uploaded it.
  */
 export async function ensureRemoteOrcadNodeRuntime(options: {
-  conn: SshConnection
+  conn: OrcadHostTransport
   host: RemoteHostPlatform
   slotDir: string
   target: NodeRuntimeTarget
@@ -262,6 +261,8 @@ export async function ensureRemoteOrcadNodeRuntime(options: {
   signal?: AbortSignal
   /** Wraps each host round trip, so a caller can tell an unconfirmed channel from a local failure. */
   remoteStep?: RemoteRuntimeStep
+  /** Replaces the POSIX first probe only; the under-lock recheck always hashes. */
+  posixProbeCommand?: typeof probeRemoteNodeRuntimeCommand
 }): Promise<EnsuredRemoteNodeRuntime> {
   const { conn, host, target, signal } = options
   const remoteStep = options.remoteStep ?? runDirectly
@@ -281,7 +282,7 @@ export async function ensureRemoteOrcadNodeRuntime(options: {
   const probe = await exec(
     windows
       ? windowsNodeRuntimeProbeCommand(runtimeDir, target, stageDir)
-      : probeRemoteNodeRuntimeCommand(host, runtimeDir, target),
+      : (options.posixProbeCommand ?? probeRemoteNodeRuntimeCommand)(host, runtimeDir, target),
     { signal, timeoutMs: NODE_RUNTIME_PROMOTE_TIMEOUT_MS }
   )
   if (probe.trim() === REMOTE_NODE_RUNTIME_READY) {

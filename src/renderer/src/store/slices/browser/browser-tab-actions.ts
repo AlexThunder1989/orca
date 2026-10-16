@@ -162,6 +162,7 @@ export function createBrowserTabActions(
           entityId: workspaceId,
           label: browserTab.title,
           targetGroupId: options?.targetGroupId,
+          ...(options?.split ? { split: options.split } : {}),
           ...(options?.afterTabId ? { afterTabId: options.afterTabId } : {}),
           // Why no routing-host default: a substituted host would disown the wrapper from its worktree.
           ...(options?.executionHostId ? { executionHostId: options.executionHostId } : {}),

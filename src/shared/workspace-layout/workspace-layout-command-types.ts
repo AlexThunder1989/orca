@@ -7,9 +7,11 @@
 import type { SleepingAgentSessionRecord } from '../agent-session-resume'
 import type { AgentType } from '../agent-status-types'
 import type { AiVaultSessionTitle } from '../ai-vault-session-title'
+import type { EditorTabView } from '../editor-tab-view-types'
 import type { TabContentType, TabGroupLayoutNode } from '../tab-types'
 import type { TerminalPaneLayoutNode, TerminalPaneSplitDirection } from '../terminal-tab-types'
 import type { PaneSide } from './terminal-pane-tree'
+import type { PaneOutcomeChanges } from './workspace-layout-pane-outcomes'
 import type { LayoutEditorFile, LayoutTerminalCreation } from './workspace-layout-model'
 
 type On = { workspace: string }
@@ -27,6 +29,7 @@ export type LayoutCommand =
       color?: string
       viewMode?: 'terminal' | 'chat'
       creation?: Partial<LayoutTerminalCreation>
+      initial?: InitialSurfaceReason
     })
   | (On & {
       type: 'splitPane'
@@ -37,7 +40,16 @@ export type LayoutCommand =
       /** The new pane's id, when the runtime minted it before applying. */
       newLeafId?: string
     })
-  | (On & { type: 'closePane'; tabId: string; leafId: string })
+  | (On & {
+      type: 'closePane'
+      tabId: string
+      leafId: string
+      /**
+       * A user's close of one pane of a split, as the desktop's pane close: the tab's last pane is
+       * refused (closing it is a tab close).
+       */
+      userPaneClose?: true
+    })
   | (On & {
       type: 'closeTabs'
       tabIds: string[]
@@ -77,18 +89,40 @@ export type LayoutCommand =
       contentType: Exclude<TabContentType, 'terminal' | 'browser' | 'agent-session' | 'simulator'>
       /** Present for edit-mode files, which are restored after restart. */
       file?: LayoutEditorFile
+      /** What the tab shows beyond its file; not saved. */
+      view?: EditorTabView
       groupId?: string
       preview?: boolean
       /** Editor tabs whose view reported an unsaved draft: a preview among them is not replaced. */
       dirtyTabIds?: string[]
     })
   | (On & { type: 'promotePreviewTab'; tabId: string })
-  | (On & { type: 'openBrowserTab'; profileId?: string | null; groupId?: string })
-  | (On & { type: 'openAgentSessionTab'; sessionId: string; agent: AgentType; groupId?: string })
+  | (On & {
+      type: 'openBrowserTab'
+      profileId?: string | null
+      groupId?: string
+      /** The id of a page that already runs; it names the tab too, as a host's page names its row. */
+      pageId?: string
+    })
+  | (On & {
+      type: 'openAgentSessionTab'
+      /** The chat's own tab id, which status and attention address; minted when absent. */
+      tabId?: string
+      sessionId: string
+      agent: AgentType
+      groupId?: string
+      initial?: InitialSurfaceReason
+    })
   | (On & { type: 'startPane'; paneKey: string })
   | (On & { type: 'restartPane'; paneKey: string })
   | (On & { type: 'sleep'; paneKeys?: string[]; records: SleepingAgentSessionRecord[] })
   | (On & { type: 'wake'; paneKeys?: string[] })
+
+/**
+ * Why a workspace's first surface is asked for: `restore` at relaunch, `activation` when a user
+ * opens the workspace. Either is a no-op once the workspace has a tab.
+ */
+export type InitialSurfaceReason = 'restore' | 'activation'
 
 export type CommandOf<T extends LayoutCommand['type']> = Extract<LayoutCommand, { type: T }>
 
@@ -127,15 +161,34 @@ export type LayoutCommandResult = {
   refused?: { tabId: string; code: 'tab_pinned' | 'editor_tab_has_unsaved_draft' }[]
   slept?: string[]
   woken?: string[]
+  /** Old tab-bar id → new, for tabs a file rename re-ided; views move their selection with it. */
+  renamedTabIds?: Record<string, string>
 }
+
+/** A command applied to a stored layout: its result, or why it changed nothing. */
+export type LayoutApplyOutcome =
+  | { ok: true; result: LayoutCommandResult }
+  | { ok: false; code: LayoutRefusalCode }
+
+/** `layout.apply`'s reply. `host_not_owned`: a paired server owns that workspace's layout. */
+export type LayoutApplyReply = LayoutApplyOutcome | { ok: false; code: 'host_not_owned' }
 
 export type LayoutContext = {
   mintId: () => string
   /** Pane ids must be UUIDs (pane keys and PTY env carry them). */
   mintLeafId: () => string
   now: () => number
+  /** True while a start of this pane is in flight; such a pane is not started again. */
+  isStarting?: (leafId: string) => boolean
 }
 
 export type LayoutApplyResult<Model> =
-  | { ok: true; model: Model; result: LayoutCommandResult; effects: LayoutEffects }
+  | {
+      ok: true
+      model: Model
+      result: LayoutCommandResult
+      effects: LayoutEffects
+      /** Leaf id → its new last outcome; null clears it. */
+      outcomes?: PaneOutcomeChanges
+    }
   | { ok: false; code: LayoutRefusalCode }

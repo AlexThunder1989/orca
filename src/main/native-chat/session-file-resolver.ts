@@ -20,6 +20,7 @@ import {
   resolveGrokSessionsDir
 } from '../../shared/grok-session-paths'
 import {
+  hostAdditionalCodexHomePaths,
   needsWslHostResolution,
   toHostReadableTranscriptPath,
   wslAgentSessionsDirs
@@ -43,6 +44,18 @@ function claudeProjectsDirs(): string[] {
 // runtime home belongs to launch, not this resolve poll.
 function codexSessionsDirs(): string[] {
   return uniqueDirs([join(resolveOrcaManagedCodexHomePath(), 'sessions'), codexHomeSessionsDir()])
+}
+
+// Why a tier after a miss: per-account homes (and, on a WSL host, the ones the desktop made)
+// are listed by a lookup that touches the disk, which the common hit should not pay.
+function codexAccountSessionsDirs(): string[] {
+  try {
+    return hostAdditionalCodexHomePaths().map((home) => join(home, 'sessions'))
+  } catch (error) {
+    // Why: a lookup that cannot list them still owes the caller its WSL tier.
+    console.warn('[session-file-resolver] could not list Codex account homes:', error)
+    return []
+  }
 }
 
 function grokSessionsDir(): string {
@@ -171,6 +184,7 @@ async function resolveSessionFileById(
     const override = options.codexSessionsDirs
     return resolveTiered('codex', trimmedId, override ?? codexSessionsDirs(), {
       wslTier: !override,
+      ...(override ? {} : { accountDirs: codexAccountSessionsDirs }),
       signal
     })
   }
@@ -198,18 +212,23 @@ async function resolveSessionFileById(
 
 /**
  * Search this host's roots in order (an earlier root wins), then — only on a miss —
- * each running WSL distro's roots for the same agent.
+ * its per-account roots, then each running WSL distro's roots for the same agent.
  */
 async function resolveTiered(
   agent: SessionIdLookupAgent,
   sessionId: string,
   hostDirs: readonly string[],
-  options: { wslTier: boolean; signal?: AbortSignal }
+  options: { wslTier: boolean; accountDirs?: () => readonly string[]; signal?: AbortSignal }
 ): Promise<string | null> {
   const { signal } = options
   const hit = await findFirstInDirs(agent, sessionId, hostDirs, signal)
-  if (hit || !options.wslTier) {
+  if (hit) {
     return hit
+  }
+  const accountDirs = (options.accountDirs?.() ?? []).filter((dir) => !hostDirs.includes(dir))
+  const accountHit = await findFirstInDirs(agent, sessionId, accountDirs, signal)
+  if (accountHit || !options.wslTier) {
+    return accountHit
   }
   signal?.throwIfAborted()
   // Why: enumerating WSL homes spawns wsl.exe per distro, which boots ones the

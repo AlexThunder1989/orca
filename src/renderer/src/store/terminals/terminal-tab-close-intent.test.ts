@@ -120,8 +120,6 @@ vi.mock('@/lib/agent-status', async (importOriginal) => ({
     'lastKnownRelayPtyIdByTabId',
     'deferredSshSessionIdsByTabId',
     'pendingReconnectPtyIdByTabId',
-    'directSshPaneRetryByTabId',
-    'directSshLivePtyBindingByTabId',
     'pendingStartupByTabId',
     'automaticAgentResumeClaimsByTabId',
     'nativeChatLaunchPromptByTabId',
