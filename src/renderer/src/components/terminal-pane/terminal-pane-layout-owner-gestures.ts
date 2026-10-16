@@ -3,8 +3,9 @@ import { useAppStore } from '@/store'
 import { sendPaneCommandToLayoutOwner } from './terminal-pane-layout-owner-commands'
 
 /**
- * A layout-owner build's pane gestures: an in-tab drop moves the pane once main has; a divider's
- * new ratios, already drawn while dragging, are saved by main when the drag ends.
+ * A layout-owner build's pane gestures: an in-tab drop moves the pane once main has answered, as
+ * today when main refuses; a divider's new ratios, already drawn while dragging, are saved by main
+ * when the drag ends.
  */
 export function layoutOwnerPaneGestures(pane: {
   worktreeId: string
@@ -14,6 +15,27 @@ export function layoutOwnerPaneGestures(pane: {
   shouldPersistLayout: () => boolean
 }): Pick<PaneManagerOptions, 'takePaneDrop' | 'onDividerRatiosCommitted'> {
   const { worktreeId, tabId } = pane
+  // Why: main holds the moved tree before this window does, so ratios sent meanwhile are refused;
+  // they wait for the window's move and go then.
+  let movesInFlight = 0
+  let ratiosWaiting = false
+  const saveRatios = (): void => {
+    if (movesInFlight > 0) {
+      ratiosWaiting = true
+      return
+    }
+    ratiosWaiting = false
+    // Why the store: the gesture's own persist has just written the window's tree there.
+    const root = useAppStore.getState().terminalLayoutsByTabId[tabId]?.root
+    if (root && pane.shouldPersistLayout()) {
+      const keep = (): void => {}
+      sendPaneCommandToLayoutOwner(
+        worktreeId,
+        { type: 'setPaneRatios', tabId, root },
+        { apply: keep, asToday: keep }
+      )
+    }
+  }
   return {
     takePaneDrop: ({ sourcePaneId, targetPaneId, zone }, move) => {
       const manager = pane.managerRef.current
@@ -22,23 +44,26 @@ export function layoutOwnerPaneGestures(pane: {
       if (!leafId || !targetLeafId) {
         return false
       }
-      return sendPaneCommandToLayoutOwner(
+      const settle = (): void => {
+        try {
+          move()
+        } finally {
+          movesInFlight -= 1
+          if (movesInFlight === 0 && ratiosWaiting) {
+            saveRatios()
+          }
+        }
+      }
+      const taken = sendPaneCommandToLayoutOwner(
         worktreeId,
         { type: 'movePane', tabId, leafId, targetLeafId, side: zone },
-        { apply: move, asToday: move }
+        { apply: settle, asToday: settle, refused: settle }
       )
-    },
-    onDividerRatiosCommitted: () => {
-      // Why the store: the gesture's own persist has just written the window's tree there.
-      const root = useAppStore.getState().terminalLayoutsByTabId[tabId]?.root
-      if (root && pane.shouldPersistLayout()) {
-        const keep = (): void => {}
-        sendPaneCommandToLayoutOwner(
-          worktreeId,
-          { type: 'setPaneRatios', tabId, root },
-          { apply: keep, asToday: keep }
-        )
+      if (taken) {
+        movesInFlight += 1
       }
-    }
+      return taken
+    },
+    onDividerRatiosCommitted: saveRatios
   }
 }

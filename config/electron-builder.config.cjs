@@ -54,6 +54,7 @@ const {
   orcadTemplateMacSignIgnore
 } = require('./scripts/packaged-orcad-template.cjs')
 const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.cjs')
+const { assertNotLayoutOwnerBuild } = require('./layout-owner-build.cjs')
 const { verifyStaticAppImagePackage } = require('./scripts/static-appimage-package-contract.cjs')
 const {
   appImageNodeRuntimeFpmArgs,
@@ -396,6 +397,7 @@ module.exports = {
     mobileWebBundleDir = MOBILE_WEB_BUNDLE_DIR,
     ensureWaylandClipboard = ensureBundledWaylandClipboard
   ) => {
+    assertNotLayoutOwnerBuild([join(__dirname, '..', 'out', 'main')])
     assertPackagedNativeVariantsInstalled(context.electronPlatformName, context.arch)
     assertBundledRipgrepInstalled()
     assertProcessHostOutputBuilt()

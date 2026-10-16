@@ -61,17 +61,51 @@ describe('sendPaneCommandToLayoutOwner', () => {
     expect(on.asToday).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['a refusal', () => mocks.callRuntimeRpc.mockResolvedValue({ ok: false, code: 'last_pane' })],
-    ['a failed call', () => mocks.callRuntimeRpc.mockRejectedValue(new Error('rpc_failed'))]
-  ])('changes nothing after %s', async (_case, arrange) => {
-    arrange()
+  it('changes nothing itself after a refusal', async () => {
+    mocks.callRuntimeRpc.mockResolvedValue({ ok: false, code: 'last_pane' })
     const on = handlers()
 
     expect(sendPaneCommandToLayoutOwner('worktree-1', SPLIT, on)).toBe(true)
 
     await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
     expect(on.apply).not.toHaveBeenCalled()
+    expect(on.asToday).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      'main lacks the pane',
+      () => mocks.callRuntimeRpc.mockResolvedValue({ ok: false, code: 'pane_not_found' })
+    ],
+    [
+      'main lacks the tab',
+      () => mocks.callRuntimeRpc.mockResolvedValue({ ok: false, code: 'tab_not_found' })
+    ],
+    [
+      'main lacks the workspace',
+      () => mocks.callRuntimeRpc.mockResolvedValue({ ok: false, code: 'workspace_not_found' })
+    ],
+    ['the call fails', () => mocks.callRuntimeRpc.mockRejectedValue(new Error('rpc_failed'))]
+  ])('acts as today when %s', async (_case, arrange) => {
+    arrange()
+    const on = handlers()
+
+    sendPaneCommandToLayoutOwner('worktree-1', SPLIT, on)
+
+    await vi.waitFor(() => expect(on.asToday).toHaveBeenCalledOnce())
+    expect(on.refused).not.toHaveBeenCalled()
+  })
+
+  it('does not run the fallback when the caller’s own handler throws', async () => {
+    mocks.callRuntimeRpc.mockResolvedValue({ ok: true, result: { leafId: 'leaf-minted' } })
+    const on = handlers()
+    on.apply.mockImplementation(() => {
+      throw new Error('mount failed')
+    })
+
+    sendPaneCommandToLayoutOwner('worktree-1', SPLIT, on)
+
+    await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
     expect(on.asToday).not.toHaveBeenCalled()
   })
 

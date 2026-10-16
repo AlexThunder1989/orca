@@ -593,6 +593,20 @@ describe('arch-aware packaging guard', () => {
     expect(() => packHost(HOST_ARCH)).not.toThrow()
   })
 
+  it('refuses to package a dark layout-owner build', () => {
+    const previous = process.env.ORCA_LAYOUT_OWNER
+    process.env.ORCA_LAYOUT_OWNER = 'main'
+    try {
+      expect(() => packHost(HOST_ARCH)).toThrow('ORCA_LAYOUT_OWNER=main')
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ORCA_LAYOUT_OWNER
+      } else {
+        process.env.ORCA_LAYOUT_OWNER = previous
+      }
+    }
+  })
+
   it('requires the other architecture natives to be installed', () => {
     const otherSherpaInstalled = existsSync(
       join(REPO_ROOT, 'node_modules', otherSherpa, 'package.json')

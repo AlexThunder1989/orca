@@ -38,7 +38,7 @@ export function splitTerminalPaneWithInheritedCwd(args: SplitArgs): void {
       args.worktreeId,
       { type: 'splitPane', tabId: args.tabId, leafId: args.pane.leafId, direction: args.direction },
       {
-        apply: ({ leafId }) => leafId && splitLocally(args, ptyId, leafId),
+        apply: ({ leafId }) => leafId && mountMainSplit(args, ptyId, leafId),
         asToday: () => splitLocally(args, ptyId)
       }
     )
@@ -46,6 +46,20 @@ export function splitTerminalPaneWithInheritedCwd(args: SplitArgs): void {
     return
   }
   splitLocally(args, ptyId)
+}
+
+/** Mounts main's new pane, or withdraws it when its source pane or manager went meanwhile. */
+function mountMainSplit(args: SplitArgs, ptyId: string | null, leafId: string): void {
+  splitLocally(args, ptyId, leafId)
+  const manager = args.getManager ? args.getManager() : args.manager
+  if (manager?.getNumericIdForLeaf(leafId) == null) {
+    const keep = (): void => {}
+    sendPaneCommandToLayoutOwner(
+      args.worktreeId,
+      { type: 'closePane', tabId: args.tabId, leafId },
+      { apply: keep, asToday: keep }
+    )
+  }
 }
 
 function splitLocally(args: SplitArgs, ptyId: string | null, leafId?: string): void {

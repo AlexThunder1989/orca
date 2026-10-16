@@ -16,8 +16,8 @@ const LIST_FIELDS: Record<string, (record: Json) => unknown> = {
   browserTabsByWorktree: (record) => record.id
 }
 
-// Why 2: a session map (layouts by tab, sleeping records by pane) holds records; a changed record
-// field is replaced whole, as diffStoredSession reports it.
+// Session maps hold records (layouts by tab, sleeping records by pane): patch down to each record's
+// fields and replace a changed field whole, as diffStoredSession reports it.
 const MAP_RECORD_DEPTH = 2
 
 /**
@@ -111,7 +111,7 @@ function patchList(stored: Json[], before: Json[], after: Json[], idOf: (record:
   const queue = after
     .map((record) => result.find((candidate) => idOf(candidate) === idOf(record)))
     .filter((record): record is Json => record !== undefined)
-  return result.map((record) => (placed.has(idOf(record)) ? queue.shift()! : record))
+  return result.map((record) => (placed.has(idOf(record)) ? (queue.shift() ?? record) : record))
 }
 
 /** After the nearest record that precedes it in `after` and is already in the list. */
@@ -121,8 +121,8 @@ function insertionIndex(
   position: number,
   idOf: (record: Json) => unknown
 ): number {
-  for (let previous = position - 1; previous >= 0; previous--) {
-    const index = result.findIndex((record) => idOf(record) === idOf(after[previous]!))
+  for (const preceding of after.slice(0, position).toReversed()) {
+    const index = result.findIndex((record) => idOf(record) === idOf(preceding))
     if (index !== -1) {
       return index + 1
     }

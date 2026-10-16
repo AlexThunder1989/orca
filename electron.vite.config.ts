@@ -1,7 +1,8 @@
 import { markdownParserAliases } from './config/build-plugins/markdown-parser-exports'
-import { isBuiltin } from 'node:module'
+import { createRequire, isBuiltin } from 'node:module'
 import { resolve } from 'node:path'
 import { defineConfig, type UserConfig } from 'electron-vite'
+import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createBootstrapFatalExitBanner } from './config/build-plugins/bootstrap-fatal-exit-banner'
@@ -66,11 +67,27 @@ const ORCA_DIAGNOSTICS_TOKEN_URL_LITERAL =
     ? JSON.stringify(orcaDiagnosticsTokenUrl)
     : 'null'
 
-// Why: the dark layout-owner path (src/shared/layout-owner-switch.ts) is compiled in only for a
-// build that asks for it; every other build substitutes 'window', so its branches fold away.
-const ORCA_LAYOUT_OWNER_LITERAL = JSON.stringify(
-  process.env.ORCA_LAYOUT_OWNER === 'main' ? 'main' : 'window'
-)
+const layoutOwnerBuild: {
+  LAYOUT_OWNER_MARKER_FILENAME: string
+  LAYOUT_OWNER_MARKER_TEXT: string
+  isLayoutOwnerBuild: () => boolean
+  layoutOwnerDefine: () => string
+} = createRequire(import.meta.url)('./config/layout-owner-build.cjs')
+const ORCA_LAYOUT_OWNER_LITERAL = layoutOwnerBuild.layoutOwnerDefine()
+
+/** Marks a dark layout-owner main build so packaging refuses it. */
+function createLayoutOwnerMarkerPlugin(): Plugin {
+  return {
+    name: 'orca-layout-owner-marker',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: layoutOwnerBuild.LAYOUT_OWNER_MARKER_FILENAME,
+        source: layoutOwnerBuild.LAYOUT_OWNER_MARKER_TEXT
+      })
+    }
+  }
+}
 
 // Why: official skill installs pin to the commit the build came from, so they match the
 // bundled skills on every channel. Main runs the installer; the renderer prints the command.
@@ -249,7 +266,8 @@ export const electronViteConfig: UserConfig = {
         plugins: [
           createMainBootstrapPlugin(),
           createPlainNodeEntryGuardPlugin(),
-          createProcessHostDevRebuildPlugin()
+          createProcessHostDevRebuildPlugin(),
+          ...(layoutOwnerBuild.isLayoutOwnerBuild() ? [createLayoutOwnerMarkerPlugin()] : [])
         ]
       }
     },

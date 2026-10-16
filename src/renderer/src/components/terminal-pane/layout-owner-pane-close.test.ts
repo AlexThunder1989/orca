@@ -110,3 +110,15 @@ it('a layout-owner build leaves an unmounted tab alone when main refuses its las
 
   expect(p.controller.onCloseTab).not.toHaveBeenCalled()
 })
+
+it('a layout-owner build closes as today when main calls it the last pane but the window has more', async () => {
+  mocks.layoutOwnerIsMain = true
+  const p = await preparePendingSplitClose()
+  p.actions.executeClosePane(1)
+
+  mocks.sendPaneCommandToLayoutOwner.mock.calls[0]?.[2].refused?.('last_pane')
+
+  expect(p.controller.onCloseTab).not.toHaveBeenCalled()
+  expect(mocks.commitTerminalSurfaceClose).toHaveBeenCalledOnce()
+  expect(p.transports.has(1)).toBe(false)
+})

@@ -79,6 +79,14 @@
         "anti-slop/no-module-mocking": "off"
       }
     },
+    // Shared render harness for the split MobileNativeChatView suites; it registers the same
+    // hoisted mocks every suite needs and is only imported by those test files.
+    {
+      "files": ["**/mobile/src/session/MobileNativeChatView.harness.test-fixture.ts"],
+      "rules": {
+        "anti-slop/no-module-mocking": "off"
+      }
+    },
     // The exemptions below are file-scoped rather than inline `oxlint-disable` comments
     // because the root lint scan does not load this plugin, so an inline directive naming
     // an anti-slop rule always reads back as an unused directive there.
