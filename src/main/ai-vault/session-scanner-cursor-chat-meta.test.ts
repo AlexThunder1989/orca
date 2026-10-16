@@ -185,12 +185,16 @@ describe('cursor chat meta', () => {
   it('re-indexes after a chat appears under an already indexed workspace', async () => {
     const cursorHome = await createCursorHome()
     await writeChatMeta(cursorHome, 'workspace-hash', 'chat-first')
+    const workspacePath = join(cursorHome, 'chats', 'workspace-hash')
+    // The directory update must be visible even within one filesystem clock tick.
+    await utimes(workspacePath, 1, 1)
     const firstTranscript = await writeTranscript(cursorHome, 'slug', 'chat-first', [])
     expect(await cursorChatMetaPath(firstTranscript)).toBeDefined()
 
     const laterMetaPath = await writeChatMeta(cursorHome, 'workspace-hash', 'chat-later')
     const laterTranscript = await writeTranscript(cursorHome, 'slug', 'chat-later', [])
 
+    expect((await stat(workspacePath)).mtimeMs).not.toBe(1_000)
     expect(await cursorChatMetaPath(laterTranscript)).toBe(laterMetaPath)
   })
 

@@ -122,7 +122,7 @@ function digestFiles(root, paths) {
   )
 }
 
-function treeDigest(root) {
+export function treeDigest(root) {
   const digest = createHash('sha256')
   const files = []
   const visit = (path) => {

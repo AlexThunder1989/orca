@@ -117,4 +117,43 @@ describe('host list rows across polls', () => {
     expect(rowRenders).toHaveBeenCalledTimes(1)
     act(() => tree!.unmount())
   })
+  it('re-renders only the workspace whose child roster changed', () => {
+    const row = worktree('a', {
+      agents: [
+        {
+          paneKey: 'parent',
+          parentPaneKey: null,
+          state: 'working',
+          agentType: 'codex',
+          prompt: '',
+          taskTitle: null,
+          displayName: null,
+          lastAssistantMessage: null,
+          toolName: null,
+          toolInput: null,
+          interrupted: false,
+          stateStartedAt: 1,
+          updatedAt: 1,
+          subagents: [{ id: 'child', state: 'working', startedAt: 1 }]
+        }
+      ]
+    })
+    let tree: ReactTestRenderer | null = null
+    act(() => {
+      tree = create(createElement(HostWorkspaceList, listProps([row, worktree('b')])))
+    })
+    rowRenders.mockClear()
+    const changed = {
+      ...row,
+      agents: [
+        {
+          ...row.agents![0]!,
+          subagents: [{ id: 'child', state: 'waiting' as const, startedAt: 1 }]
+        }
+      ]
+    }
+    act(() => tree!.update(createElement(HostWorkspaceList, listProps([changed, worktree('b')]))))
+    expect(rowRenders).toHaveBeenCalledTimes(1)
+    act(() => tree!.unmount())
+  })
 })

@@ -514,8 +514,8 @@ describe('while the lookup is still asking Codex', () => {
   it('writes nothing while an entry is already in place', async () => {
     await start()
     const before = snapshot(codexHome())
-    // Why new bytes: a Codex update the lookup has not asked about yet.
-    writeFileSync(mocks.codexPath, 'codex 0.161.0')
+    // A different size invalidates the binary fingerprint even within one filesystem clock tick.
+    writeFileSync(mocks.codexPath, 'codex 0.161.0 updated')
     const release = holdDerivation()
 
     await finishHeldLookupWait(reconcileCodexHooksForLaunch, true)

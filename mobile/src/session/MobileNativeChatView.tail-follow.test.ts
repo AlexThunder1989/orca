@@ -13,6 +13,37 @@ import {
   update
 } from './MobileNativeChatView.harness.test-fixture'
 
+vi.mock('react-native', async () => {
+  const { reactNativeStub } = await import('./MobileNativeChatView.render-stubs.test-fixture')
+  return reactNativeStub()
+})
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 })
+}))
+vi.mock('react-native-gesture-handler', async () => {
+  const { gestureHandlerStub } = await import('./MobileNativeChatView.render-stubs.test-fixture')
+  return gestureHandlerStub()
+})
+vi.mock('lucide-react-native', () => ({
+  ArrowDown: 'ArrowDown',
+  ChevronsDownUp: 'ChevronsDownUp',
+  ChevronsUpDown: 'ChevronsUpDown',
+  Square: 'Square'
+}))
+vi.mock('./MobileNativeChatMessage', () => ({ MobileNativeChatMessage: 'ChatMessage' }))
+vi.mock('./MobileNativeChatLiveLine', () => ({ MobileNativeChatLiveLine: 'LiveStatus' }))
+vi.mock('./MobileNativeChatAsk', () => ({ MobileNativeChatAsk: 'ChatAsk' }))
+vi.mock('./MobileNativeChatPermission', () => ({ MobileNativeChatPermission: 'ChatPermission' }))
+vi.mock('./MobileNativeChatQuestion', () => ({ MobileNativeChatQuestion: 'ChatQuestion' }))
+vi.mock('../components/ActionSheetModal', () => ({ ActionSheetModal: 'ActionSheetModal' }))
+vi.mock('./MobileAgentWorkingIndicator', () => ({
+  MobileAgentWorkingIndicator: 'WorkingIndicator'
+}))
+vi.mock('./MobileNativeChatComposer', async () => {
+  const { composerStub } = await import('./MobileNativeChatView.render-stubs.test-fixture')
+  return composerStub()
+})
+
 describe('MobileNativeChatView: tail-follow', () => {
   installChatViewHooks()
 

@@ -151,6 +151,7 @@ jobs:
           ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: ./.github/actions/install-node-dependencies
+        id: dependencies
         with:
           native-runtime: ${{ runner.os == 'Windows' && 'node' || 'none' }}
           cache-pnpm-store: ${{ runner.os != 'Windows' }}
@@ -191,6 +192,8 @@ jobs:
         with:
           arches: ${{ (inputs.build_template && matrix.os == 'windows-2022') && 'x64 arm64' || (runner.arch == 'ARM64' && 'arm64' || 'x64') }}
       - run: pnpm build:orcad
+        env:
+          ORCA_REUSE_PREPARED_WINDOWS_SECURITY: ${{ github.event_name == 'pull_request' && runner.os == 'Windows' && steps.dependencies.outcome == 'success' }}
       - wait: bun-orcad
       - run: pnpm test:node-server --artifact ${{ runner.os == 'Linux' && '--cross-runtime' || '' }}
         env:

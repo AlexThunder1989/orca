@@ -165,7 +165,10 @@ stageNodePty(BUILD_TARGET)
 await stageParcelWatcher(BUILD_TARGET)
 stageOrcadWindowsProcessTree(ROOT, OUT_DIR, BUILD_TARGET)
 stageOrcadWindowsCliLauncher(ROOT, OUT_DIR, BUILD_TARGET)
-stageOrcadWindowsSecurity(ROOT, OUT_DIR, BUILD_TARGET)
+stageOrcadWindowsSecurity(ROOT, OUT_DIR, BUILD_TARGET, undefined, undefined, {
+  enabled: process.env.ORCA_REUSE_PREPARED_WINDOWS_SECURITY === 'true',
+  runtimePath: nodeRuntimePath
+})
 const emojiDatasetOutput = join(OUT_DIR, ORCAD_EMOJI_SHORTCODE_DATASET)
 mkdirSync(dirname(emojiDatasetOutput), { recursive: true })
 copyFileSync(

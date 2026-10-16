@@ -49,6 +49,8 @@
       "files": [
         "**/*.test.{ts,tsx}",
         "**/*.spec.{ts,tsx}",
+        // Extracted React Native mocks remain test-only.
+        "**/mobile/src/session/MobileNativeChatView.harness.test-fixture.ts",
         "tests/**/*.{ts,tsx}",
         "**/__mocks__/**"
       ],

@@ -1,4 +1,5 @@
 import { isFreshNonDoneAgentStatus } from '../../shared/agent-status-types'
+import { isAgentStatusFresh } from '../../shared/agent-status-freshness'
 import type { RuntimeWorktreeAgentRow, RuntimeWorktreePsSummary } from '../../shared/runtime-types'
 import { mergeWorktreeSummaryStatus } from './runtime-worktree-status-projection'
 import type { RuntimeWorktreePsSummaryLookup } from './runtime-worktree-summary-paths'
@@ -51,7 +52,12 @@ export function attachRuntimeWorktreeAgentRows(args: {
       ...(source.mainAgent ? { mainAgent: source.mainAgent } : {}),
       stateStartedAt: source.stateStartedAt,
       updatedAt: source.updatedAt,
+      ...(source.children !== undefined ? { children: source.children } : {}),
+      ...(source.subagents !== undefined ? { subagents: source.subagents } : {}),
       ...(source.structuredHost === 'owned' ? { structuredHostOwned: true as const } : {})
+    }
+    if (source.children !== undefined || source.subagents !== undefined) {
+      row.subagentObservation = isAgentStatusFresh(row, now) ? 'live' : 'unverifiable'
     }
     const rows = rowsByWorktree.get(summary.worktreeId)
     if (rows) {

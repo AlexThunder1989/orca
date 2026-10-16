@@ -1,4 +1,5 @@
 import { resolveStructuredCodexAccountKind } from '../structured-agent-account-home'
+import { getStructuredAgentSessionHost } from '../../native-chat/agent-session-wire/structured-agent-session-registry'
 import { collectRuntimeWorktreeAgentSources } from '../runtime-worktree-agent-sources'
 import { OrcaRuntimeWithWorktreePsDependencies } from './workspace-process-listing-dependencies'
 import { DEFAULT_WORKTREE_PS_LIMIT } from '../orca-runtime-postlude'
@@ -137,7 +138,8 @@ export abstract class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithWorktr
         mirroredWorktreeIdByTabId,
         connectedPtyEvidence,
         // Structured sessions are in here too: the host publishes them into the same store.
-        hookSnapshots: this.getAgentStatusSnapshotFn?.() ?? []
+        hookSnapshots: this.getAgentStatusSnapshotFn?.() ?? [],
+        readStructuredSummary: getStructuredAgentSessionHost()?.readStatusSummary
       }),
       orchestrationByPaneKey: this.agentOrchestrationProjection.buildByPaneKey(),
       getSummary

@@ -205,6 +205,8 @@ export function HostWorkspaceList({ controller }: { controller: HostScreenContro
               cardDetails={cardDetails}
               agentActivityDisplayMode={state.view.agentActivityDisplayMode}
               onPress={actions.openWorktreeSession}
+              onAgentPress={actions.openWorktreeSession}
+              statusLive={connState === 'connected' && !item.hostContextHealthLabel}
               onLongPress={
                 item.workspaceKind === 'folder-workspace' ? undefined : state.setActionTarget
               }

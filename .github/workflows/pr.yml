@@ -25,8 +25,8 @@ jobs:
   # inputs are unchanged; empty diffs fail closed and run everything.
   code_paths:
     name: detect changes and check repository guards
-    # Reuse one lightweight checkout for detection and the always-required guards.
-    runs-on: ubuntu-slim
+    # Start routing without waiting behind the GitHub-hosted test queue.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
       contents: read
@@ -175,11 +175,8 @@ jobs:
     name: static analysis and typecheck
     needs: [code_paths]
     if: needs.code_paths.outputs.static_analysis == 'true' || needs.code_paths.outputs.typecheck == 'true'
-    # Why ARM: measured 128s against 172s on ubuntu-latest, with every compute step faster --
-    # type-aware 24s->15s, anti-slop 28->19s, localization extraction 67->46s, the orcad smoke
-    # 39->14s. Both lint engines ship linux-arm64 and the Bun target follows process.arch, so
-    # the whole toolchain resolves. Free for public repositories.
-    runs-on: ubuntu-24.04-arm
+    # Leave headroom for typechecking and overlapping checks.
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     outputs:
       shards: ${{ steps.unit-plan.outputs.shards }}
       managed_hook_node18: ${{ steps.managed_hook_node18.outcome }}
@@ -896,7 +893,7 @@ jobs:
     uses: ./.github/workflows/unit-tests.yml
     with:
       node_versions: '["24"]'
-      runner: ubuntu-24.04-arm
+      runner: blacksmith-4vcpu-ubuntu-2404
       shards: ${{ needs.preflight.outputs.shards }}
       run_shards: ${{ needs.code_paths.outputs.mobile_ci_tools != 'true' }}
       browser_contract: ${{ needs.code_paths.outputs.orcad_browser == 'true' }}
@@ -1533,7 +1530,8 @@ jobs:
       - package
       - package_windows
       - layout_oracle
-    runs-on: ubuntu-slim
+    # Report settled results without competing with the GitHub-hosted test queue.
+    runs-on: blacksmith-2vcpu-ubuntu-2204
     timeout-minutes: 5
 
     steps:

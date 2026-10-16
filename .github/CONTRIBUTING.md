@@ -60,6 +60,12 @@ pnpm test
 pnpm build
 ```
 
+For repeated local typechecks, use `pnpm tc` (or `pnpm tc:node`, `pnpm tc:web`,
+and `pnpm tc:cli`). These keep TypeScript's incremental cache. CI uses
+`pnpm typecheck:ci` with Bun for full checks. Shared tests are checked by the
+Node project; shared production code is checked in all three environments.
+Run `pnpm tc:node` after editing shared tests, or `pnpm tc` to check everything.
+
 Add high-quality tests for behavior changes and bug fixes. Prefer tests that would actually catch a regression, not shallow coverage that only exercises the happy path.
 
 If your change affects UI or interaction behavior, verify it on the platforms it could impact.
