@@ -203,6 +203,7 @@ export function createClaudeJournalTranslator(
         turn.suppressReopen()
         return
       }
+      turn.observeStartedSend(event.type === 'message' ? (event.startedSend ?? null) : null)
       if (event.type === 'message') {
         context.observe(event.message, event.observedAt ?? Date.now())
         // A root init is the CLI starting a new request cycle (measured per turn,

@@ -16,10 +16,6 @@ import { scanAiVaultSessions } from './session-scanner'
 import { resetSessionParseCacheForTests } from './session-scanner-parse-cache'
 import { AiVaultScannerServiceClient } from './session-scanner-service-client'
 import {
-  AI_VAULT_SERVICE_SCAN_TIMEOUT_MS,
-  AiVaultServiceDeadlineError
-} from './session-scanner-service-request-deadline'
-import {
   AiVaultServiceTestChild,
   aiVaultServiceRequestId,
   readyAiVaultServiceChild
@@ -64,7 +60,7 @@ async function scanInChild(): Promise<{ reports: AiVaultScanWork[]; final: AiVau
   let now = 0
   trackAiVaultScanProgress(
     signal,
-    (_units, work) => reports.push(work),
+    (work) => reports.push(work),
     () => (now += 1_000)
   )
   await scanAiVaultSessions({ ...roots, platform: 'darwin', limit: 20, signal })
@@ -110,7 +106,7 @@ describe('Session History scan progress, scanner child to window', () => {
     readyAiVaultServiceChild(child)
     await vi.waitFor(() => expect(localAiVaultScanProgress('')?.stage).toBe('finding'))
     const id = aiVaultServiceRequestId(child, 'scan')
-    child.emit('message', { type: 'progress', id, units: 1, work: reports[0] })
+    child.emit('message', { type: 'progress', id, work: reports[0] })
     child.emit('message', {
       type: 'result',
       id,
@@ -134,51 +130,19 @@ describe('Session History scan progress, scanner child to window', () => {
     })
   })
 
-  it('reports a scan the no-progress deadline ended as stopped on the agent still walking', async () => {
-    vi.useFakeTimers()
-    const { child, scan, published } = startScan()
-    const settled = scan.catch((error: Error) => error)
-    readyAiVaultServiceChild(child)
-    await vi.advanceTimersByTimeAsync(0)
-    const walking: AiVaultScanWork = {
-      stage: 'finding',
-      agents: [{ agent: 'codex', files: 77_483, databases: 0, walking: true }],
-      read: { done: 0, total: 0 }
-    }
-    child.emit('message', {
-      type: 'progress',
-      id: aiVaultServiceRequestId(child, 'scan'),
-      units: 1,
-      work: walking
-    })
-    await vi.advanceTimersByTimeAsync(AI_VAULT_SERVICE_SCAN_TIMEOUT_MS)
-
-    expect(await settled).toBeInstanceOf(Error)
-    expect(published.at(-1)).toMatchObject({ stage: 'stopped', agents: walking.agents })
-  })
-
-  it('replaces an old stop during preparation and clears it for a later ordinary failure', () => {
+  it('keeps a replacement entry when the scan it replaced fails late', () => {
     const old = startLocalAiVaultScanProgress('scope', 'old', () => 1_000)
-    old.sent(1)
-    old.fail(new AiVaultServiceDeadlineError('scan timed out', 'scan', 1))
-    expect(localAiVaultScanProgress('scope')?.stage).toBe('stopped')
-
+    old.sent()
     const replacement = startLocalAiVaultScanProgress('scope', 'replacement', () => 2_000)
-    old.fail(new Error('cancelled'))
-    expect(localAiVaultScanProgress('scope')).toBeNull()
-    replacement.sent(2)
+    old.fail()
+    replacement.sent()
     expect(localAiVaultScanProgress('scope')).toMatchObject({ stage: 'finding', startedAt: 2_000 })
 
-    replacement.fail(new Error('service unavailable'))
-    expect(localAiVaultScanProgress('scope')).toBeNull()
-
-    const interrupted = startLocalAiVaultScanProgress('scope', 'interrupted', () => 3_000)
-    interrupted.sent(3)
-    interrupted.fail(new AiVaultServiceDeadlineError('another scan timed out', 'scan', 2))
+    replacement.fail()
     expect(localAiVaultScanProgress('scope')).toBeNull()
   })
 
-  it('does not call a healthy scan stopped when the interactive lane expires', async () => {
+  it('clears the entry when an interactive timeout retires the shared scanner', async () => {
     vi.useFakeTimers()
     const { child, client, scan } = startScan()
     const rejectedScan = scan.catch((error: Error) => error)
@@ -193,13 +157,12 @@ describe('Session History scan progress, scanner child to window', () => {
     child.emit('message', {
       type: 'progress',
       id: aiVaultServiceRequestId(child, 'scan'),
-      units: 1,
       work: { stage: 'finding', agents: [], read: { done: 0, total: 0 } }
     })
     await vi.advanceTimersByTimeAsync(15_000)
 
-    expect(await rejectedInteractive).toBeInstanceOf(AiVaultServiceDeadlineError)
-    expect(await rejectedScan).toBeInstanceOf(AiVaultServiceDeadlineError)
+    expect(await rejectedInteractive).toBeInstanceOf(Error)
+    expect(await rejectedScan).toBeInstanceOf(Error)
     expect(localAiVaultScanProgress('')).toBeNull()
     client.dispose()
   })

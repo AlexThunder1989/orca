@@ -148,6 +148,24 @@ describe('which server an SSH host runs on connect', () => {
     })
   })
 
+  it('offers "Move anyway" when only saved state refuses', async () => {
+    const d = deps({
+      convert: async () => ({
+        outcome: 'refused',
+        verdict: 'live',
+        code: 'orcad_migration_preflight_blocked',
+        reason: 'This SSH host cannot move yet: saved tabs and panes (2).',
+        canLeaveBehind: true
+      })
+    })
+    await expect(resolveHostServerOnConnect(target, d)).resolves.toEqual({
+      route: 'unserved',
+      reason: 'refused',
+      detail: 'This SSH host cannot move yet: saved tabs and panes (2).',
+      canLeaveBehind: true
+    })
+  })
+
   it('falls back to the relay ladder for good when orcad cannot run, and remembers why', async () => {
     const d = deps({
       isEmptyHost: () => true,

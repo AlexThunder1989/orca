@@ -158,11 +158,11 @@ export function useMobileStructuredSendWithOutcome(args: {
         ...(options ? { options } : {}),
         deadline,
         clientMessageId: send.clientMessageId,
+        onAccepted: (cursor) =>
+          accept({ ...send, ...(cursor ? { recordedCursor: cursor } : {}) }, images),
         onError: onSendError
       })
-      if (outcome === 'accepted') {
-        accept(send, images)
-      } else if (outcome === 'unknown') {
+      if (outcome === 'unknown') {
         hold(send)
       }
       return outcome

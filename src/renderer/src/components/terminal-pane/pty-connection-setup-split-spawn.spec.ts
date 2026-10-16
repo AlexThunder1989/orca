@@ -1,7 +1,12 @@
 import { bindPtyConnectionTestMocks, ptyConnectionTestMocks } from './pty-connection-mocks.spec'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushAsyncTicks, createDeferred } from './pty-connection-test-async'
-import { createRect, createMeasuredElement } from './pty-connection-test-dom'
+import {
+  createKeyboardEventTarget,
+  createRect,
+  createMeasuredElement,
+  keyEvent
+} from './pty-connection-test-dom'
 import {
   createMockTransport,
   createPane,
@@ -616,6 +621,53 @@ export function registerPtyConnectionSetupSplitSpawnTests(): void {
       expect(transport.claimViewport).toHaveBeenCalledTimes(1)
       ;(onDataHandler as (data: string) => void)('b')
       // The renderer stays parked until runtime convergence is acknowledged, so a second keystroke can retry a transient failed resize.
+      expect(transport.claimViewport).toHaveBeenCalledTimes(2)
+      setFitOverride('pty-live', 'desktop-fit', 0, 0)
+    })
+
+    it('forwards focus and hover reports without claiming a parked mirror (#26469)', async () => {
+      // Regression: a TUI re-arms DECSET 1004 after every SIGWINCH and xterm answers with a focus
+      // report. Claiming on it made two mirrors of different grids take the PTY from each other.
+      const { connectPanePty } = await import('./pty-connection')
+      const transport = createMockTransport('pty-live')
+      transportFactoryQueue.push(transport)
+      mockStoreState = {
+        ...mockStoreState,
+        tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] }
+      }
+      const keyTarget = createKeyboardEventTarget()
+      const pane = createPane(1)
+      Object.assign(pane.terminal, { element: keyTarget.target })
+      const registered: { onData?: (data: string) => void } = {}
+      pane.terminal.onData.mockImplementation((handler: (data: string) => void) => {
+        registered.onData = handler
+        return { dispose: vi.fn() }
+      })
+      const { setFitOverride } = await import('@/lib/pane-manager/mobile-fit-overrides')
+      connectPanePty(pane as never, createManager(1) as never, createDeps() as never)
+      const send = registered.onData
+      if (!send) {
+        throw new Error('expected onData handler to be registered')
+      }
+      setFitOverride('pty-live', 'remote-desktop-fit', 80, 24)
+      transport.claimViewport.mockClear()
+
+      for (const passive of ['\x1b[I', '\x1b[O', '\x1b[<35;10;5M', '\x1b[MC*%']) {
+        send(passive)
+        expect(transport.sendInput).toHaveBeenCalledWith(passive, 'query-reply')
+      }
+      expect(transport.claimViewport).not.toHaveBeenCalled()
+
+      // A focus report landing between Ctrl+C's keydown and its byte must not consume the intent.
+      keyTarget.dispatch(keyEvent({ key: 'c', ctrlKey: true }))
+      send('\x1b[I')
+      expect(transport.claimViewport).not.toHaveBeenCalled()
+      send('\x03')
+      expect(transport.sendInputAccepted).toHaveBeenCalledWith('\x03', 'query-reply')
+      expect(transport.sendInputAccepted).not.toHaveBeenCalledWith('\x1b[I', 'query-reply')
+      expect(transport.claimViewport).toHaveBeenCalledTimes(1)
+
+      send('\x1b[<0;10;5M')
       expect(transport.claimViewport).toHaveBeenCalledTimes(2)
       setFitOverride('pty-live', 'desktop-fit', 0, 0)
     })

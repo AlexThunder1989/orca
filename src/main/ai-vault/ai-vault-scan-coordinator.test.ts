@@ -7,7 +7,6 @@ import {
   startLocalAiVaultScanProgress,
   type LocalAiVaultScanProgressHandle
 } from './ai-vault-local-scan-progress'
-import { AiVaultServiceDeadlineError } from './session-scanner-service-request-deadline'
 
 const EMPTY_RESULT = { sessions: [], issues: [], scannedAt: '2026-07-27T00:00:00.000Z' }
 
@@ -17,16 +16,16 @@ describe('AiVaultScanCoordinator', () => {
     const stages: (string | null)[] = []
     onLocalAiVaultScanProgress(({ progress }) => stages.push(progress?.stage ?? null))
     try {
-      const stopped = startLocalAiVaultScanProgress('scope', 'stopped', () => 500)
-      stopped.sent(1)
-      stopped.fail(new AiVaultServiceDeadlineError('scan timed out', 'scan', 1))
+      const earlier = startLocalAiVaultScanProgress('scope', 'earlier', () => 500)
+      earlier.sent()
+      earlier.finish(null)
       let old: LocalAiVaultScanProgressHandle | null = null
       const first = coordinator.run({
         key: 'scope',
         onCreate: (id) => {
           old = startLocalAiVaultScanProgress('scope', id, () => 1_000)
         },
-        onError: (error) => old?.fail(error),
+        onError: () => old?.fail(),
         start: (signal) =>
           new Promise<typeof EMPTY_RESULT>((_resolve, reject) => {
             signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })

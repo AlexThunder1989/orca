@@ -1062,6 +1062,14 @@
       "aiVaultResumeRefusal": {
         "openInChat": "이 {{value0}} 대화는 채팅에서 열려 있습니다. 열려면 세션 기록을 새로고침하세요.",
         "ownershipUnknown": "Orca가 이 {{value0}} 대화의 소유자를 확인할 수 없습니다. 세션 기록을 새로고침한 후 다시 시도하세요."
+      },
+      "pendingWorktreeCreation": {
+        "checkingOutFiles": "파일 체크아웃 중… {{percent}}%",
+        "provisioningVm": "VM 프로비저닝 중…",
+        "settingUpWorkspace": "워크스페이스 설정 중…",
+        "preparingWorkspace": "워크스페이스 준비 중…",
+        "creatingWorktree": "작업 트리 만드는 중…",
+        "fetchingBaseBranch": "기본 브랜치 가져오는 중…"
       }
     },
     "hooks": {
@@ -3134,7 +3142,11 @@
               "command_label": "명령",
               "agent_toolbar_hint": "/목표, 기술, 경로 지원",
               "agent_footer_hint": "여러 줄로 된 프롬프트는 괜찮습니다. 집중하세요.",
-              "resize_hint": "크기를 조정하려면 모서리를 드래그하세요."
+              "resize_hint": "크기를 조정하려면 모서리를 드래그하세요.",
+              "length_over_limit": "너무 길어서 저장할 수 없습니다.",
+              "length_count": "{{value0}} / {{value1}}자",
+              "size_count": "{{value0}} / {{value1}}",
+              "prompt_over_host_limit": "이 호스트에는 너무 깁니다. 더 긴 프롬프트를 저장하려면 호스트의 Orca를 업데이트하세요."
             },
             "TerminalQuickCommandDialogFooter": {
               "2e2b958dfc": "저장",
@@ -12566,6 +12578,13 @@
           "cancel": "취소",
           "confirm": "서버 버전 유지"
         },
+        "moveAnyway": {
+          "action": "그래도 이동…",
+          "title": "이 호스트를 그래도 이동",
+          "description": "Orca는 아래에 저장된 항목을 제외하고 이 호스트를 관리형 서버로 이동합니다. 이 항목들은 이 컴퓨터에 남아 있으며 관리형 서버에는 표시되지 않습니다. 저장하지 않은 편집은 보존되며 절대 삭제되지 않습니다.",
+          "cancel": "취소",
+          "confirm": "그래도 이동"
+        },
         "ZcodeCliSetupSection": {
           "apiKey": "ZCode API 키 설정",
           "apiKeyInstructions": "Enter를 눌러 ZCode를 시작한 뒤 /login을 입력하고, 이용 중인 요금제 사이트에 맞는 API 키 옵션을 선택하세요. ZCode에서 입력 내용이 가려지는 프롬프트에 키를 입력하세요.",
@@ -14138,10 +14157,7 @@
             "databaseCount_other": "데이터베이스 {{value0}}개",
             "scanning": "{{value0}} 스캔 중",
             "reading": "파일 {{value0}}개 읽는 중",
-            "stoppedAfter": "{{value0}}에서 중지됨",
-            "scanned": "{{value0}} 스캔함",
-            "stoppedAt": "{{value0}}에서 중지됨",
-            "refresh": "새로 고침"
+            "scanned": "{{value0}} 스캔함"
           }
         }
       },

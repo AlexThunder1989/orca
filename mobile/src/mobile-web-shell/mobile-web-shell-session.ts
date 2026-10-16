@@ -28,6 +28,7 @@ import { routeViewOf, sameRouteView } from './page-route-policy'
 import { CLEAR_PAGE_DOCUMENT_STATE, pageDocumentStatePatch } from './page-document-state'
 import { openByOwnRoutes, openCached, rendersRoute } from './mobile-web-shell-cached-generation'
 import { step } from './mobile-web-shell-session-step'
+import { AWAIT_DOCUMENT_LOAD, reducePageDocumentLifecycle } from './page-document-lifecycle'
 
 export function createMobileWebShellSession(
   routePathname: string,
@@ -46,6 +47,7 @@ export function createMobileWebShellSession(
     remountedOnce: false,
     pageReady: false,
     pagePainted: false,
+    documentLoaded: false,
     pageBackClaimed: false,
     gates: null,
     cached: null,
@@ -342,47 +344,25 @@ export function reduceMobileWebShellSession(
           }
         },
         session.state.kind === 'activating' && session.state.source === 'download'
-          ? [{ kind: 'forget-update-failures' }]
-          : []
+          ? [{ kind: 'forget-update-failures' }, AWAIT_DOCUMENT_LOAD]
+          : [AWAIT_DOCUMENT_LOAD]
       )
-    case 'remounted':
-      // Only the session id changes, so the view remounts against the same verified bytes. A new
-      // key is a new document, so whatever the last one said is no longer evidence about this one.
-      // The flow goes with it: the wait the retired document armed would otherwise expire onto a
-      // healthy page that is still inside its own, and take a working workspace off screen.
-      return session.state.kind === 'ready'
-        ? step(session, {
-            ...CLEAR_PAGE_DOCUMENT_STATE,
-            flow: session.flow + 1,
-            state: { ...session.state, sessionId: event.sessionId }
-          })
-        : step(session, {})
     case 'download-failed':
       return onDownloadFailed(session, event.cause)
     case 'shell-failed':
       return onShellFailed(session, event.reason)
+    case 'remounted':
     case 'document-started':
-      // A replacement document inherits nothing: what the last one declared and painted says
-      // nothing about this one, and leaving its paint latched uncovers the view over a blank tree.
-      // The flow goes with it for the same reason `remounted` moves it — the retired document's
-      // readiness wait would otherwise expire onto a replacement that is still loading.
-      return session.state.kind === 'ready'
-        ? step(session, { ...CLEAR_PAGE_DOCUMENT_STATE, flow: session.flow + 1 })
-        : step(session, {})
     case 'document-loaded':
-      // Nothing to wait on outside `ready`, and nothing to wait for once the page has spoken: the
-      // two orders this can arrive in are a race, and the latch is what makes either one fine.
-      return session.state.kind === 'ready' && !session.pageReady
-        ? step(session, {}, [{ kind: 'await-page-ready' }])
-        : step(session, {})
+    case 'page-ready-deadline':
+    case 'document-load-deadline':
+      return reducePageDocumentLifecycle(session, event, (failed) =>
+        onShellFailed(failed, 'document-load-failed')
+      )
     case 'page-ready':
     case 'page-painted':
     case 'page-back-claim':
       return step(session, pageDocumentStatePatch(session, event))
-    case 'page-ready-deadline':
-      // A document that finished and never said a word is a document that did not load, whatever
-      // the WebView reported: `document-load-failed` is what drops the generation and fetches once.
-      return session.pageReady ? step(session, {}) : onShellFailed(session, 'document-load-failed')
     case 'layout-changed':
       return onLayoutChanged(session, event.wide)
     case 'retry-pressed':

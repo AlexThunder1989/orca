@@ -64,7 +64,8 @@ function api(next: OrcadDeltaMovePreview, result: OrcadDeltaMoveResult): Managed
     listPendingMigrations: unused,
     previewDeltaMove: vi.fn(async () => next),
     moveDelta: vi.fn(async () => result),
-    keepServerVersion: unused
+    keepServerVersion: unused,
+    allowMoveLeavingBehind: unused
   }
 }
 

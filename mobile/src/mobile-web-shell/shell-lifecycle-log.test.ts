@@ -158,6 +158,18 @@ describe('shell lifecycle log lines', () => {
     ])
   })
 
+  it('logs a document that never finished loading, and the recovery flow', () => {
+    const opened = replay(DOWNLOAD_OPEN)
+    const { lines } = replay(
+      [{ type: 'document-started' }, { type: 'document-load-deadline' }],
+      opened
+    )
+    expect(summary(lines)).toEqual([
+      'web-shell-page Web shell: document never finished loading before the deadline',
+      'web-shell-flow Web shell: checking host'
+    ])
+  })
+
   it('logs a view failure but not the remount it earns', () => {
     const opened = replay(DOWNLOAD_OPEN)
     const { lines } = replay(

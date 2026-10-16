@@ -23,7 +23,6 @@ import {
 import type { AiVaultResumeInChatEligibility } from './ai-vault-session-resume-in-chat'
 import { AiVaultVirtualRow, type AiVaultListRow } from './AiVaultVirtualRow'
 import type { AiVaultSearchHit } from '../../../../shared/ai-vault-search-types'
-import type { AiVaultScanProgress } from '../../../../shared/ai-vault-scan-progress'
 
 const VAULT_ROW_OVERSCAN = 8
 const VAULT_EXPANDED_SESSION_ROW_ESTIMATED_HEIGHT = 420
@@ -32,7 +31,7 @@ export function AiVaultSessionVirtualList({
   groups,
   collapsedGroups,
   loading,
-  scanProgressStage = null,
+  scanProgressShown = false,
   sessionsCount,
   filteredSessionsCount,
   noAgentsSelected,
@@ -65,8 +64,8 @@ export function AiVaultSessionVirtualList({
   groups: readonly AiVaultSessionListGroup[]
   collapsedGroups: ReadonlySet<string>
   loading: boolean
-  /** Set while the progress strip above names the scan, so the list does not repeat it. */
-  scanProgressStage?: AiVaultScanProgress['stage'] | null
+  /** The progress strip above names the scan, so the list does not repeat it. */
+  scanProgressShown?: boolean
   sessionsCount: number
   filteredSessionsCount: number
   noAgentsSelected: boolean
@@ -178,11 +177,10 @@ export function AiVaultSessionVirtualList({
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-sleek"
       >
         {loading && sessionsCount === 0 ? (
-          <SessionLoadingState showLabel={scanProgressStage === null} />
+          <SessionLoadingState showLabel={!scanProgressShown} />
         ) : null}
 
-        {/* A stopped scan listed nothing; "none found" would contradict the strip. */}
-        {!loading && sessionsCount === 0 && !error && scanProgressStage !== 'stopped' ? (
+        {!loading && sessionsCount === 0 && !error ? (
           <EmptyState
             title={translate(
               'auto.components.right.sidebar.AiVaultPanel.noAgentSessionsFound',

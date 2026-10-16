@@ -154,6 +154,7 @@ export function useStructuredAgentSession(args: {
     target,
     // Never held for an in-doubt rewind: the host recovers it on the next send.
     fence: transportState.fence,
+    cursor: state.cursor,
     submissions: transportState.submissions,
     queuedMessageIds,
     queue,

@@ -33,11 +33,11 @@ vi.mock('../platform/haptics', () => ({ triggerMediumImpact: vi.fn() }))
 vi.mock('../components/AgentSpinner', () => ({ AgentSpinner: () => null }))
 vi.mock('../components/MobileRepoIcon', () => ({ MobileRepoIcon: () => null }))
 vi.mock('../components/WorktreeAgentList', () => ({ WorktreeAgentList: () => null }))
-// The row always renders the glyphs, so each call is one row render, named by its comment.
+// The row always renders the glyphs, so each call is one row render.
 vi.mock('../components/WorktreeMetaGlyphs', () => ({
   prStateColor: () => '#000000',
-  WorktreeMetaGlyphs: ({ comment }: { comment?: string }) => {
-    rowRenders(comment)
+  WorktreeMetaGlyphs: () => {
+    rowRenders()
     return null
   }
 }))
@@ -48,6 +48,7 @@ vi.mock('../components/NewWorkspaceFab', () => ({ FAB_SIZE: 56 }))
 import { buildSections } from '../worktree/workspace-list-sections'
 import { NO_WORKSPACE_ROW_FILTERS } from '../../../src/shared/workspace-view/workspace-row-filters'
 import { HostWorkspaceList } from './host-workspace-list'
+import { INITIAL_MOBILE_VIEW } from '../worktree/workspace-view-settings'
 
 function worktree(id: string, overrides: Partial<Worktree> = {}): Worktree {
   return {
@@ -62,7 +63,6 @@ function worktree(id: string, overrides: Partial<Worktree> = {}): Worktree {
     unread: false,
     isPinned: false,
     linkedPR: null,
-    comment: id,
     status: 'active',
     ...overrides
   }
@@ -92,7 +92,7 @@ function listProps(worktrees: Worktree[]) {
     state: {
       actionError: '',
       setActionTarget: noop,
-      view: { groupBy: 'none' },
+      view: { ...INITIAL_MOBILE_VIEW, groupBy: 'none' },
       search: '',
       showSearch: false,
       worktreesLoaded: true
@@ -114,7 +114,7 @@ describe('host list rows across polls', () => {
     const changed = [rows[0]!, { ...rows[1]!, branch: 'feature/b-renamed' }, rows[2]!]
     act(() => tree!.update(createElement(HostWorkspaceList, listProps(changed))))
 
-    expect(rowRenders.mock.calls.map(([comment]) => comment)).toEqual(['b'])
+    expect(rowRenders).toHaveBeenCalledTimes(1)
     act(() => tree!.unmount())
   })
 })

@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Check, ChevronDown, LoaderCircle, Pause } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Check, ChevronDown, LoaderCircle } from 'lucide-react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useNow } from '@/hooks/use-now'
 import { getIntlLocale, translate } from '@/i18n/i18n'
@@ -65,12 +64,6 @@ function stripSentence(progress: AiVaultScanProgress): string {
         'Reading {{value0}} files',
         { value0 }
       )
-    case 'stopped':
-      return translate(
-        'auto.components.right.sidebar.AiVaultScanProgressStrip.stoppedAfter',
-        'Stopped after {{value0}}',
-        { value0 }
-      )
     case 'finished':
       return translate(
         'auto.components.right.sidebar.AiVaultScanProgressStrip.scanned',
@@ -106,25 +99,13 @@ function formatElapsed(ms: number): string {
 
 // The strip stays muted; status colour lives only in the per-agent rows.
 function StripMark({ progress }: { progress: AiVaultScanProgress }): React.JSX.Element {
-  if (progress.stage === 'stopped') {
-    return <Pause className="size-3 shrink-0" />
-  }
   if (progress.settledAt === null) {
     return <LoaderCircle className="size-3 shrink-0 animate-spin" />
   }
   return <Check className="size-3 shrink-0" />
 }
 
-function agentDetail(agent: AiVaultScanAgentProgress, stopped: boolean): string {
-  if (stopped && agent.walking) {
-    return translate(
-      'auto.components.right.sidebar.AiVaultScanProgressStrip.stoppedAt',
-      'stopped at {{value0}}',
-      {
-        value0: formatCount(agent.files)
-      }
-    )
-  }
+function agentDetail(agent: AiVaultScanAgentProgress): string {
   if (agent.databases > 0) {
     const databases = databaseCountLabel(agent.databases)
     return agent.files > 0 ? `${fileCountLabel(agent.files)} · ${databases}` : databases
@@ -132,26 +113,18 @@ function agentDetail(agent: AiVaultScanAgentProgress, stopped: boolean): string 
   return fileCountLabel(agent.files)
 }
 
-function AgentRow({
-  agent,
-  stopped
-}: {
-  agent: AiVaultScanAgentProgress
-  stopped: boolean
-}): React.JSX.Element {
+function AgentRow({ agent }: { agent: AiVaultScanAgentProgress }): React.JSX.Element {
   return (
     <div className="flex h-7 items-center gap-2 px-3 text-xs">
       {!agent.walking ? (
         <Check className="size-3.5 shrink-0 text-status-success" />
-      ) : stopped ? (
-        <Pause className="size-3.5 shrink-0 text-status-warning" />
       ) : (
         <LoaderCircle className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
       )}
       <AgentIcon agent={agent.agent} size={14} />
       <span className="min-w-0 truncate text-foreground">{agentLabel(agent.agent)}</span>
       <span className="ml-auto shrink-0 text-[11px] text-muted-foreground tabular-nums">
-        {agentDetail(agent, stopped)}
+        {agentDetail(agent)}
       </span>
     </div>
   )
@@ -159,59 +132,36 @@ function AgentRow({
 
 /** One line under the search box naming what this computer's scan is doing; opens to one row per agent. */
 export function AiVaultScanProgressStrip({
-  progress,
-  onRefresh
+  progress
 }: {
   progress: AiVaultScanProgress
-  onRefresh: () => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const now = useNow(progress.settledAt === null ? 1_000 : 30_000)
-  const stopped = progress.stage === 'stopped'
   return (
     <div className={cn('shrink-0 border-b border-sidebar-border', open && 'bg-sidebar-accent/35')}>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="flex h-8 items-center text-[11px] text-muted-foreground tabular-nums hover:bg-sidebar-accent/50">
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 pl-3 pr-1.5 text-left outline-none focus-visible:ring-[2px] focus-visible:ring-sidebar-ring/30"
-            >
-              <StripMark progress={progress} />
-              <StripText progress={progress} />
-              {stopped ? null : (
-                <span className="ml-auto shrink-0">
-                  {progress.settledAt === null
-                    ? formatElapsed(now - progress.startedAt)
-                    : formatTimeAgo(progress.settledAt)}
-                </span>
-              )}
-            </button>
-          </CollapsibleTrigger>
-          {stopped ? (
-            <Button type="button" variant="link" size="xs" onClick={onRefresh}>
-              {translate(
-                'auto.components.right.sidebar.AiVaultScanProgressStrip.refresh',
-                'Refresh'
-              )}
-            </Button>
-          ) : null}
-          {/* Same toggle for the pointer; the labelled trigger is the keyboard stop. */}
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-hidden
-              className="flex h-full cursor-pointer items-center pl-1 pr-2"
-            >
-              <ChevronDown className={cn('size-3 transition-transform', open && 'rotate-180')} />
-            </button>
-          </CollapsibleTrigger>
-        </div>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex h-8 w-full cursor-pointer items-center gap-1.5 pl-3 pr-2 text-left text-[11px] text-muted-foreground tabular-nums outline-none hover:bg-sidebar-accent/50 focus-visible:ring-[2px] focus-visible:ring-sidebar-ring/30"
+          >
+            <StripMark progress={progress} />
+            <StripText progress={progress} />
+            <span className="ml-auto shrink-0">
+              {progress.settledAt === null
+                ? formatElapsed(now - progress.startedAt)
+                : formatTimeAgo(progress.settledAt)}
+            </span>
+            <ChevronDown
+              className={cn('size-3 shrink-0 transition-transform', open && 'rotate-180')}
+            />
+          </button>
+        </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="py-1">
             {progress.agents.map((agent) => (
-              <AgentRow key={agent.agent} agent={agent} stopped={stopped} />
+              <AgentRow key={agent.agent} agent={agent} />
             ))}
           </div>
         </CollapsibleContent>

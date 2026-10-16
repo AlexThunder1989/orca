@@ -144,6 +144,7 @@ export function stamp(flow: number, event: PendingEvent): MobileWebShellSessionE
     case 'remounted':
     case 'download-failed':
     case 'page-ready-deadline':
+    case 'document-load-deadline':
       return { ...event, flow: event.flow ?? flow }
   }
 }

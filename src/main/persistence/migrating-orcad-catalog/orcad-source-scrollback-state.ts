@@ -18,6 +18,7 @@ export type ProjectedOrcadMigrationScrollback = {
   session: WorkspaceSessionState
   snapshots: OrcadMigrationTerminalScrollbackSnapshot[]
   blockedItems: string[]
+  leftBehindItems: string[]
 }
 
 export function hasDuplicateOrcadMigrationScrollbackDescriptors(
@@ -38,11 +39,14 @@ export function hasDuplicateOrcadMigrationScrollbackDescriptors(
 
 export function projectOrcadMigrationSessionScrollback(
   session: WorkspaceSessionState,
-  storage?: TerminalScrollbackSnapshotStorage
+  storage?: TerminalScrollbackSnapshotStorage,
+  /** "Move anyway": a pane's history that can't move stays on this desktop; the pane still moves. */
+  leaveBehind = false
 ): ProjectedOrcadMigrationScrollback {
   const projected = structuredClone(session)
   const snapshots: OrcadMigrationTerminalScrollbackSnapshot[] = []
   const blockedItems: string[] = []
+  const leftBehindItems: string[] = []
   let totalBytes = 0
   for (const [tabId, layout] of Object.entries(projected.terminalLayoutsByTabId ?? {})) {
     const sourceLayout = session.terminalLayoutsByTabId[tabId]
@@ -66,7 +70,17 @@ export function projectOrcadMigrationSessionScrollback(
         bytes.length === 0 ||
         bytes.length > TERMINAL_SCROLLBACK_STORE_BYTE_LIMIT
       ) {
-        blockedItems.push(`saved terminal history Orca could not read for tab ${tabId}`)
+        ;(leaveBehind ? leftBehindItems : blockedItems).push(
+          `saved terminal history Orca could not read for tab ${tabId}`
+        )
+        continue
+      }
+      if (
+        leaveBehind &&
+        (snapshots.length + 1 > MAX_ORCAD_MIGRATION_SCROLLBACK_SNAPSHOTS ||
+          totalBytes + bytes.length > MAX_ORCAD_MIGRATION_SCROLLBACK_TOTAL_BYTES)
+      ) {
+        leftBehindItems.push(`saved terminal history over the move's limit for tab ${tabId}`)
         continue
       }
       totalBytes += bytes.length
@@ -95,7 +109,7 @@ export function projectOrcadMigrationSessionScrollback(
   snapshots.sort((left, right) =>
     compareKeys(`${left.tabId}\0${left.leafId}`, `${right.tabId}\0${right.leafId}`)
   )
-  return { session: projected, snapshots, blockedItems }
+  return { session: projected, snapshots, blockedItems, leftBehindItems }
 }
 
 export function readOrcadMigrationSourceScrollbackChunk(args: {

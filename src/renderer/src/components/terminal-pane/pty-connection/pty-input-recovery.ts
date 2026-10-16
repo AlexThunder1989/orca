@@ -28,6 +28,7 @@ import { legacyRelayBridgePtyIdForPane } from '../legacy-relay-bridge-panes'
 
 import type { ConnectPanePtySession } from './connect-pane-pty-session'
 import type { PtyTransport } from '../pty-transport-types'
+import { isPassiveTerminalInputReport } from '../terminal-passive-input-report'
 import { resolveTerminalInlineImagesEnabled } from '../../../../../shared/terminal-inline-images-settings'
 
 /** Transport creation, terminal capability replies, viewport claims, and undeliverable-input recovery. */
@@ -131,9 +132,14 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
     session.sendDesktopQueryReplyImmediate
   )
 
-  session.claimViewportForUserActivity = (): void => {
+  session.claimViewportForUserActivity = (input?: string): void => {
     const currentPtyId = session.transport.getPtyId()
     if (!currentPtyId || getFitOverrideForPty(currentPtyId)?.mode !== 'remote-desktop-fit') {
+      return
+    }
+    // Why: TUIs re-arm DECSET 1004 on every SIGWINCH and xterm answers with a focus report; claiming
+    // on it made two mirrors of different grids take the PTY from each other forever (#26469).
+    if (input !== undefined && isPassiveTerminalInputReport(input)) {
       return
     }
     let proposed: { cols: number; rows: number } | undefined

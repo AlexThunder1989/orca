@@ -31,6 +31,7 @@ vi.mock('../worktree/host-workspace-list-states', () => ({
 
 import { colors } from '../theme/mobile-theme'
 import { HostWorkspaceList } from './host-workspace-list'
+import { INITIAL_MOBILE_VIEW } from '../worktree/workspace-view-settings'
 
 /**
  * The banner the list paints for an action that did not happen, rendered rather than described.
@@ -68,7 +69,7 @@ function listWith(fields: { actionError: string; setActionError: (value: string)
       setActionError: fields.setActionError,
       catalogError: null,
       collapsedGroups: new Set(),
-      groupMode: 'none',
+      view: { ...INITIAL_MOBILE_VIEW, groupBy: 'none' },
       search: '',
       showSearch: false,
       worktreesLoaded: true

@@ -7963,6 +7963,20 @@
           }
         },
         {
+          "complete": "settings.get#1",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "settings": {
+                "compactWorktreeCards": true
+              }
+            }
+          }
+        },
+        {
           "action": "sort",
           "id": "sort"
         },

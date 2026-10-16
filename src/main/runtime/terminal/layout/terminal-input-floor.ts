@@ -2,7 +2,7 @@ import { OrcaRuntimeWithOnPtyExit } from '../lifecycle/pty-exit-lifecycle'
 import type { PtyLivenessVerdict } from '../../../../shared/pty-liveness-verdict'
 import type { DriverState } from '../../orca-runtime-core'
 import type { TerminalInputKind } from '../../../../shared/terminal-input-kind'
-import { isUntypedTerminalInput } from '../../terminal-run-facts'
+import { isUntypedTerminalInput } from '../../../../shared/terminal-untyped-input'
 import { clampTerminalViewport } from '../../terminal-viewport'
 import { getPtyTerminalState, getTerminalState } from '../../terminal-wait-results'
 

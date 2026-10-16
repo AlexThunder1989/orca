@@ -14,7 +14,6 @@ import { errorMessage } from './session-scanner-values'
 import { throwIfAiVaultScanCancelled } from './ai-vault-scan-cancellation'
 import {
   noteAiVaultScanFileFound,
-  noteAiVaultScanProgress,
   noteAiVaultScanWorkChanged,
   openAiVaultScanSource
 } from './ai-vault-scan-progress'
@@ -90,7 +89,6 @@ export async function discoverFiles(args: {
         })
       }
     }
-    noteAiVaultScanProgress(args.signal)
     noteAiVaultScanWorkChanged(args.signal)
   }
 
@@ -302,7 +300,6 @@ export async function forEachSessionFile(
     }
     return
   }
-  noteAiVaultScanProgress(options.signal)
 
   for (const entry of entries) {
     options.signal?.throwIfAborted()

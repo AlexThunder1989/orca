@@ -28,6 +28,7 @@ export const RUNTIME_ENVIRONMENT_HANDLER_CHANNELS = [
   'runtimeEnvironments:previewOrcadDeltaMove',
   'runtimeEnvironments:moveOrcadDelta',
   'runtimeEnvironments:keepOrcadServerVersion',
+  'runtimeEnvironments:allowOrcadMoveLeavingBehind',
   'runtimeEnvironments:createOrcadSshHost',
   'runtimeEnvironments:resumeOrcadSshHost',
   'runtimeEnvironments:listPendingOrcadSshProvisioning'

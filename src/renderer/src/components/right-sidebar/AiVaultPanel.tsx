@@ -271,12 +271,7 @@ export default function AiVaultPanel(): React.JSX.Element {
         onRefresh={() => (searching ? search.retry() : void refresh({ force: true }))}
       />
 
-      {stripProgress ? (
-        <AiVaultScanProgressStrip
-          progress={stripProgress}
-          onRefresh={() => void refresh({ force: true })}
-        />
-      ) : null}
+      {stripProgress ? <AiVaultScanProgressStrip progress={stripProgress} /> : null}
 
       {!searching && error ? (
         <div className="border-b border-sidebar-border px-3 py-2 text-xs text-destructive">
@@ -290,9 +285,6 @@ export default function AiVaultPanel(): React.JSX.Element {
             scanResult,
             loading && executionHostScope === LOCAL_EXECUTION_HOST_ID
           )}
-          localScanStopShown={
-            stripProgress?.stage === 'stopped' && scanResult?.scanId === stripProgress.scanId
-          }
         />
       )}
       <AiVaultPanelSearch search={search} noAgents={agents.length === 0}>
@@ -320,7 +312,7 @@ export default function AiVaultPanel(): React.JSX.Element {
             groups={groups}
             collapsedGroups={collapsedGroups}
             loading={searching ? search.loading : loading}
-            scanProgressStage={stripProgress?.stage ?? null}
+            scanProgressShown={stripProgress !== null}
             sessionsCount={sessions.length}
             filteredSessionsCount={filteredSessions.length}
             noAgentsSelected={agents.length === 0}

@@ -323,11 +323,20 @@ describe('DeleteWorktreeDialog lineage copy', () => {
     const parent = { ...makeWorktree('parent', '/parent'), repoId: repo.id }
     const child = { ...makeWorktree('child', '/child'), repoId: checkout.id }
     const { DeleteWorktreeLineageNotice } = await import('./DeleteWorktreeLineageNotice')
-    const markup = renderToStaticMarkup(<DeleteWorktreeLineageNotice
-      parent={parent} descendants={[child]}
-      repoMap={new Map([[repo.id, repo], [checkout.id, checkout]])}
-      dirtyChangeCountsByWorktreeId={new Map()} dirtyChangePreviewsByWorktreeId={new Map()}
-    />)
+    const markup = renderToStaticMarkup(
+      <DeleteWorktreeLineageNotice
+        parent={parent}
+        descendants={[child]}
+        repoMap={
+          new Map([
+            [repo.id, repo],
+            [checkout.id, checkout]
+          ])
+        }
+        dirtyChangeCountsByWorktreeId={new Map()}
+        dirtyChangePreviewsByWorktreeId={new Map()}
+      />
+    )
     expect(visibleMarkupText(markup)).toContain('(Second checkout)')
     expect(visibleMarkupText(markup)).toContain('child · Second checkout')
   })

@@ -11,6 +11,7 @@ import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { persistAgentLaunchTabOrder } from '@/lib/launch-agent-tab-order'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
+import { captureNativeChatComposerFocusIntent } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
 import { buildDuplicatedBrowserTabOptions } from '@/lib/duplicate-browser-tab-options'
 import { browserWorkspaceHasRemoteOwner } from '@/runtime/remote-browser-tab-ownership'
 import { getClientCreationActionPolicy } from '@/lib/client-creation-action-policy'
@@ -73,6 +74,7 @@ export function useTerminalCreateActions(controller: TerminalColdActivationContr
         state.groupsByWorktree[activeWorktreeId]?.[0]?.id
       const result = launchAgentInNewTab({
         requestId: newAgentLaunchRequestId(),
+        focusIntent: captureNativeChatComposerFocusIntent(),
         agent,
         worktreeId: activeWorktreeId,
         groupId: targetGroupId,

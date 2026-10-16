@@ -14,6 +14,14 @@ import {
   projectClientSessionTabSelection
 } from '../../client-session-tab-selection'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import {
+  agentProviderSessionsEqual,
+  type SleepingAgentSessionRecord
+} from '../../../../shared/agent-session-resume'
+import type {
+  MobileTerminalResumeCommand,
+  OrcaRuntimeWithResolveMobileSessionTerminalCommand as MobileTerminalStartup
+} from '../../terminal/launch/mobile-terminal-startup'
 import { runtimeWorktreeIdsEqual } from '../../runtime-worktree-path-identity'
 import {
   buildHeadlessMobileSessionTabGroups,
@@ -24,6 +32,9 @@ export abstract class OrcaRuntimeWithApplyMobileSessionTabNavigation extends Orc
   protected abstract emitMobileSessionTabsSnapshotToClient(
     ...args: Parameters<MobileSessionPublication['emitMobileSessionTabsSnapshotToClient']>
   ): ReturnType<MobileSessionPublication['emitMobileSessionTabsSnapshotToClient']>
+  protected abstract resolveMobileSessionResumeCommand(
+    ...args: Parameters<MobileTerminalStartup['resolveMobileSessionResumeCommand']>
+  ): ReturnType<MobileTerminalStartup['resolveMobileSessionResumeCommand']>
   protected abstract isHeadlessMobileSessionPublication(
     ...args: Parameters<MobileSessionPreservation['isHeadlessMobileSessionPublication']>
   ): ReturnType<MobileSessionPreservation['isHeadlessMobileSessionPublication']>
@@ -115,16 +126,112 @@ export abstract class OrcaRuntimeWithApplyMobileSessionTabNavigation extends Orc
     worktreeId: string,
     tab: RuntimeMobileSessionTerminalTab
   ): boolean {
+    // Why: 'live'/'quit' captures describe a pane that was still running, so a reconnect
+    // must still mint its replacement PTY (#11542). Only a worktree-owned capture records
+    // a deliberate takedown the user did not ask to undo.
+    return this.getPaneSleepingAgentRecord(worktreeId, tab)?.origin === 'worktree-sleep'
+  }
+
+  /**
+   * The record the host window's cold restore would resume this pane from, if the pane owns it.
+   * Why: a running agent's worktree-sleep record is relaunched in a fresh tab by the window's
+   * worktree activation, so resuming it in the pane as well would run one transcript twice.
+   */
+  protected getPaneOwnedResumeRecord(
+    worktreeId: string,
+    tab: RuntimeMobileSessionTerminalTab
+  ): SleepingAgentSessionRecord | null {
+    const record = this.getPaneSleepingAgentRecord(worktreeId, tab)
+    if (!record) {
+      return null
+    }
+    const paneOwned =
+      record.origin === 'live' || record.origin === 'quit' || record.state === 'done'
+    return paneOwned ? record : null
+  }
+
+  /**
+   * The pane's resume launch: undefined when it owns no record, `{}` (plain shell, record kept,
+   * as the window does) when the record cannot be resumed here.
+   */
+  protected async resolvePaneOwnedResumeStartup(
+    worktreeId: string,
+    tab: RuntimeMobileSessionTerminalTab
+  ): Promise<MobileTerminalResumeCommand | Record<string, never> | undefined> {
+    const record = this.getPaneOwnedResumeRecord(worktreeId, tab)
+    if (!record) {
+      return undefined
+    }
+    // Why: nothing here spends the record, so a session another pane also records could be
+    // resumed twice (two writers on one transcript), as could one already live in another pane.
+    const records = this.getWorkspaceSessionForWorktree(worktreeId)?.sleepingAgentSessionsByPaneKey
+    const sharedWithAnotherPane = Object.values(records ?? {}).some(
+      (other) =>
+        other !== record &&
+        other.agent === record.agent &&
+        agentProviderSessionsEqual(record.agent, other.providerSession, record.providerSession)
+    )
+    if (
+      sharedWithAnotherPane ||
+      this.isProviderSessionLiveInAnotherPane(record) ||
+      this.hookStoreNamesAnotherSessionForPane(record)
+    ) {
+      return {}
+    }
+    try {
+      const workspace = await this.resolveTerminalWorkspaceLaunchScope(`id:${worktreeId}`)
+      return this.resolveMobileSessionResumeCommand(workspace, record) ?? {}
+    } catch {
+      return {}
+    }
+  }
+
+  /** The host's hook store places this conversation in another pane not proven exited. */
+  private isProviderSessionLiveInAnotherPane(record: SleepingAgentSessionRecord): boolean {
+    const otherPaneKeys = new Set(
+      (this.getAgentProviderSessionSnapshotFn?.() ?? [])
+        .filter(
+          (row) =>
+            row.paneKey !== record.paneKey &&
+            agentProviderSessionsEqual(record.agent, row.providerSession, record.providerSession)
+        )
+        .map((row) => row.paneKey)
+    )
+    if (otherPaneKeys.size === 0) {
+      return false
+    }
+    // Why: only a proven exit clears a holder; an unverifiable PTY (dropped SSH relay) or one not
+    // yet hydrated after a restart may still be writing the transcript.
+    const provenExitedPaneKeys = new Set<string>()
+    for (const pty of this.ptysById.values()) {
+      if (pty.paneKey && otherPaneKeys.has(pty.paneKey)) {
+        if (!this.isPtyKnownExited(pty.ptyId)) {
+          return true
+        }
+        provenExitedPaneKeys.add(pty.paneKey)
+      }
+    }
+    return [...otherPaneKeys].some((paneKey) => !provenExitedPaneKeys.has(paneKey))
+  }
+
+  /** The pane moved on to another conversation after the record was saved; the hook store is authoritative. */
+  private hookStoreNamesAnotherSessionForPane(record: SleepingAgentSessionRecord): boolean {
+    return (this.getAgentProviderSessionRowsForPaneFn?.(record.paneKey) ?? []).some(
+      (row) =>
+        row.providerSession !== undefined &&
+        !agentProviderSessionsEqual(record.agent, row.providerSession, record.providerSession)
+    )
+  }
+
+  private getPaneSleepingAgentRecord(
+    worktreeId: string,
+    tab: RuntimeMobileSessionTerminalTab
+  ): SleepingAgentSessionRecord | null {
     const record =
       this.getWorkspaceSessionForWorktree(worktreeId)?.sleepingAgentSessionsByPaneKey?.[
         makePaneKey(tab.parentTabId, tab.leafId)
       ]
-    // Why: 'live'/'quit' captures describe a pane that was still running, so a reconnect
-    // must still mint its replacement PTY (#11542). Only a worktree-owned capture records
-    // a deliberate takedown the user did not ask to undo.
-    return (
-      record?.origin === 'worktree-sleep' && runtimeWorktreeIdsEqual(record.worktreeId, worktreeId)
-    )
+    return record && runtimeWorktreeIdsEqual(record.worktreeId, worktreeId) ? record : null
   }
 
   protected shouldMaterializeHeadlessMobileSessionTab(

@@ -213,9 +213,16 @@ describe('launchAgentInNewTab', () => {
 
   it('stamps the launched agent on the new tab for immediate provider icon bootstrap', async () => {
     const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
+    const cancelFocus = vi.fn()
 
-    launchAgentInNewTab({ requestId: 'request-1', agent: 'codex', worktreeId: 'wt-1' })
+    launchAgentInNewTab({
+      requestId: 'request-1',
+      agent: 'codex',
+      worktreeId: 'wt-1',
+      focusIntent: { request: vi.fn(), cancel: cancelFocus }
+    })
 
+    expect(cancelFocus).toHaveBeenCalledOnce()
     expect(mockCreateTab).toHaveBeenCalledWith('wt-1', undefined, undefined, {
       launchAgent: 'codex',
       pendingStartup: expect.anything()

@@ -70,9 +70,7 @@ export function useHostScreenState(hostId: string | undefined, action: string | 
   const [serverWorkspaces, setServerWorkspaces] = useState<ServerWorkspaces>(NO_SERVER_WORKSPACES)
   // Why its own banner state: a tap on a server that needs an update says so until dismissed.
   const [serverNotice, setServerNotice] = useState<string | null>(null)
-  const [showSortPicker, setShowSortPicker] = useState(false)
-  const [showGroupPicker, setShowGroupPicker] = useState(false)
-  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [showWorkspaceOptions, setShowWorkspaceOptions] = useState(false)
   const [actionTarget, setActionTarget] = useState<Worktree | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Worktree | null>(null)
   const [confirmRemoveHost, setConfirmRemoveHost] = useState(false)
@@ -134,22 +132,18 @@ export function useHostScreenState(hostId: string | undefined, action: string | 
     setSearch,
     setServerNotice,
     setServerWorkspaces,
-    setShowFilterModal,
+    setShowWorkspaceOptions,
     setShowPinnedInGroups,
-    setShowGroupPicker,
     setShowSearch,
-    setShowSortPicker,
     setSleptIds,
     setWorktrees,
     setWorktreesLoaded,
-    showFilterModal,
+    showWorkspaceOptions,
     showPinnedInGroups,
-    showGroupPicker,
     showSearch,
     setView,
     view,
     viewRef,
-    showSortPicker,
     sleptIds,
     worktreeCatalogRef,
     worktrees,

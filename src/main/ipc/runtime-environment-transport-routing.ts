@@ -13,6 +13,7 @@ import {
   type RemoteRuntimeSubscription
 } from '../../shared/remote-runtime-client'
 import { withRuntimeUnreachableHint } from './runtime-environment-unreachable-hint'
+import { decodeSessionTabsDeltaEvents } from './runtime-environment-session-tabs-delta-decoding'
 import { enqueueRuntimeCall } from './runtime-environment-call-queue'
 import {
   sendRemoteRuntimeConnectionRequestAbortable,
@@ -149,7 +150,7 @@ export async function subscribeRuntimeEnvironment(
   method: string,
   params: unknown,
   timeoutMs: number | undefined,
-  callbacks: {
+  rawCallbacks: {
     onEvent: (
       payload:
         | { type: 'response'; response: RuntimeRpcResponse<unknown> }
@@ -162,6 +163,10 @@ export async function subscribeRuntimeEnvironment(
   isCurrent: () => boolean = () => true,
   signal?: AbortSignal
 ): Promise<RemoteRuntimeSubscription> {
+  const callbacks = {
+    ...rawCallbacks,
+    onEvent: decodeSessionTabsDeltaEvents(method, rawCallbacks.onEvent)
+  }
   const environment = await resolveManagedRuntimeEnvironment(userDataPath, selector)
   const pairedConnection = getPreferredPairedRuntimeConnection(environment)
   const effectiveTimeoutMs = timeoutMs ?? DEFAULT_REMOTE_RUNTIME_TIMEOUT_MS

@@ -2,40 +2,27 @@ import type { AiVaultAgent } from '../../shared/ai-vault-types'
 import type { AiVaultScanWork } from '../../shared/ai-vault-scan-progress'
 import { AiVaultScanTally } from './ai-vault-scan-tally'
 
-// Why: the parent's scan deadline is a no-progress window, so the child has to
-// say when a scan's work advanced. Keyed by the request's cancel signal, which
-// every work site already receives, so the index loop or an interactive read
-// running through the same readers can never extend a scan's deadline.
-const reporters = new WeakMap<
-  AbortSignal,
-  { note: () => void; workChanged: () => void; tally: AiVaultScanTally }
->()
+// Keyed by the request's cancel signal, which every work site already receives,
+// so the index loop or an interactive read through the same readers never counts.
+const reporters = new WeakMap<AbortSignal, { workChanged: () => void; tally: AiVaultScanTally }>()
 
-// Rate-limited because a cold scan consumes thousands of chunks and stats, and
-// the parent only reads the counter as "still moving" inside a 130 s window.
+// Rate-limited because a cold scan lists thousands of folders and files.
 export const AI_VAULT_SCAN_PROGRESS_INTERVAL_MS = 1_000
 
-/**
- * Reports this scan's work at most once per interval until stop is called.
- * A trailing tally can keep the same units; only advancing units re-arm the deadline.
- */
+/** Reports this scan's work at most once per interval until stop is called. */
 export function trackAiVaultScanProgress(
   signal: AbortSignal,
-  report: (units: number, work: AiVaultScanWork) => void,
+  report: (work: AiVaultScanWork) => void,
   now: () => number = () => performance.now()
 ): () => void {
-  let units = 0
   let lastReportedAt = Number.NEGATIVE_INFINITY
   let trailing: ReturnType<typeof setTimeout> | null = null
   const tally = new AiVaultScanTally()
   const publish = (): void => {
     lastReportedAt = now()
-    report(units, tally.snapshot())
+    report(tally.snapshot())
   }
   const workChanged = (): void => {
-    if (units === 0) {
-      return
-    }
     if (trailing) {
       return
     }
@@ -50,33 +37,12 @@ export function trackAiVaultScanProgress(
     }, wait)
     trailing.unref?.()
   }
-  reporters.set(signal, {
-    tally,
-    workChanged,
-    note: () => {
-      units++
-      if (now() - lastReportedAt < AI_VAULT_SCAN_PROGRESS_INTERVAL_MS) {
-        return
-      }
-      if (trailing) {
-        clearTimeout(trailing)
-        trailing = null
-      }
-      publish()
-    }
-  })
+  reporters.set(signal, { tally, workChanged })
   return () => {
     if (trailing) {
       clearTimeout(trailing)
     }
     reporters.delete(signal)
-  }
-}
-
-/** Counts one unit of real work for the scan that owns `signal`; a no-op for any other work. */
-export function noteAiVaultScanProgress(signal: AbortSignal | undefined): void {
-  if (signal) {
-    reporters.get(signal)?.note()
   }
 }
 
@@ -137,7 +103,7 @@ export function noteAiVaultScanFilesRead(signal: AbortSignal | undefined, count:
   reporter?.workChanged()
 }
 
-/** Sends a trailing tally without advancing the scanner's no-progress deadline. */
+/** Sends the tally after a batch of files was counted. */
 export function noteAiVaultScanWorkChanged(signal: AbortSignal | undefined): void {
   if (signal) {
     reporters.get(signal)?.workChanged()

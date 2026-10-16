@@ -29,6 +29,8 @@ export type AcpStructuredSessionAdapterDeps = {
   resolveLaunchArgs?: () => Promise<string[]> | string[]
   /** The chat's journal as it stands, read without opening it; null when it has none. */
   readJournal?: (sessionId: string) => JournalLoad | null
+  /** Orca's data folder on this host, under its instance lock. */
+  dataDirectory: string
   /** Starts the agent's process and owns its protocol: `createAcpAgentConnection` in production. */
   connect: ConnectAcpAgent
   readProcessStartTime?: (pid: number) => Promise<number | null>

@@ -7,6 +7,7 @@ import { useAppStore } from '@/store'
 import { Button } from '../ui/button'
 import { sshHostServerStatusLine } from '@/ssh/ssh-host-server-status-copy'
 import { SshHostChangedActions } from './SshHostChangedActions'
+import { SshHostMoveAnywayAction } from './SshHostMoveAnywayAction'
 
 /** Whether this SSH host's managed Orca server serves it, and why not when it doesn't. */
 export function SshTargetServerStatus({
@@ -49,6 +50,11 @@ export function SshTargetServerStatus({
         </Collapsible>
       ) : null}
       <SshHostChangedActions target={target} onChanged={onChanged} />
+      <SshHostMoveAnywayAction
+        target={target}
+        status={state?.managedServer}
+        onChanged={onChanged}
+      />
     </div>
   )
 }

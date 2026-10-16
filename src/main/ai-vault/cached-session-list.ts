@@ -135,7 +135,7 @@ export async function listAiVaultSessions(
     onCreate: (scanId) => {
       progress = startLocalAiVaultScanProgress(scanKey, scanId)
     },
-    onError: (error) => progress?.fail(error),
+    onError: () => progress?.fail(),
     onReject: (error, scanId) =>
       isAiVaultScanCancelledError(error) ? error : new AiVaultLocalScanError(scanId, error),
     start: async (scanSignal, scanId) => {

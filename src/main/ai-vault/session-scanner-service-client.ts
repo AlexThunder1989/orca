@@ -249,7 +249,7 @@ export class AiVaultScannerServiceClient {
       return
     }
     if (message.type === 'progress') {
-      noteAiVaultServiceScanProgress(call, message, this.onDeadline)
+      noteAiVaultServiceScanProgress(call, message.work)
       return
     }
     this.active.delete(call.lane)

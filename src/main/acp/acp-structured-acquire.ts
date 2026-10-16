@@ -16,6 +16,7 @@ import {
 import { providerTimelineSink } from '../native-chat/agent-session-timeline/provider-timeline-plan'
 import { providerSpawnedProcessIdentity } from '../provider-process/provider-spawned-process-identity'
 import { AcpAgentError } from './acp-errors'
+import { acpPrivateTempConnect } from './acp-private-temp'
 import { acpAuthenticationRequired, acpSignInRequiredRefusal } from './acp-turn-failures'
 import {
   ACP_REOPEN_FAILED,
@@ -103,7 +104,11 @@ export async function acquireAcpStructuredSession(input: {
       early.push(deliver)
     }
   }
-  const connection = deps.connect(
+  // No await for an agent without the flag: nothing may come between the last abort check and spawn.
+  const connect = spec.privateTempDirectory
+    ? await acpPrivateTempConnect(deps, closedBeforeSpawn)
+    : deps.connect
+  const connection = connect(
     {
       command: launch.command,
       args: launch.args,

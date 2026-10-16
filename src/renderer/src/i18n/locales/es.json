@@ -1062,6 +1062,14 @@
       "aiVaultResumeRefusal": {
         "openInChat": "Esta conversación de {{value0}} está abierta en un chat. Actualiza el historial de sesiones para abrirla.",
         "ownershipUnknown": "Orca no pudo confirmar quién es el propietario de esta conversación de {{value0}}. Actualiza el historial de sesiones e inténtalo de nuevo."
+      },
+      "pendingWorktreeCreation": {
+        "checkingOutFiles": "Extrayendo archivos… {{percent}}%",
+        "provisioningVm": "Provisionando VM…",
+        "settingUpWorkspace": "Configurando tu espacio de trabajo…",
+        "preparingWorkspace": "Preparando el espacio de trabajo…",
+        "creatingWorktree": "Creando el worktree…",
+        "fetchingBaseBranch": "Obteniendo la rama base…"
       }
     },
     "hooks": {
@@ -12566,6 +12574,13 @@
           "cancel": "Cancelar",
           "confirm": "Conservar la versión del servidor"
         },
+        "moveAnyway": {
+          "action": "Mover de todos modos…",
+          "title": "Mover este host de todos modos",
+          "description": "Orca mueve este host a su servidor gestionado sin los elementos guardados que aparecen abajo. Se quedan en este equipo y no aparecen en el servidor gestionado. Las ediciones sin guardar se conservan; nunca se eliminan.",
+          "cancel": "Cancelar",
+          "confirm": "Mover de todos modos"
+        },
         "ZcodeCliSetupSection": {
           "title": "Usar GLM con ZCode",
           "description": "Inicia sesión para usar GLM como agente de programación. La clave de API de cuota de arriba solo supervisa el uso; ZCode gestiona su propio inicio de sesión y su selección de modelo.",
@@ -14138,10 +14153,7 @@
             "databaseCount_other": "{{value0}} bases de datos",
             "scanning": "Analizando {{value0}}",
             "reading": "Leyendo {{value0}} archivos",
-            "stoppedAfter": "Detenido tras {{value0}}",
-            "scanned": "Analizados {{value0}}",
-            "stoppedAt": "detenido en {{value0}}",
-            "refresh": "Actualizar"
+            "scanned": "Analizados {{value0}}"
           }
         }
       },

@@ -118,7 +118,7 @@ describe('terminal gate characterization: census-only verdicts', () => {
 })
 
 describe('acting on a terminal proof', () => {
-  it('retires only the detached and expired leases an exited proof covers', () => {
+  it('retires every lease an exited proof covers, attached ones included (#29083)', () => {
     const leases = store(MIXED)
     const markSshRemotePtyLease = vi.fn()
     retireProvenExitedLeases({ ...leases, markSshRemotePtyLease }, 'ssh-1', {
@@ -126,6 +126,7 @@ describe('acting on a terminal proof', () => {
       provenPtyIds: ['att', 'det', 'exp', 'ter']
     })
     expect(markSshRemotePtyLease.mock.calls).toEqual([
+      ['ssh-1', 'att', 'terminated'],
       ['ssh-1', 'det', 'terminated'],
       ['ssh-1', 'exp', 'terminated']
     ])

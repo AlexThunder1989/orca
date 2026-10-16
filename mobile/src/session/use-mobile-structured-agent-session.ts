@@ -149,6 +149,7 @@ export function useMobileStructuredAgentSession(args: {
   )
   const sends = useMobileStructuredSends({
     sessionKey,
+    cursor: state.cursor,
     submissions: state.submissions,
     queuedMessages,
     onSendError

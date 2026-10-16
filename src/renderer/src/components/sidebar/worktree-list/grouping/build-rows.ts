@@ -28,7 +28,10 @@ import {
 import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 import type { OrderedGroupEntry, WorktreeGroupEntry } from './worktree-group-entry'
 import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
-import { appendProjectGroupSections, getProjectGroupOccurrencePaths } from './project-group-sections'
+import {
+  appendProjectGroupSections,
+  getProjectGroupOccurrencePaths
+} from './project-group-sections'
 import { getSidebarLineageChildren } from '../../pinned-section-worktrees'
 import { emitPinnedGroup } from './pinned-group-rows'
 import {
@@ -103,29 +106,35 @@ export function buildSidebarRowPlan(
       : new Map<string, Worktree[]>(),
     isPinned: (worktree) => worktree.isPinned === true,
     duplicatePinned: pinnedDisplayPolicy === 'duplicate-in-groups',
-    owningSectionOf: (worktree) => getProjectGroupingForRepo(worktree.repoId, repoMap, projectIndex),
+    owningSectionOf: (worktree) =>
+      getProjectGroupingForRepo(worktree.repoId, repoMap, projectIndex),
     projectIdOf: (worktree) => worktree.repoId,
     sectionsOf: ({ pinned, natural, displayRootByIdentity }) => {
       const groups: OrderedGroupEntry[] =
         groupBy === 'none'
-          ? [[ALL_GROUP_KEY, { label: ALL_GROUP_META.label, items: [...natural], repoIds: new Set() }]]
+          ? [
+              [
+                ALL_GROUP_KEY,
+                { label: ALL_GROUP_META.label, items: [...natural], repoIds: new Set() }
+              ]
+            ]
           : buildOrderedGroups({
-            groupBy,
-            naturalWorktrees: natural,
-            repoMap,
-            prCache,
-            settings,
-            workspaceStatuses,
-            projectIndex,
-            displayRootByIdentity,
-            placeholderRepoIds,
-            importedWorktreesByRepo,
-            newExternalWorktreesInboxByRepo,
-            pendingByRepo,
-            repoOrder,
-            projectOrderBy,
-            folderWorkspaces: renderableFolderWorkspaces
-          })
+              groupBy,
+              naturalWorktrees: natural,
+              repoMap,
+              prCache,
+              settings,
+              workspaceStatuses,
+              projectIndex,
+              displayRootByIdentity,
+              placeholderRepoIds,
+              importedWorktreesByRepo,
+              newExternalWorktreesInboxByRepo,
+              pendingByRepo,
+              repoOrder,
+              projectOrderBy,
+              folderWorkspaces: renderableFolderWorkspaces
+            })
       if (pinned.length > 0) {
         groups.unshift([
           PINNED_GROUP_KEY,

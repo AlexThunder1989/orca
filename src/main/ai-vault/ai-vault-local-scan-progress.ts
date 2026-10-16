@@ -3,17 +3,14 @@ import type {
   AiVaultScanProgressUpdate,
   AiVaultScanWork
 } from '../../shared/ai-vault-scan-progress'
-import {
-  AiVaultServiceDeadlineError,
-  type AiVaultServiceScanListener
-} from './session-scanner-service-request-deadline'
+import type { AiVaultServiceScanListener } from './session-scanner-service-request-deadline'
 
 type Listener = (update: AiVaultScanProgressUpdate) => void
 
 /** One local scan from coordinator creation through its service reply. */
 export type LocalAiVaultScanProgressHandle = AiVaultServiceScanListener & {
   finish: (work: AiVaultScanWork | null) => void
-  fail: (error: unknown) => void
+  fail: () => void
 }
 
 const MAX_PROGRESS_ENTRIES = 8
@@ -56,7 +53,6 @@ export function startLocalAiVaultScanProgress(
   scanId: string,
   now: () => number = Date.now
 ): LocalAiVaultScanProgressHandle {
-  let serviceRequestId: number | null = null
   let current: AiVaultScanProgress = {
     scanId,
     stage: 'finding',
@@ -66,8 +62,7 @@ export function startLocalAiVaultScanProgress(
     settledAt: null
   }
   const handle: LocalAiVaultScanProgressHandle = {
-    sent: (requestId) => {
-      serviceRequestId = requestId
+    sent: () => {
       if (currentHandles.get(scanKey) === handle) {
         publish(scanKey, current)
       }
@@ -84,18 +79,10 @@ export function startLocalAiVaultScanProgress(
         publish(scanKey, { ...current, ...work, stage: 'finished', settledAt: now() })
       }
     },
-    fail: (error) => {
+    fail: () => {
       if (currentHandles.get(scanKey) === handle) {
         currentHandles.delete(scanKey)
-        if (
-          error instanceof AiVaultServiceDeadlineError &&
-          error.operation === 'scan' &&
-          error.requestId === serviceRequestId
-        ) {
-          publish(scanKey, { ...current, stage: 'stopped', settledAt: now() })
-        } else {
-          publish(scanKey, null)
-        }
+        publish(scanKey, null)
       }
     }
   }
@@ -122,7 +109,7 @@ export async function requestLocalAiVaultScan<T extends { work: AiVaultScanWork 
     progress.finish(value.work)
     return value
   } catch (error) {
-    progress.fail(error)
+    progress.fail()
     throw error
   }
 }

@@ -12,7 +12,7 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 vi.mock('expo-secure-store', () => ({ WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'when-unlocked' }))
-vi.mock('lucide-react-native', () => ({ Check: 'Check', Moon: 'Moon' }))
+vi.mock('lucide-react-native', () => ({ Moon: 'Moon' }))
 vi.mock('../agent-history/worktree-navigation-actions', () => ({
   buildWorktreeNavigationActions: () => []
 }))
@@ -22,7 +22,7 @@ vi.mock('../components/ConfirmModal', () => ({ ConfirmModal: 'ConfirmModal' }))
 vi.mock('../components/NewWorktreeModalController', () => ({
   NewWorktreeModalController: 'NewWorktreeModalController'
 }))
-vi.mock('../components/PickerModal', () => ({ PickerModal: 'PickerModal' }))
+vi.mock('./workspace-options-sheet', () => ({ WorkspaceOptionsSheet: 'WorkspaceOptionsSheet' }))
 
 import { MOBILE_DESKTOP_RELAY_RUNTIME_CAPABILITY } from '../../../src/shared/mobile-desktop-relay-contract'
 import { FakeSession } from '../transport/mobile-endpoint-supervisor-test-fakes'
@@ -47,13 +47,12 @@ async function actionLabels(row: Partial<Worktree>): Promise<string[]> {
     existingWorktreePaths: [],
     hostCapabilities: [MOBILE_DESKTOP_RELAY_RUNTIME_CAPABILITY],
     hostId: 'host-1',
-    sectionsResult: { uniqueRepos: [] },
-    settings: { activeFilterCount: 0 },
+    settings: {},
     showNewWorktree: false,
     state: {
       actionTarget: { worktreeId: 'wt', repo: 'orca', branch: 'main', ...row },
       confirmDelete: null,
-      view: { ...INITIAL_MOBILE_VIEW },
+      view: INITIAL_MOBILE_VIEW,
       hostLabelById: new Map(),
       pinnedIds: new Set()
     }

@@ -57,7 +57,10 @@ export function getPinnedSectionWorktrees(
     rows: worktrees,
     isPinned: (worktree) => worktree.isPinned === true,
     childrenByParentIdentity: getSidebarLineageChildren(
-      worktrees, lineageById, worktreeMap, filterRepoIds
+      worktrees,
+      lineageById,
+      worktreeMap,
+      filterRepoIds
     ),
     identityOf: getWorktreeHostIdentity,
     duplicatePinned: false

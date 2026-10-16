@@ -1166,6 +1166,14 @@
       "aiVaultResumeRefusal": {
         "openInChat": "Cette conversation {{value0}} est ouverte dans un chat. Actualisez l'historique des sessions pour l'ouvrir.",
         "ownershipUnknown": "Orca n'a pas pu confirmer à qui appartient cette conversation {{value0}}. Actualisez l'historique des sessions et réessayez."
+      },
+      "pendingWorktreeCreation": {
+        "checkingOutFiles": "Extraction des fichiers… {{percent}}%",
+        "provisioningVm": "Provisionnement de la VM…",
+        "settingUpWorkspace": "Configuration de votre espace de travail…",
+        "preparingWorkspace": "Préparation de l'espace de travail…",
+        "creatingWorktree": "Création du worktree…",
+        "fetchingBaseBranch": "Récupération de la branche de base…"
       }
     },
     "hooks": {
@@ -3242,7 +3250,11 @@
               "command_label": "Commande",
               "agent_toolbar_hint": "Prend en charge /goal, les skills et les chemins",
               "agent_footer_hint": "Les prompts multi-lignes conviennent — restez concis.",
-              "resize_hint": "Glissez le coin pour redimensionner"
+              "resize_hint": "Glissez le coin pour redimensionner",
+              "length_over_limit": "Trop long pour être enregistré.",
+              "length_count": "{{value0}} / {{value1}} caractères",
+              "size_count": "{{value0}} / {{value1}}",
+              "prompt_over_host_limit": "Trop long pour cet hôte. Mettez à jour Orca sur l’hôte pour enregistrer des prompts plus longs."
             },
             "TerminalQuickCommandDialogFooter": {
               "2e2b958dfc": "Enregistrer",
@@ -12674,6 +12686,13 @@
           "cancel": "Annuler",
           "confirm": "Conserver la version du serveur"
         },
+        "moveAnyway": {
+          "action": "Déplacer quand même…",
+          "title": "Déplacer cet hôte quand même",
+          "description": "Orca déplace cet hôte vers son serveur géré sans les éléments enregistrés ci-dessous. Ils restent sur cet ordinateur et n’apparaissent pas sur le serveur géré. Les modifications non enregistrées sont conservées, jamais supprimées.",
+          "cancel": "Annuler",
+          "confirm": "Déplacer quand même"
+        },
         "ZcodeCliSetupSection": {
           "title": "Utiliser GLM avec ZCode",
           "description": "Connectez-vous pour utiliser GLM comme agent de codage. La clé API de quota ci-dessus ne fait que surveiller l'utilisation ; ZCode gère sa propre connexion et le choix du modèle.",
@@ -14246,10 +14265,7 @@
             "databaseCount_other": "{{value0}} bases de données",
             "scanning": "Analyse de {{value0}}",
             "reading": "Lecture de {{value0}} fichiers",
-            "stoppedAfter": "Arrêté après {{value0}}",
-            "scanned": "{{value0}} analysés",
-            "stoppedAt": "arrêté à {{value0}}",
-            "refresh": "Actualiser"
+            "scanned": "{{value0}} analysés"
           }
         }
       },

@@ -68,7 +68,7 @@ export function useHostScreenController({
   const now = useNow(30_000)
   const { hostCapabilities, floatingWorkspaceEnabled } = useHostProtocolGates()
   const state = useHostScreenState(hostId, action)
-  const settings = useHostViewSettings({ client, connState, hostId, state })
+  const settings = useHostViewSettings({ client, connState, state })
   const hostDisplay = useHostDisplay(
     hostId && state.hostName
       ? { id: hostId, name: state.hostName, ...state.hostStoredDescriptor }
@@ -121,9 +121,15 @@ export function useHostScreenController({
       buildProjectSectionCatalog(
         state.servedProjectSections,
         state.desktopRepos,
-        state.view.filters.visibleHostIds
+        state.view.filters.visibleHostIds,
+        state.view.projectOrderBy
       ),
-    [state.servedProjectSections, state.desktopRepos, state.view.filters.visibleHostIds]
+    [
+      state.servedProjectSections,
+      state.desktopRepos,
+      state.view.filters.visibleHostIds,
+      state.view.projectOrderBy
+    ]
   )
   const collapsedGroups = useMemo(
     () => new Set(state.view.collapsedGroups),
@@ -162,6 +168,8 @@ export function useHostScreenController({
     activeWorktreeScroll,
     catalog,
     collapsedGroups,
+    // Resolved: the desktop's value once read; the served catalog's (or the default) before.
+    projectOrderBy: projectCatalog.projectOrderBy,
     client,
     connState,
     contentMaxWidth,

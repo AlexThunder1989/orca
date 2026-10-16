@@ -392,7 +392,9 @@ function ParentWorktreeCandidateList({
                         {[
                           repoMap.get(candidate.repoId)?.displayName,
                           branchDisplayName(candidate.branch)
-                        ].filter(Boolean).join(' · ')}
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </span>
                     </div>
                   </div>

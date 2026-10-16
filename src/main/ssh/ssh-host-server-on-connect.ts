@@ -61,6 +61,7 @@ export type HostServerOnConnectResult =
       detail?: string
       terminals?: number
       terminalsElsewhere?: boolean
+      canLeaveBehind?: true
       /** A move that stopped short kept the host locked; the next connect resumes it. */
       held?: true
     }
@@ -295,7 +296,12 @@ async function afterConversion(
       if (result.code === 'orcad_migration_terminals') {
         return { route: 'unserved', reason: terminalReason(result.verdict) }
       }
-      return { route: 'unserved', reason: 'refused', detail: result.reason }
+      return {
+        route: 'unserved',
+        reason: 'refused',
+        detail: result.reason,
+        ...(result.canLeaveBehind ? { canLeaveBehind: true } : {})
+      }
   }
 }
 

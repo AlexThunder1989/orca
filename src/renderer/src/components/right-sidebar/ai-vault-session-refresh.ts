@@ -152,6 +152,11 @@ export function useAiVaultSessionRefresh(
         pendingRefreshRef.current = true
         pendingForceRef.current ||= args.force === true
         pendingBackgroundRef.current &&= args.background === true
+        if (args.force === true && args.background !== true) {
+          void window.api.aiVault
+            .cancelListSessions({ requestToken: requestTokenRef.current })
+            .catch((error: unknown) => console.warn('Could not cancel Session History scan', error))
+        }
         return
       }
 

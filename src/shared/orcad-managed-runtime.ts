@@ -13,6 +13,8 @@ export type OrcadManagedRefusal = {
   verdict: 'live' | 'unverifiable'
   code: string
   reason: string
+  /** Only saved state blocks, which a confirmed "Move anyway" leaves on this desktop. */
+  canLeaveBehind?: true
 }
 
 export type OrcadManagedDeferral = {

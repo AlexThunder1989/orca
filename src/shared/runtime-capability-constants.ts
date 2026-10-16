@@ -94,6 +94,9 @@ export const SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY =
 // repeating the host's whole bounded list on every title tick.
 export const SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY =
   'session-tabs.retirement-proof-delta.v1' as const
+// Why: a client advertising this rebuilds each `updated` frame's tab list from the previous frame
+// on the same stream, so one tab's status change no longer re-sends every tab in the worktree.
+export const SESSION_TABS_TAB_DELTA_RUNTIME_CAPABILITY = 'session-tabs.tab-delta.v1' as const
 export const AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY =
   'agent-session.session-boundary.v1' as const
 export const AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY =

@@ -7,6 +7,7 @@ import {
   normalizeTuiAgentEnvRecord
 } from '../../../shared/tui-agent-launch-defaults'
 import { normalizeTerminalQuickCommands } from '../../../shared/terminal-quick-commands'
+import { assertTerminalQuickCommandsStorable } from '../../../shared/terminal-quick-command-prompt-limit'
 import { normalizeTerminalCustomThemes } from '../../../shared/terminal-custom-themes'
 import { normalizeTerminalDefaultShell } from '../../../shared/terminal-default-shell'
 import { normalizeTerminalCursorStyleDefault } from '../../../shared/terminal-cursor-style-settings'
@@ -64,12 +65,6 @@ export function updateSettings(
     // Loaded defaults are ambiguous; synchronize the legacy switch only on an explicit write.
     sanitizedUpdates.terminalLinkActionPopoverEnabled = linkBehavior === 'actions'
   }
-  if ('opencodeSessionCookie' in updates && !updates.opencodeSessionCookie) {
-    operations.removeRetainedBlob(PROTECTED_SECRET_SLOT.opencodeSessionCookie)
-  }
-  if ('httpProxyUrl' in updates && !updates.httpProxyUrl) {
-    operations.removeRetainedBlob(PROTECTED_SECRET_SLOT.httpProxyUrl)
-  }
   // Why: coerce to boolean here (not the IPC edge) so every write path is covered and a truthy non-bool can't persist as "tray-minimize on".
   if ('minimizeToTrayOnClose' in updates) {
     sanitizedUpdates.minimizeToTrayOnClose = updates.minimizeToTrayOnClose === true
@@ -114,9 +109,10 @@ export function updateSettings(
     sanitizedUpdates.agentYoloDefaultsMigrated = true
   }
   if ('terminalQuickCommands' in updates) {
-    sanitizedUpdates.terminalQuickCommands = normalizeTerminalQuickCommands(
-      updates.terminalQuickCommands
-    )
+    const terminalQuickCommands = normalizeTerminalQuickCommands(updates.terminalQuickCommands)
+    // Every local and paired save lands here, so this is where an unstorable list is refused.
+    assertTerminalQuickCommandsStorable(terminalQuickCommands)
+    sanitizedUpdates.terminalQuickCommands = terminalQuickCommands
   }
   if ('terminalDefaultShell' in updates) {
     sanitizedUpdates.terminalDefaultShell = normalizeTerminalDefaultShell(
@@ -273,6 +269,12 @@ export function updateSettings(
       ...sanitizedUpdates.notifications
     }),
     ...(mergedTelemetry !== undefined ? { telemetry: mergedTelemetry } : {})
+  }
+  if ('opencodeSessionCookie' in updates && !updates.opencodeSessionCookie) {
+    operations.removeRetainedBlob(PROTECTED_SECRET_SLOT.opencodeSessionCookie)
+  }
+  if ('httpProxyUrl' in updates && !updates.httpProxyUrl) {
+    operations.removeRetainedBlob(PROTECTED_SECRET_SLOT.httpProxyUrl)
   }
   if (
     !Object.is(

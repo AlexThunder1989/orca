@@ -33,6 +33,11 @@ import type { SshTarget } from '../../shared/ssh-types'
 import type { CensusHostRelayTerminals } from './orcad-migration-terminal-gate'
 import { createManagedOrcadEnvironment } from './orcad-runtime-deployment'
 import { createSshRelayMigrationSource } from './orcad-migration-ssh-relay-source'
+import {
+  leaveBehindClearsOrcadMigrationBlockers,
+  onlyLeavableOrcadMigrationBlockers
+} from './ssh-target-orcad-preflight'
+import { ORCAD_MIGRATION_LEAVE_BEHIND_TERMINALS_REASON } from './orcad-migration-source-fence'
 import { retainOrcadMigrationSource } from './orcad-migration-source-retention'
 import {
   linkedOrcadMigrationCutoverPort,
@@ -207,7 +212,26 @@ async function fenceOrResume(
       )
     )
   }
-  return refuse(result.verdict, result.code, result.reason)
+  // Already moving anyway: what still refuses is what can't be left behind.
+  const leavable =
+    result.blockers &&
+    onlyLeavableOrcadMigrationBlockers(result.blockers) &&
+    !target.managedServerLeaveBehind
+  if (leavable && terminalProof.verdict !== 'exited') {
+    // Why no offer: leaving tabs behind would strand terminals the relay bridge still serves.
+    return refuse(
+      result.verdict,
+      result.code,
+      `${result.reason} ${ORCAD_MIGRATION_LEAVE_BEHIND_TERMINALS_REASON}`
+    )
+  }
+  return {
+    ...refuse(result.verdict, result.code, result.reason),
+    // Why previewed: an offer the confirmed export would refuse again is a dead end.
+    ...(leavable && leaveBehindClearsOrcadMigrationBlockers(store, target.id)
+      ? { canLeaveBehind: true }
+      : {})
+  }
 }
 
 function requireJournaledCutover(

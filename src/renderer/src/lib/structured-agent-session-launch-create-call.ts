@@ -159,6 +159,6 @@ export async function launchStructuredAgentSession(
   return {
     sessionId: result.value.sessionId,
     fence: result.value.fence,
-    ...(firstMessage ? { firstMessage } : {})
+    ...(firstMessage ? { firstMessage, cursor: result.cursor } : {})
   }
 }

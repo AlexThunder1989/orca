@@ -71,6 +71,7 @@ export function traceShellStep(
     case 'page-painted':
     case 'page-back-claim':
     case 'page-ready-deadline':
+    case 'document-load-deadline':
     case 'layout-changed':
       return trace
   }
@@ -181,6 +182,10 @@ function eventLines(
       return before.pageReady
         ? []
         : [pageLine('warn', 'Web shell: page never said ready before the deadline')]
+    case 'document-load-deadline':
+      return before.documentLoaded || before.pageReady
+        ? []
+        : [pageLine('warn', 'Web shell: document never finished loading before the deadline')]
     case 'document-started':
     case 'document-loaded':
     case 'page-ready':

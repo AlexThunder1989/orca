@@ -23,6 +23,7 @@ import { RUNTIME_ENVIRONMENT_HANDLER_CHANNELS } from './runtime-environment-hand
 import { registerOrcadRuntimeLifecycleHandlers } from './orcad-runtime-lifecycle-handlers'
 import { registerOrcadRuntimeConversionHandlers } from './orcad-runtime-conversion-handlers'
 import { registerOrcadDeltaMoveHandlers } from './orcad-delta-move-handlers'
+import { registerOrcadLeaveBehindHandlers } from './orcad-leave-behind-handlers'
 import { registerOrcadRuntimeMaintenanceHandlers } from './orcad-runtime-maintenance-handlers'
 import { clearPublishedManagedServer } from './ssh-renderer-broadcast'
 import { clearManagedServerNotes } from './runtime-environment-managed-tunnel'
@@ -150,6 +151,7 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
   registerOrcadRuntimeLifecycleHandlers({ getUserDataPath })
   registerOrcadRuntimeConversionHandlers(getUserDataPath)
   registerOrcadDeltaMoveHandlers(getUserDataPath)
+  registerOrcadLeaveBehindHandlers()
   registerOrcadRuntimeMaintenanceHandlers({
     getUserDataPath,
     getActiveEnvironmentId: () => store.getSettings().activeRuntimeEnvironmentId,

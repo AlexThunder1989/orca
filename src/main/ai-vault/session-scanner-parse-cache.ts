@@ -1,7 +1,6 @@
 import { createQoderSessionResumeState } from './session-scanner-qoder-parser'
 import type { AiVaultSession } from '../../shared/ai-vault-types'
 import { inSessionParseFileLane } from './session-parse-file-lane'
-import { noteAiVaultScanProgress } from './ai-vault-scan-progress'
 import { createAntigravitySessionResumeState } from './session-scanner-antigravity-parser'
 import { createCodexSessionResumeState } from './session-scanner-codex-parser'
 import { createDroidSessionResumeState } from './session-scanner-droid-parser'
@@ -130,11 +129,9 @@ export async function parseAgentSessionFileCached(
 ): Promise<AiVaultSession | null> {
   // The whole lookup-read-store sequence runs in the lane: a concurrent parse of
   // the same path shares this entry's resume point and its message channel.
-  const session = await inSessionParseFileLane(candidate.file.path, () =>
+  return inSessionParseFileLane(candidate.file.path, () =>
     parseCachedInLane(candidate, platform, stats, requireRead, signal)
   )
-  noteAiVaultScanProgress(signal)
-  return session
 }
 
 /**

@@ -150,7 +150,9 @@ export function startParityLanes(
   // A folder's contained repo is saved too, so the host can borrow its runtime if it would.
   const repo =
     scopeRepo ??
-    (args.workspace.repoPath ? launchScope({ kind: 'repo', path: args.workspace.repoPath }).repo : null)
+    (args.workspace.repoPath
+      ? launchScope({ kind: 'repo', path: args.workspace.repoPath }).repo
+      : null)
   const store = {
     getSettings: () => settings,
     getProjects: () => [

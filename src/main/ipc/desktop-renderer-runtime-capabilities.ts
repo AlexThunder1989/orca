@@ -20,6 +20,7 @@ import {
   AGENT_LAUNCH_TAB_CLOSED_CLIENT_CAPABILITY
 } from '../../shared/agent-launch-runtime-capability'
 import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from '../../shared/agent-session-background-task-child-views-capability'
+import { TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY } from '../../shared/terminal-quick-command-capabilities'
 
 /**
  * What the desktop renderer advertises when it calls its own main process over `runtime:call`.
@@ -58,5 +59,7 @@ export const DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES: readonly RuntimeCapab
   AGENT_LAUNCH_PROMPT_UNCONFIRMED_RUNTIME_CAPABILITY,
   // A launch whose tab the user closed is answered as exactly that, which the desktop stays silent
   // on, rather than as unknown, which it would report as a failure.
-  AGENT_LAUNCH_TAB_CLOSED_CLIENT_CAPABILITY
+  AGENT_LAUNCH_TAB_CLOSED_CLIENT_CAPABILITY,
+  // Same build as its host, so it reads every quick-command prompt the host stores.
+  TERMINAL_QUICK_COMMAND_LONG_PROMPTS_RUNTIME_CAPABILITY
 ] as const

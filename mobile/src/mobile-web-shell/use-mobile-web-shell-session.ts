@@ -7,6 +7,7 @@ import { deriveHostCacheKey } from './host-cache-key'
 import { download, openCache, readManifest } from './mobile-web-shell-session-effects'
 import {
   createMobileWebShellRuntime,
+  DOCUMENT_LOAD_DEADLINE_MS,
   PAGE_READY_DEADLINE_MS,
   type MobileWebShellRuntime
 } from './mobile-web-shell-runtime'
@@ -210,13 +211,17 @@ export function useMobileWebShellSession(args: {
         case 'remount':
           send({ type: 'remounted', flow, sessionId: runtime.mintSessionId() })
           return
-        case 'await-page-ready': {
-          const cancel = runtime.setTimer(() => {
-            timersRef.current.delete(cancel)
-            send({ type: 'page-ready-deadline', flow })
-          }, PAGE_READY_DEADLINE_MS)
+        case 'await-page-ready':
+        case 'await-document-load': {
+          const pageReady = effect.kind === 'await-page-ready'
+          const cancel = runtime.setTimer(
+            () => {
+              timersRef.current.delete(cancel)
+              send({ type: pageReady ? 'page-ready-deadline' : 'document-load-deadline', flow })
+            },
+            pageReady ? PAGE_READY_DEADLINE_MS : DOCUMENT_LOAD_DEADLINE_MS
+          )
           timersRef.current.add(cancel)
-          return
         }
       }
     },

@@ -19,13 +19,10 @@ export type AiVaultScanWork = {
   read: { done: number; total: number }
 }
 
-/**
- * One local Session History scan entry, as main pushes it to windows.
- * When `stopped`, the agents still `walking` are the ones the scan stopped on.
- */
+/** One local Session History scan entry, as main pushes it to windows. */
 export type AiVaultScanProgress = Omit<AiVaultScanWork, 'stage'> & {
   scanId: string
-  stage: AiVaultScanWork['stage'] | 'finished' | 'stopped'
+  stage: AiVaultScanWork['stage'] | 'finished'
   startedAt: number
   settledAt: number | null
 }

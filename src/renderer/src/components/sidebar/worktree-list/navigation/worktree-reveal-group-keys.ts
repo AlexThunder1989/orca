@@ -39,31 +39,33 @@ export function getWorktreeRevealCollapsedGroupKeys(args: {
     args.repoMap.get(args.worktree.repoId),
     args.defaultHostId
   )
-  const plan = args.occurrencePlan ?? buildSidebarRowPlan(
-    args.groupBy,
-    [...(args.visibleWorktrees ?? args.worktrees)],
-    args.repoMap,
-    args.prCache,
-    new Set(),
-    undefined,
-    args.workspaceStatuses,
-    undefined,
-    { ...args.worktreeLineageById },
-    new Map(args.worktrees.map((row) => [row.id, row])),
-    true,
-    args.settings,
-    args.projectGroups,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    args.projectGrouping,
-    undefined,
-    undefined,
-    args.defaultHostId,
-    args.pinnedDisplayPolicy,
-    args.filterRepoIds
-  ).occurrencePlan
+  const plan =
+    args.occurrencePlan ??
+    buildSidebarRowPlan(
+      args.groupBy,
+      [...(args.visibleWorktrees ?? args.worktrees)],
+      args.repoMap,
+      args.prCache,
+      new Set(),
+      undefined,
+      args.workspaceStatuses,
+      undefined,
+      { ...args.worktreeLineageById },
+      new Map(args.worktrees.map((row) => [row.id, row])),
+      true,
+      args.settings,
+      args.projectGroups,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      args.projectGrouping,
+      undefined,
+      undefined,
+      args.defaultHostId,
+      args.pinnedDisplayPolicy,
+      args.filterRepoIds
+    ).occurrencePlan
   const occurrence = plan.preferredByIdentity.get(getWorktreeHostIdentity(args.worktree))
   if (!occurrence) {
     return []

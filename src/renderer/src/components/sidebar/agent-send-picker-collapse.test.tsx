@@ -182,7 +182,10 @@ it.each([true, false])('reveals the target with pinned ancestors visible=%s', (v
     capture: { source: 'orchestration-context', confidence: 'explicit' },
     createdAt: 1
   })
-  const worktreeLineageById = { [parent.id]: lineage(parent, root), [child.id]: lineage(child, parent) }
+  const worktreeLineageById = {
+    [parent.id]: lineage(parent, root),
+    [child.id]: lineage(child, parent)
+  }
   const collapsedGroups = new Set([
     'host:ssh:builder',
     'lineage:ssh:builder|remote',

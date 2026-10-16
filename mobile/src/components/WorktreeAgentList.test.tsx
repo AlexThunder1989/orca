@@ -70,6 +70,21 @@ describe('WorktreeAgentList', () => {
     expect(renderer!.root.findAllByType('WorktreeAgentRow')).toHaveLength(3)
   })
 
+  it("shows every agent row with no summary under the desktop's Full list layout", async () => {
+    await act(async () => {
+      renderer = create(
+        createElement(WorktreeAgentList, {
+          agents: [agent('agent-1'), agent('agent-2'), agent('agent-3')],
+          now: 2_000,
+          unvisited: false,
+          fullList: true
+        })
+      )
+    })
+    expect(renderer!.root.findAllByType('Pressable')).toHaveLength(0)
+    expect(renderer!.root.findAllByType('WorktreeAgentRow')).toHaveLength(3)
+  })
+
   it('keeps a single agent visible without a redundant disclosure control', async () => {
     await act(async () => {
       renderer = create(

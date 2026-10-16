@@ -52,8 +52,8 @@ async function scanReportingProgress(
   request: Extract<AiVaultServiceRequest, { operation: 'scan' }>,
   signal: AbortSignal
 ): Promise<{ result: AiVaultListResult; work: AiVaultScanWork | null }> {
-  const stopProgress = trackAiVaultScanProgress(signal, (units, work) =>
-    send({ type: 'progress', id: request.id, units, work })
+  const stopProgress = trackAiVaultScanProgress(signal, (work) =>
+    send({ type: 'progress', id: request.id, work })
   )
   try {
     const result = await scanAiVaultSessions({ ...request.options, signal })
