@@ -224,7 +224,7 @@ export async function acquireCodexStructuredSession(input: {
     assertCodexConnectionOpen(connection, sessionId)
     acquisitions.deleteIfCurrent(sessionId, attempt)
     // Where this session's child work goes: the host's records, after each frame is journaled.
-    const sink = codexChildWorkSink(sessionId, deps)
+    const sink = codexChildWorkSink(sessionId, deps, acquireInput.events)
     const session: CodexSession = {
       account,
       connection,

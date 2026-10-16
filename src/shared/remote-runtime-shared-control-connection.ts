@@ -186,6 +186,7 @@ export class RemoteRuntimeSharedControlConnection {
       },
       onError: (error) => this.handleSocketClosed(error, socketGeneration),
       onTextFrame: (frame) => this.handleTextFrame(frame, socketGeneration),
+      onActivity: this.options.onAnswered,
       liveness: {
         options: this.options.liveness,
         onDead: (error) => this.handleSocketClosed(error, socketGeneration)

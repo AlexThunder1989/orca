@@ -3,6 +3,8 @@ import { getExplicitRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runti
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
+import type { TerminalPaneLayoutNode } from '../../../../shared/terminal-tab-types'
+import type { PaneSide } from '../../../../shared/workspace-layout/terminal-pane-tree'
 import type {
   LayoutApplyReply,
   LayoutCommandResult,
@@ -15,6 +17,8 @@ export type PaneLayoutCommand =
   | { type: 'closePane'; tabId: string; leafId: string }
   | { type: 'renamePane'; tabId: string; leafId: string; title: string | null }
   | { type: 'equalizePanes'; tabId: string }
+  | { type: 'movePane'; tabId: string; leafId: string; targetLeafId: string; side: PaneSide }
+  | { type: 'setPaneRatios'; tabId: string; root: TerminalPaneLayoutNode }
 
 /**
  * A pane command in a layout-owner build: main applies it first, then `apply` shows main's result.

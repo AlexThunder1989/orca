@@ -197,6 +197,7 @@ export async function stopStructuredAgentSessionAgentUnderSerialize(
         journal: session.journal,
         sessionId,
         fence: child.fence,
+        rowFence: Math.max(child.fence, record?.lease.runtimeFence ?? child.fence),
         generation: child.generation ?? 'unknown',
         turnItemId: quitCuts,
         trigger: ending.quit,

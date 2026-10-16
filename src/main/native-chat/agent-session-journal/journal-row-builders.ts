@@ -55,6 +55,7 @@ export function journalItemRowBuilder(
   options: AgentJournalRowAttribution & {
     fence: number
     ownerFence?: number
+    executionOwner?: number
     observedAt?: number
     recovered?: true
   },
@@ -68,6 +69,7 @@ export function journalItemRowBuilder(
       seq,
       fence: options.fence,
       ownerFence: options.ownerFence,
+      executionOwner: options.executionOwner,
       ts: options.observedAt ?? ts,
       recovered: options.recovered,
       linkage: options,
@@ -240,6 +242,7 @@ export function buildJournalItemRow(
     fence: number
     /** The writer's provenance claim (`journalItemOwnerFence`); absent for host bookkeeping. */
     ownerFence?: number
+    executionOwner?: number
     ts: number
     recovered?: true
     linkage?: AgentJournalProducerLinkage
@@ -260,6 +263,7 @@ export function buildJournalItemRow(
     body,
     ...journalRowBase(input.state.epoch, input.seq, input.fence, input.ts, [body]),
     ownerFence: journalItemOwnerFence(input.state, resolved, input),
+    ...(input.executionOwner === undefined ? {} : { executionOwner: input.executionOwner }),
     ...(input.recovered ? { recovered: input.recovered } : {}),
     turnScope: input.turnScope,
     ...agentJournalLinkageFields(input.linkage)

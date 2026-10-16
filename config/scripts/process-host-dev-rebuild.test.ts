@@ -38,7 +38,7 @@ function fixture(): { root: string; packageDir: string; main: string } {
   // Runs the real package build against this fixture package.
   writeFileSync(
     join(packageDir, 'scripts', 'build-dist.mjs'),
-    `const { buildPackageDist } = await import(${JSON.stringify(pathToFileURL(resolve(realPackageDir, 'scripts', 'build-dist.mjs')).href)})\nawait buildPackageDist(${JSON.stringify(packageDir)})\n`
+    `import { appendFileSync } from 'node:fs'\nappendFileSync(${JSON.stringify(join(packageDir, 'builds.txt'))}, 'build\\n')\nconst { buildPackageDist } = await import(${JSON.stringify(pathToFileURL(resolve(realPackageDir, 'scripts', 'build-dist.mjs')).href)})\nawait buildPackageDist(${JSON.stringify(packageDir)})\n`
   )
   mkdirSync(join(root, 'node_modules', '@orca'), { recursive: true })
   const packageRequire = createRequire(join(realPackageDir, 'package.json'))
@@ -127,6 +127,29 @@ function readEmittedVersion(root: string): number {
 }
 
 describe('External process-host development rebuilds', () => {
+  it('skips package compilation when only application code changes', async () => {
+    const { root, packageDir, main } = fixture()
+    const watcher = watch({
+      input: main,
+      external: ['@orca/process-host'],
+      plugins: [createProcessHostDevRebuildPlugin(root)],
+      output: { file: join(root, 'out', 'main.cjs'), format: 'cjs' }
+    })
+    watchers.push(watcher)
+    closeSuccessfulBundles(watcher)
+    await nextEvent(watcher, 'END')
+    const builds = join(packageDir, 'builds.txt')
+    expect(readFileSync(builds, 'utf8')).toBe('build\n')
+
+    const rebuilt = nextEvent(watcher, 'END')
+    writeFileSync(main, "module.exports = { ...require('@orca/process-host'), changed: true }\n")
+    await rebuilt
+
+    expect(readEmittedVersion(root)).toBe(1)
+    expect(readFileSync(join(root, 'out', 'main.cjs'), 'utf8')).toContain('changed')
+    expect(readFileSync(builds, 'utf8')).toBe('build\n')
+  })
+
   it('emits private source edits and new imports before the Electron reload hook', async () => {
     const { root, packageDir, main } = fixture()
     const loadedVersions: number[] = []

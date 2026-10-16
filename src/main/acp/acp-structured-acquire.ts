@@ -190,7 +190,7 @@ export async function acquireAcpStructuredSession(input: {
       dialect: spec.dialect,
       now,
       childStops: () => childStops,
-      ...acpLaneChildWorkDelivery(deps, sessionId),
+      ...acpLaneChildWorkDelivery(deps, sessionId, events),
       logger: deps.logger ?? createStructuredAgentSessionLogger(),
       onInputAccepted: (clientMessageId) => session?.turns.accept(clientMessageId),
       onFailed: () => input.forceClose(sessionId)

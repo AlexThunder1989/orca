@@ -13,6 +13,7 @@ vi.mock('./orcad-managed-wake', () => ({ wakeStoppedManagedOrcad: vi.fn() }))
 import { wakeStoppedManagedOrcad } from './orcad-managed-wake'
 import {
   ensureManagedOrcadServing,
+  MANAGED_ORCAD_NOT_ACTIVATED_DETAIL,
   resetManagedOrcadServingForTests,
   setManagedOrcadStartListener,
   type OrcadManagedServingInput
@@ -173,5 +174,59 @@ describe('ensureManagedOrcadServing', () => {
     // A rebind to the port a restarted server bound is a different server address.
     await ensureManagedOrcadServing({ ...input(probe), remotePort: 40_001 }, () => 2)
     expect(probe).toHaveBeenCalledTimes(3)
+  })
+
+  it('skips the probe after an idle pause while the control socket keeps answering', async () => {
+    let now = 0
+    const probe = vi.fn(async () => true)
+    const answeredAt = vi.fn((): number | null => null)
+    const live = { ...input(probe), answeredAt }
+    await ensureManagedOrcadServing(live, () => now)
+    expect(probe).toHaveBeenCalledOnce()
+
+    now = 6_000
+    answeredAt.mockReturnValue(4_000)
+    expect(await ensureManagedOrcadServing(live, () => now)).toEqual({ state: 'serving' })
+    expect(answeredAt).toHaveBeenCalledWith('env-1')
+    expect(probe).toHaveBeenCalledOnce()
+  })
+
+  it('shares one probe between concurrent calls once the last answer is stale', async () => {
+    let answer!: (value: boolean) => void
+    const probe = vi.fn(() => new Promise<boolean>((resolve) => (answer = resolve)))
+    // Last heard before a suspend: too old to prove anything.
+    const stale = { ...input(probe), answeredAt: () => 0 }
+    const calls = [1, 2, 3].map(() => ensureManagedOrcadServing(stale, () => 60_000))
+    answer(true)
+    expect(await Promise.all(calls)).toEqual([
+      { state: 'serving' },
+      { state: 'serving' },
+      { state: 'serving' }
+    ])
+    expect(probe).toHaveBeenCalledOnce()
+  })
+
+  it('still detects a stopped server once its control socket closed', async () => {
+    vi.mocked(wakeStoppedManagedOrcad).mockResolvedValue({ outcome: 'not-activated' })
+    const answeredAt = vi.fn((): number | null => 0)
+    const probe = vi.fn(async () => true)
+    const watched = { ...input(probe), answeredAt }
+    expect(await ensureManagedOrcadServing(watched, () => 0)).toEqual({ state: 'serving' })
+    expect(probe).not.toHaveBeenCalled()
+
+    // Another desktop stopped the server: its socket closed, so there is no live answer.
+    answeredAt.mockReturnValue(null)
+    probe.mockResolvedValue(false)
+    expect(await ensureManagedOrcadServing(watched, () => 1_000)).toEqual({
+      state: 'unverifiable',
+      detail: MANAGED_ORCAD_NOT_ACTIVATED_DETAIL
+    })
+    expect(probe).toHaveBeenCalledOnce()
+  })
+
+  it('does not take an answer from a wall clock that moved backwards as proof', async () => {
+    const probe = vi.fn(async () => true)
+    await ensureManagedOrcadServing({ ...input(probe), answeredAt: () => 50_000 }, () => 10_000)
+    expect(probe).toHaveBeenCalledOnce()
   })
 })

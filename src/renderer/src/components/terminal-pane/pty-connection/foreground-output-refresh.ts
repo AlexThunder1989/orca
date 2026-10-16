@@ -102,7 +102,7 @@ export function bindForegroundOutputRefresh(session: ConnectPanePtySession): voi
     )
   }
 
-  session.handleRemoteOutputPauseChanged = (paused, supported): void => {
+  session.handleRemoteOutputPauseChanged = (paused, supported, dropsReported): void => {
     const ptyId = session.transport.getPtyId()
     if (!ptyId || !isRemoteRuntimePtyId(ptyId)) {
       return
@@ -127,7 +127,24 @@ export function bindForegroundOutputRefresh(session: ConnectPanePtySession): voi
       session.registerSideEffectFactConsumerForPty(ptyId, true)
       session.remoteOutputFactConsumerPtyId = ptyId
     }
+    // Why: a host that reports drops lets a quiet pane reveal with zero snapshot fetches; others may have dropped anything.
+    if (!(supported && dropsReported)) {
+      session.markHiddenOutputRestoreNeeded()
+    }
+  }
+
+  session.handleRemotePausedOutputDropped = (): void => {
+    const ptyId = session.transport.getPtyId()
+    if (session.disposed || !ptyId || !isRemoteRuntimePtyId(ptyId)) {
+      return
+    }
+    // Why: the gap invalidates cross-chunk carry, exactly like a local drop marker.
+    session.transport.resetCrossChunkParserState?.()
+    const restoreWasInFlight = session.hiddenOutputRestoreInFlight !== null
     session.markHiddenOutputRestoreNeeded()
+    if (restoreWasInFlight) {
+      session.hiddenOutputRestoreFreshSnapshotNeeded = true
+    }
   }
 
   session.syncHiddenRendererPtyDelivery = (): void => {

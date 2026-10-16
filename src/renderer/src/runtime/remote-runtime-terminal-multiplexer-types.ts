@@ -14,7 +14,12 @@ export type TerminalMultiplexEvent =
       type: 'subscribed'
       streamId: number
       streamGeneration?: string
-      capabilities?: { ackOutputSourceRanges?: 1; outputPause?: 1; inputAck?: 1 }
+      capabilities?: {
+        ackOutputSourceRanges?: 1
+        outputPause?: 1
+        outputPauseDropNotice?: 1
+        inputAck?: 1
+      }
       inputLedgerId?: string
     }
   | { type: 'end'; streamId: number; verdict?: TerminalStreamEndVerdict }
@@ -55,6 +60,8 @@ export type RemoteRuntimeMultiplexedTerminalCallbacks = {
   /** The host installed the stream and named its capabilities; its initial snapshot is still on the way. */
   onSubscribeAcknowledged?: () => void
   onOutputPauseCapability?: () => void
+  /** The host discarded output while this stream was paused (negotiated streams only). */
+  onPausedOutputDropped?: () => void
   onEnd?: (verdict: TerminalStreamEndVerdict) => void
   onError?: (message: string) => void
   onFitOverrideChanged?: (event: {
@@ -148,6 +155,8 @@ export type RemoteRuntimeMultiplexedTerminal = {
   resize: (cols: number, rows: number) => boolean
   claimViewport: (cols: number, rows: number) => boolean
   setOutputPaused: (paused: boolean) => boolean
+  // Why: only then does a pause with no drop notice prove nothing was lost.
+  reportsPausedOutputDrops?: () => boolean
   serializeBuffer: (opts?: {
     scrollbackRows?: number
   }) => Promise<RemoteRuntimeSnapshotImage | null>
@@ -166,6 +175,9 @@ export type RemoteRuntimeMultiplexedTerminalState = {
   acknowledgeOutput: boolean
   acknowledgeOutputSourceRanges: boolean
   supportsOutputPause: boolean
+  supportsPausedOutputDropNotice: boolean
+  // Why: the host announced the seq jump the pane's own restore covers, so it must not also trigger a resync.
+  pausedOutputGapExpected: boolean
   supportsInputAck: boolean
   inputLedgerId: string | null
   outputPaused: boolean

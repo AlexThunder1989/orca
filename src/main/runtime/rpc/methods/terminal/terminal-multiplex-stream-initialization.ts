@@ -7,6 +7,7 @@ import { TERMINAL_MULTIPLEX_ACK_STREAM_INITIAL_WINDOW_BYTES } from '../../../../
 import { createTerminalOutputBatcher } from './terminal-output-batcher'
 import { appendPendingMultiplexOutput } from './terminal-stream-replay'
 import { updateViewportForClient } from './terminal-viewport-update'
+import { notePausedOutputDropped } from './terminal-multiplex-paused-output-drop'
 import {
   isMultiplexStreamAttached,
   type MultiplexSubscribeRequest,
@@ -33,6 +34,9 @@ export async function initializeMultiplexStream(
     ackInFlightBytes: 0,
     ackWindowBytes: TERMINAL_MULTIPLEX_ACK_STREAM_INITIAL_WINDOW_BYTES,
     supportsOutputPause: request.capabilities?.outputPause === 1,
+    supportsOutputPauseDropNotice:
+      request.capabilities?.outputPause === 1 && request.capabilities.outputPauseDropNotice === 1,
+    pausedOutputDropNoticeSent: false,
     supportsWriteUnavailable: request.capabilities?.writeUnavailable === 1,
     inputSessionId: request.capabilities?.inputAck === 1 ? (request.inputSessionId ?? null) : null,
     outputPaused: false,
@@ -84,6 +88,7 @@ export async function initializeMultiplexStream(
       return
     }
     if (stream.outputPaused) {
+      notePausedOutputDropped(state, stream)
       return
     }
     if (stream.buffering) {

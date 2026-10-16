@@ -21,11 +21,9 @@ type AgentIdentityResolution = {
 
 export function shouldSuppressInheritedTerminalStatus(args: {
   inheritedFromActivePane: boolean
-  incomingState: AgentStatusState
 }): boolean {
-  // Why: nested child hooks inherit the parent's ORCA_PANE_KEY. A child
-  // completion does not prove the active parent turn completed.
-  return args.inheritedFromActivePane && args.incomingState === 'done'
+  // Nested CLIs inherit the pane key, but own neither its turn nor its children.
+  return args.inheritedFromActivePane
 }
 
 function normalizedKnownAgentType(agentType: AgentType | null | undefined): AgentType | null {

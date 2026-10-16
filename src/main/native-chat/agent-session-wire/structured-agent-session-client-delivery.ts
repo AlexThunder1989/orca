@@ -19,6 +19,7 @@ import { heldStructuredAgentSessionCurrentWork } from './structured-agent-sessio
 import { structuredAgentSessionConversationFence } from './structured-agent-session-provider-child'
 import type { StructuredAgentSessionStatusSubscriber } from './structured-agent-session-status-feed'
 import { createStructuredAgentSessionHostStatusFeed } from './structured-agent-session-host-status-feed'
+import type { StructuredAgentSessionChildWorkProducer } from './structured-agent-session-subagent-rows'
 import {
   StructuredAgentSessionTurnCompletionFeed,
   type StructuredAgentSessionTurnCompletionSubscriber
@@ -102,8 +103,11 @@ export class StructuredAgentSessionClientDelivery {
   publishConversationName = (sessionId: string): void =>
     this.statusFeed.publishConversationName(sessionId)
 
-  publishChildWork = (sessionId: string, evidence: AgentChildWorkEvidence[]): void =>
-    this.statusFeed.publishChildWork(sessionId, evidence)
+  publishChildWork = (
+    sessionId: string,
+    evidence: AgentChildWorkEvidence[],
+    producer?: StructuredAgentSessionChildWorkProducer
+  ): void => this.statusFeed.publishChildWork(sessionId, evidence, producer)
 
   /** What the feed publishes as `stopping`: only a working session is still being stopped. */
   readStopping = (sessionId: string): boolean => {

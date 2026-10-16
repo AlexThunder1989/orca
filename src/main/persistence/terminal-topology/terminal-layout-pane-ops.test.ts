@@ -201,4 +201,47 @@ describe('Store.applyLayoutCommand pane operations', () => {
       second: { type: 'leaf', leafId: LEAF_B }
     })
   })
+
+  it('moves a pane as the window drops it: the new split starts even', async () => {
+    const store = await storeWithSplitTab(['local'])
+
+    await store.applyLayoutCommand({
+      type: 'movePane',
+      workspace: WORKTREE,
+      tabId: TAB,
+      leafId: LEAF_B,
+      targetLeafId: LEAF_A,
+      side: 'left'
+    })
+
+    expect(store.getWorkspaceSession().terminalLayoutsByTabId[TAB]?.root).toEqual({
+      type: 'split',
+      direction: 'vertical',
+      first: { type: 'leaf', leafId: LEAF_B },
+      second: { type: 'leaf', leafId: LEAF_A }
+    })
+  })
+
+  it('saves a divider’s new ratios, and refuses a tree whose panes differ', async () => {
+    const store = await storeWithSplitTab(['local'])
+    const split = {
+      type: 'split',
+      direction: 'vertical',
+      first: { type: 'leaf', leafId: LEAF_A },
+      second: { type: 'leaf', leafId: LEAF_B }
+    } as const
+    const ratios = { type: 'setPaneRatios', workspace: WORKTREE, tabId: TAB } as const
+
+    await store.applyLayoutCommand({ ...ratios, root: { ...split, ratio: 0.7 } })
+    expect(store.getWorkspaceSession().terminalLayoutsByTabId[TAB]?.root).toEqual({
+      ...split,
+      ratio: 0.7
+    })
+
+    const reply = await store.applyLayoutCommand({
+      ...ratios,
+      root: { ...split, second: { type: 'leaf', leafId: 'another-leaf' } }
+    })
+    expect(reply).toEqual({ ok: false, code: 'pane_structure_changed' })
+  })
 })

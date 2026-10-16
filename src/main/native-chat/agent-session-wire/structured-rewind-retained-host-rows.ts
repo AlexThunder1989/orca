@@ -89,6 +89,7 @@ export function retainedRowReplacement(row: RetainedRow): AgentJournalProducerLi
   observedAt: number
   turnScope?: AgentJournalTurnScope
   ownerFence: number
+  executionOwner?: number
 } {
   const identity = parseAgentJournalItemKey(row.itemId)
   if (!identity) {
@@ -109,6 +110,7 @@ export function retainedRowReplacement(row: RetainedRow): AgentJournalProducerLi
     // The old fold's provenance, so a rewind never makes a dead generation's work current. A record
     // from before rows carried it states none: 0, which is never current.
     ownerFence: row.ownerFence ?? 0,
+    ...(row.executionOwner === undefined ? {} : { executionOwner: row.executionOwner }),
     ...(agentId === undefined ? {} : { agentId }),
     ...(parentAgentId === undefined ? {} : { parentAgentId }),
     ...(providerParentRef === undefined ? {} : { providerParentRef }),

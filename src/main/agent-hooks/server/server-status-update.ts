@@ -68,10 +68,6 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusA
       })
       return undefined
     }
-    if (payload.hookEventName === 'UserPromptSubmit') {
-      // Why: the prompt boundary is authoritative even when text is unchanged; its next OSC working row must not inherit the prior cron/background turn stamp.
-      this.activeHookTurnCompletedAtByPaneKey.delete(payload.paneKey)
-    }
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Main admits enriched legacy rows; the shared view declares their base event type.
     const previous = this.state.lastStatusByPaneKey.get(payload.paneKey) as
       | EnrichedAgentHookEventPayload
@@ -92,13 +88,39 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusA
     const connectionClearWatermark = terminalOwnedPayload.connectionId
       ? this.connectionTimestampWatermarkById.get(terminalOwnedPayload.connectionId)
       : undefined
-    // Why: renderer ordering rejects older rows; live evidence must sort after reconnect clears and restored rows across clock rollback.
     const restoredStatusWatermark = previous?.restoredUnconfirmed ? previous.receivedAt : undefined
+    // Delivery ordering and identity freshness must use the same clock across rollback.
     const now = Math.max(
       Date.now(),
       (connectionClearWatermark ?? -1) + 1,
       (restoredStatusWatermark ?? -1) + 1
     )
+    const identity = resolveAgentStatusIdentity({
+      existing:
+        previous && this.sameTerminalOwner(previous, terminalOwnedPayload)
+          ? {
+              agentType: previous.payload.agentType,
+              state: previous.payload.state,
+              updatedAt: previous.receivedAt,
+              restoredUnconfirmed: previous.restoredUnconfirmed
+            }
+          : undefined,
+      incoming: terminalOwnedPayload.payload.agentType,
+      now
+    })
+    if (
+      previous &&
+      shouldSuppressInheritedTerminalStatus({
+        inheritedFromActivePane: identity.inheritedFromActivePane
+      })
+    ) {
+      this.commitStatusRowMutation(rowBefore, previous)
+      return previous
+    }
+    if (payload.hookEventName === 'UserPromptSubmit') {
+      // Why: the prompt boundary is authoritative even when text is unchanged; its next OSC working row must not inherit the prior cron/background turn stamp.
+      this.activeHookTurnCompletedAtByPaneKey.delete(payload.paneKey)
+    }
     if (terminalOwnedPayload.connectionId) {
       this.connectionTimestampWatermarkById.set(terminalOwnedPayload.connectionId, now)
     }
@@ -159,41 +181,8 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusA
               : stateReconciledPayload.payload
           }
         : stateReconciledPayload
-    const identity = resolveAgentStatusIdentity({
-      existing: previous
-        ? {
-            agentType: previous.payload.agentType,
-            state: previous.payload.state,
-            updatedAt: previous.receivedAt,
-            restoredUnconfirmed: previous.restoredUnconfirmed
-          }
-        : undefined,
-      incoming: rootContextPreservingPayload.payload.agentType,
-      now
-    })
-    if (
-      previous &&
-      shouldSuppressInheritedTerminalStatus({
-        inheritedFromActivePane: identity.inheritedFromActivePane,
-        incomingState: rootContextPreservingPayload.payload.state
-      })
-    ) {
-      this.commitStatusRowMutation(rowBefore, previous)
-      return previous
-    }
-    const { model: _nestedModel, ...modelFencedPayload } = rootContextPreservingPayload.payload
-    const parentModel = previous?.payload.model
-    const identityResolvedPayload = identity.inheritedFromActivePane
-      ? {
-          ...rootContextPreservingPayload,
-          // Why: a nested CLI's model must stay with the child whose identity was fenced out.
-          payload: {
-            ...modelFencedPayload,
-            agentType: identity.agentType,
-            ...(parentModel ? { model: parentModel } : {})
-          }
-        }
-      : identity.agentType === rootContextPreservingPayload.payload.agentType
+    const identityResolvedPayload =
+      identity.agentType === rootContextPreservingPayload.payload.agentType
         ? rootContextPreservingPayload
         : {
             ...rootContextPreservingPayload,

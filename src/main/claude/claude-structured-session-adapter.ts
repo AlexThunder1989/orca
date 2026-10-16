@@ -155,7 +155,7 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
   ): void {
     const evidence = drainClaudeChildWork(session, message, this.deps.now?.() ?? Date.now())
     if (evidence.length > 0) {
-      this.deps.onChildWorkEvidence?.(sessionId, evidence)
+      this.deps.onChildWorkEvidence?.(sessionId, evidence, session?.events)
     }
   }
 

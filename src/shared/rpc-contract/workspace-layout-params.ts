@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TerminalPaneLayoutNodeSchema } from './session-tabs-schemas-params'
 
 export const LayoutSubscribeParams = z
   .object({
@@ -33,6 +34,21 @@ const RenamePaneCommand = z.object({
   title: z.union([z.string().trim().min(1), z.null()])
 })
 
+const MovePaneCommand = z.object({
+  type: z.literal('movePane'),
+  ...OnPane,
+  targetLeafId: z.string().min(1),
+  side: z.enum(['left', 'right', 'top', 'bottom'])
+})
+
+/** The tab's tree with its new ratios; main refuses one whose panes differ from its own. */
+const SetPaneRatiosCommand = z.object({
+  type: z.literal('setPaneRatios'),
+  workspace: OnPane.workspace,
+  tabId: OnPane.tabId,
+  root: TerminalPaneLayoutNodeSchema
+})
+
 const EqualizePanesCommand = z.object({
   type: z.literal('equalizePanes'),
   workspace: OnPane.workspace,
@@ -48,6 +64,8 @@ export const LayoutApplyParams = z.object({
     SplitPaneCommand,
     ClosePaneCommand,
     RenamePaneCommand,
-    EqualizePanesCommand
+    EqualizePanesCommand,
+    MovePaneCommand,
+    SetPaneRatiosCommand
   ])
 })

@@ -1,3 +1,4 @@
+import type { StructuredAgentSessionChildWorkProducer } from '../native-chat/agent-session-wire/structured-agent-session-subagent-rows'
 import type { StructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import type { AgentSessionAccountKind } from '../../shared/agent-session-availability'
 import type {
@@ -95,7 +96,12 @@ export type CodexStructuredSessionAdapterDeps = {
   /** Where bookkeeping a close or exit does after the child is gone reports a failure. */
   logger?: StructuredAgentSessionLogger
   /** What the session's child work did, delivered after the journal handled the frame. */
-  onChildWorkEvidence?: (sessionId: string, evidence: AgentChildWorkEvidence[]) => void
+  /** `producer`: the reporting child's own sink, which writes what the report changes. */
+  onChildWorkEvidence?: (
+    sessionId: string,
+    evidence: AgentChildWorkEvidence[],
+    producer?: StructuredAgentSessionChildWorkProducer
+  ) => void
   /** A send admitted earlier: its identity once Codex echoes it, or its rejection when the turn
    *  Codex answered it into ended without taking it. */
   onDispatchSettledLate?: (

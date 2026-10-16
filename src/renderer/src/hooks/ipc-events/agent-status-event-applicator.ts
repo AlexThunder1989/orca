@@ -1,3 +1,4 @@
+import { sameAgentStatusTerminalOwner } from '../../../../shared/agent-status-terminal-owner'
 import { isWslHookRelayConnectionId } from '../../../../shared/wsl-hook-relay-contract'
 import type { AgentStatusIpcPayload } from '../../../../shared/agent-status-types'
 import {
@@ -196,22 +197,30 @@ export function createAgentStatusEventApplicator(args: {
       ? { ...statusPayloadWithProvenance, observation: data.observation }
       : statusPayloadWithProvenance
     const identity = resolveAgentStatusIdentity({
-      existing: existingStatus
-        ? {
-            agentType: existingStatus.agentType,
-            state: existingStatus.state,
-            updatedAt: existingStatus.updatedAt,
-            restoredUnconfirmed: existingStatus.restoredUnconfirmed
+      existing:
+        existingStatus &&
+        sameAgentStatusTerminalOwner(
+          {
+            connectionId: existingStatus.connectionId ?? null,
+            worktreeId: existingStatus.worktreeId
+          },
+          {
+            connectionId:
+              (ownershipConnectionId === undefined
+                ? existingStatus.connectionId
+                : ownershipConnectionId) ?? null,
+            worktreeId: data.worktreeId ?? owningWorktreeId ?? existingStatus.worktreeId
           }
-        : undefined,
+        )
+          ? existingStatus
+          : undefined,
       incoming: statusPayload.agentType,
       now: data.receivedAt
     })
     if (
       existingStatus &&
       shouldSuppressInheritedTerminalStatus({
-        inheritedFromActivePane: identity.inheritedFromActivePane,
-        incomingState: statusPayload.state
+        inheritedFromActivePane: identity.inheritedFromActivePane
       })
     ) {
       return 'dropped'

@@ -47,7 +47,6 @@ src/session/MobileNativeChatQuestion.test.tsx
 src/session/MobileNativeChatSessionOptionPickers.test.ts
 src/session/MobileNativeChatSessionOptionRows.test.ts
 src/session/MobileNativeChatTurnStatus.test.ts
-src/session/MobileNativeChatView.test.ts
 src/session/QuickCommandsList.test.ts
 src/session/QuickCommandsSheet.test.ts
 src/session/ai-vault-resume-launch.test.ts

@@ -37,6 +37,7 @@ on:
       - 'config/scripts/space-sharing-copy.mjs'
       - 'config/patches/**'
       - 'native/windows-registry/**'
+      - 'native/windows-security/**'
       - 'native/windows-cli-launcher/**'
       - 'native/windows-agent-hook/**'
       - 'config/scripts/build-windows-cli-launcher.mjs'

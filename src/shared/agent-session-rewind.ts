@@ -58,6 +58,9 @@ export const AgentSessionRewindRecordSchema = z.object({
         // The row's execution provenance, carried into the rebuilt epoch. Absent on records written
         // before rows carried it.
         ownerFence: z.number().int().nonnegative().optional(),
+        // The run executing a reusable child's row, kept apart from `ownerFence`. Absent on records
+        // written before rows carried it.
+        executionOwner: z.number().int().nonnegative().optional(),
         ...AgentJournalProducerLinkageFields
       })
     )

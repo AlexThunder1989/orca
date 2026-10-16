@@ -1,0 +1,85 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import { layoutOwnerPaneGestures } from './terminal-pane-layout-owner-gestures'
+import type { sendPaneCommandToLayoutOwner } from './terminal-pane-layout-owner-commands'
+
+const mocks = vi.hoisted(() => ({
+  root: {
+    type: 'split',
+    direction: 'vertical',
+    ratio: 0.3,
+    first: { type: 'leaf', leafId: 'leaf-1' },
+    second: { type: 'leaf', leafId: 'leaf-2' }
+  },
+  send: vi.fn<typeof sendPaneCommandToLayoutOwner>()
+}))
+
+vi.mock('./terminal-pane-layout-owner-commands', () => ({
+  sendPaneCommandToLayoutOwner: mocks.send
+}))
+vi.mock('@/store', () => ({
+  useAppStore: { getState: () => ({ terminalLayoutsByTabId: { 'tab-1': { root: mocks.root } } }) }
+}))
+
+function gestures(shouldPersistLayout = true) {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the gestures read only getLeafId.
+  const manager = {
+    getLeafId: (paneId: number) => (paneId > 0 ? `leaf-${paneId}` : null)
+  } as unknown as PaneManager
+  return layoutOwnerPaneGestures({
+    worktreeId: 'worktree-1',
+    tabId: 'tab-1',
+    managerRef: { current: manager },
+    shouldPersistLayout: () => shouldPersistLayout
+  })
+}
+
+describe('layoutOwnerPaneGestures', () => {
+  beforeEach(() => {
+    mocks.send.mockReset()
+    mocks.send.mockReturnValue(true)
+  })
+
+  it('takes an in-tab drop and moves the pane once main has', () => {
+    const move = vi.fn()
+
+    const taken = gestures().takePaneDrop?.(
+      { sourcePaneId: 2, targetPaneId: 1, zone: 'left' },
+      move
+    )
+
+    expect(taken).toBe(true)
+    expect(mocks.send).toHaveBeenCalledWith(
+      'worktree-1',
+      { type: 'movePane', tabId: 'tab-1', leafId: 'leaf-2', targetLeafId: 'leaf-1', side: 'left' },
+      { apply: move, asToday: move }
+    )
+    expect(move).not.toHaveBeenCalled()
+  })
+
+  it('leaves the drop to the window when main cannot take it', () => {
+    const drop = { sourcePaneId: 2, targetPaneId: 1, zone: 'left' } as const
+
+    expect(gestures().takePaneDrop?.({ ...drop, sourcePaneId: 0 }, vi.fn())).toBe(false)
+    expect(mocks.send).not.toHaveBeenCalled()
+
+    mocks.send.mockReturnValue(false)
+    expect(gestures().takePaneDrop?.(drop, vi.fn())).toBe(false)
+  })
+
+  it('sends the tab’s new ratios to main when a divider drag ends', () => {
+    gestures().onDividerRatiosCommitted?.()
+
+    expect(mocks.send).toHaveBeenCalledWith(
+      'worktree-1',
+      { type: 'setPaneRatios', tabId: 'tab-1', root: mocks.root },
+      { apply: expect.any(Function), asToday: expect.any(Function) }
+    )
+  })
+
+  it('sends no ratios while a restore owns the layout', () => {
+    gestures(false).onDividerRatiosCommitted?.()
+
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+})

@@ -49,13 +49,22 @@ export function createProcessHostDevRebuildPlugin(root = process.cwd()): Plugin 
   let signalDirectory: string | undefined
   let signalFile: string | undefined
   let signalVersion = 0
+  let packageDirty = true
+  let packageFiles = new Set<string>()
   return {
     name: 'orca-process-host-dev-rebuild',
+    watchChange(id) {
+      const file = resolve(id)
+      if (packageFiles.has(file) || file === signalFile) {
+        packageDirty = true
+      }
+    },
     buildStart() {
       if (!this.meta.watchMode) {
         return
       }
       const inputs = processHostInputs(root)
+      packageFiles = new Set(inputs.files.map((file) => resolve(file)))
       for (const file of inputs.files) {
         this.addWatchFile(file)
       }
@@ -87,6 +96,7 @@ export function createProcessHostDevRebuildPlugin(root = process.cwd()): Plugin 
         const watcher = ts.sys.watchDirectory(
           directory,
           () => {
+            packageDirty = true
             if (signalFile) {
               writeFileSync(signalFile, String(++signalVersion))
             }
@@ -95,6 +105,9 @@ export function createProcessHostDevRebuildPlugin(root = process.cwd()): Plugin 
           { watchDirectory: ts.WatchDirectoryKind.UseFsEvents }
         )
         directoryWatchers.set(directory, { recursive, watcher })
+      }
+      if (!packageDirty) {
+        return
       }
       // The external package must finish emitting before electron-vite restarts the app. The
       // package's own build keeps its compiler and per-file atomic dist sync identical to build:packages.
@@ -113,6 +126,7 @@ export function createProcessHostDevRebuildPlugin(root = process.cwd()): Plugin 
           `[process-host-dev-rebuild] Package compilation failed: ${result.stderr || result.stdout || result.signal || result.code}`
         )
       }
+      packageDirty = false
     },
     closeWatcher() {
       signalFile = undefined

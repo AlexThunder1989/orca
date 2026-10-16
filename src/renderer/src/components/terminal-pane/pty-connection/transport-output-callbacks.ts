@@ -95,9 +95,18 @@ export function bindCaptureTransportOutputCallbacks(session: ConnectPanePtySessi
             session.deps.onPtyRecoveryStateRef?.current?.(session.pane.id, state)
           }
         },
-        onOutputPauseChanged: (paused: boolean, supported: boolean): void => {
+        onOutputPauseChanged: (
+          paused: boolean,
+          supported: boolean,
+          dropsReported?: boolean
+        ): void => {
           if (isCurrent()) {
-            session.handleRemoteOutputPauseChanged(paused, supported)
+            session.handleRemoteOutputPauseChanged(paused, supported, dropsReported === true)
+          }
+        },
+        onPausedOutputDropped: (): void => {
+          if (isCurrent()) {
+            session.handleRemotePausedOutputDropped()
           }
         },
         onSpawnDeferred: (reason: SpawnDeferralReason): void => {

@@ -277,7 +277,7 @@ describe('CI dependency download caches', () => {
     }
   )
 
-  it('opts Windows server consumers out while preserving the main warmer store writer', () => {
+  it('opts Windows preparation out of download stores while retaining native caches', () => {
     const installer = './.github/actions/install-node-dependencies'
     const persistence = workflow('node-server-tests').jobs.persistence.steps.find(
       (step) => step.uses === installer
@@ -292,8 +292,8 @@ describe('CI dependency download caches', () => {
     expect(action.inputs['cache-pnpm-store'].default).toBe('true')
     expect(persistence.with['cache-pnpm-store']).toBe("${{ runner.os != 'Windows' }}")
     expect(ssh.with['cache-pnpm-store']).toBe('false')
-    expect(warmer.with['cache-pnpm-store']).toBeUndefined()
-    expect(warmer.with['cache-pnpm-store-lookup-only']).toBe('true')
+    expect(warmer.with['cache-pnpm-store']).toBe('false')
+    expect(warmer.with['native-runtime']).toBe('node')
     expect(persistence.with['cache-pnpm-store-lookup-only']).toBe('true')
     for (const job of [workflow('ci-cache-warmup').jobs.warm, platformJobs['warm-linux-arm']]) {
       const install = job.steps.find((step) => step.uses?.includes('install-node-dependencies'))
@@ -330,6 +330,7 @@ describe('CI dependency download caches', () => {
           '.github/workflows/ci-cache-warmup-platform-jobs.yml',
           '.github/actions/install-node-dependencies/**',
           '.github/actions/prepare-native-runtime/**',
+          'native/windows-security/**',
           'pnpm-lock.yaml'
         ])
       )

@@ -170,13 +170,14 @@ export async function rewindStructuredAgentSession(
               if (!body) {
                 throw new Error('agent_session_rewind:missing-retained-item')
               }
-              const ownerFence = ctx.journal.itemFence(itemId)
+              const { ownerFence, executionOwner } = ctx.journal.itemProvenance(itemId)
               return {
                 itemId: providerKey(itemId),
                 body: renameRewindTurnOpener(body, providerKey),
                 observedAt,
                 ...(turnScope ? { turnScope } : {}),
                 ...(ownerFence === undefined ? {} : { ownerFence }),
+                ...(executionOwner === undefined ? {} : { executionOwner }),
                 ...agentJournalLinkageFields(linkage)
               }
             })

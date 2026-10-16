@@ -27,6 +27,8 @@ export type OrcadManagedServingInput = {
   connection: OrcadHostTransport
   remotePort: number
   probe: (environment: KnownRuntimeEnvironment, timeoutMs: number) => Promise<boolean>
+  /** When this environment's ready control socket last heard from its server, if it has. */
+  answeredAt?: (environmentId: string) => number | null
 }
 
 /** A wake refused because another update, rollback or recovery holds the host; it clears itself. */
@@ -41,6 +43,9 @@ const PROBE_TIMEOUT_MS = 5_000
 // Why: a connect checks right after its fresh tunnel did; one verdict serves both, on that
 // transport and port only, so a kill, reboot or rebind is never answered from cache.
 const VERDICT_REUSE_MS = 5_000
+// Why: the control socket hears a pong every 10 s while healthy, and a kill, reboot, rebind or
+// stop closes it, so a recent answer on it proves serving without a fresh probe socket.
+const LIVE_ANSWER_PROOF_MS = 20_000
 
 type ServingTransport = { connection: OrcadHostTransport; generation: number; remotePort: number }
 // Why per transport: a check on a dropped connection fails, and a caller on the reconnected one
@@ -84,6 +89,12 @@ export function ensureManagedOrcadServing(
     (entry.settledAt === undefined || now() - entry.settledAt < VERDICT_REUSE_MS)
   ) {
     return entry.check
+  }
+  const answeredAt = input.answeredAt?.(id) ?? null
+  const answerAge = answeredAt === null ? null : now() - answeredAt
+  // Why the lower bound: a wall clock set backwards must not stretch the proof.
+  if (answerAge !== null && answerAge >= 0 && answerAge < LIVE_ANSWER_PROOF_MS) {
+    return Promise.resolve({ state: 'serving' })
   }
   const next: ServingCheck = { ...transport, check: checkAndStart(input) }
   checks.set(id, next)

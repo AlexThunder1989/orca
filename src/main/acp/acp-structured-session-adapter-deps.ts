@@ -1,3 +1,4 @@
+import type { StructuredAgentSessionChildWorkProducer } from '../native-chat/agent-session-wire/structured-agent-session-subagent-rows'
 import type { StructuredAgentSessionLifecycleEvent } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { StructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import type {
@@ -36,7 +37,12 @@ export type AcpStructuredSessionAdapterDeps = {
   readProcessStartTime?: (pid: number) => Promise<number | null>
   /** Every exit, expected or not: the host ends that child's record. */
   onEvent?: (event: StructuredAgentSessionLifecycleEvent) => void
-  onChildWorkEvidence?: (sessionId: string, evidence: AgentChildWorkEvidence[]) => void
+  /** `producer`: the reporting child's own sink, which writes what the report changes. */
+  onChildWorkEvidence?: (
+    sessionId: string,
+    evidence: AgentChildWorkEvidence[],
+    producer?: StructuredAgentSessionChildWorkProducer
+  ) => void
   /** A send this adapter admitted, settled once the agent answered for it. */
   onDispatchSettledLate?: (
     settlement: { sessionId: string; clientMessageId: string } & (

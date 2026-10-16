@@ -30,6 +30,7 @@ import {
   type StructuredAgentSessionJournalProjection
 } from './structured-agent-session-status-journal-projection'
 import { structuredStatusSummariesEqual } from './structured-agent-session-status-summary-equality'
+import type { StructuredAgentSessionChildWorkProducer } from './structured-agent-session-subagent-rows'
 import { StructuredAgentSessionStatusOwnership } from './structured-agent-session-status-ownership'
 
 export type { StructuredAgentSessionStatusSink } from './structured-agent-session-status-ownership'
@@ -284,9 +285,13 @@ export class StructuredAgentSessionStatusFeed {
 
   /** Child-work evidence for a session this feed publishes; a failing sink costs nothing else.
    *  The summary then re-reads the records, which is also what re-folds the parent's row. */
-  publishChildWork(sessionId: string, evidence: AgentChildWorkEvidence[]): void {
+  publishChildWork(
+    sessionId: string,
+    evidence: AgentChildWorkEvidence[],
+    producer?: StructuredAgentSessionChildWorkProducer
+  ): void {
     const session = this.deps.sessions.get(sessionId)
-    if (!session || !this.admitChildWork(sessionId, session, evidence)) {
+    if (!session || !this.admitChildWork(sessionId, session, evidence, producer)) {
       return
     }
     this.publish(sessionId)
@@ -314,7 +319,8 @@ export class StructuredAgentSessionStatusFeed {
   private admitChildWork(
     sessionId: string,
     session: StatusFeedSession,
-    evidence: AgentChildWorkEvidence[]
+    evidence: AgentChildWorkEvidence[],
+    producer?: StructuredAgentSessionChildWorkProducer
   ): boolean {
     try {
       this.ownership.publishChildWork(sessionId, evidence, session.params.provider)
@@ -323,7 +329,7 @@ export class StructuredAgentSessionStatusFeed {
       return false
     }
     try {
-      this.deps.onChildWorkChanged?.(sessionId)
+      this.deps.onChildWorkChanged?.(sessionId, producer)
     } catch (error) {
       this.logFailure('child-work-observer', 'child work observer failed', sessionId, error)
     }

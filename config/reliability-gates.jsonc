@@ -290,10 +290,10 @@
       "oracle": "After acknowledged phone replies with stale host status, the exact card disappears and Send is enabled; unknown, refused or unverifiable-settlement replies retain enabled choices, while an older host's accepted reply dismisses like an acknowledged one; a same-occurrence view toggle retains pending acknowledgment and real replacements discard it. A slow 32 KiB SSH answer completes all chunks before Enter; cancellation preserves issued bytes but omits remaining groups. Paired settlement invokes the actual provider and lost callbacks remain unknown; older hosts deliver ordinary messages, launch and selector groups once and their accepted answers dismiss as before. An answered card stays hidden across a view remount; a collapsed card is a strip that frees the composer and expands back; an identical question in a new wait shows again; a composer send caught by a new card keeps its bubble without submitting or clearing the line under it.",
       "commands": [
         "ORCA_BACKGROUND_LAUNCH=1 pnpm test src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx src/renderer/src/components/native-chat/native-chat-observed-send.test.ts src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-input.test.tsx src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-composer.test.tsx src/renderer/src/components/native-chat/use-native-chat-prompt-card-presentation.test.ts src/renderer/src/runtime/runtime-terminal-verified-input.test.ts src/renderer/src/components/native-chat/NativeChatComposer.test.tsx src/renderer/src/components/native-chat/NativeChatResolvedView.turn-status.test.tsx src/renderer/src/components/native-chat/NativeChatApprovalCard.test.tsx src/renderer/src/components/native-chat/native-chat-interactive-prompt.test.ts src/renderer/src/runtime/runtime-terminal-inspection.test.ts src/renderer/src/lib/agent-paste-draft.test.ts src/renderer/src/lib/agent-paste-draft-submit-retry.test.ts src/renderer/src/lib/agent-followup-delivery.test.ts src/main/ipc/pty/ipc/write-input-acceptance.test.ts src/main/ipc/pty/ipc/write-input-user-input.test.ts src/main/ipc/pty/ipc/write-input-chunk-yield.test.ts src/main/ipc/pty-write-ipc-validation.test.ts src/main/daemon/daemon-pty-write-settlement-recovery.test.ts src/main/runtime/runtime-terminal-writer.test.ts src/main/runtime/rpc/terminal-send.test.ts src/main/runtime/rpc/terminal-send-launch-draft-resolution.test.ts src/main/runtime/terminal-send-stale-leaf-liveness.test.ts src/renderer/src/lib/agent-paste-draft-readiness-budget.test.ts tests/e2e/native-chat-ssh-delivery.unit.test.ts --maxWorkers=2",
-        "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.test.ts mobile/src/session/mobile-prompt-controller.test.ts mobile/src/session/mobile-native-chat-permission-send.test.ts mobile/src/session/use-mobile-native-chat-cancel-ask.test.ts mobile/src/session/use-mobile-native-chat-answer-send.test.ts mobile/src/session/use-mobile-native-chat-message-send.test.ts mobile/src/session/mobile-native-chat-send.test.ts mobile/src/session/MobileNativeChatCardHeaderAction.test.tsx mobile/src/session/MobileNativeChatPromptCard.test.tsx --maxWorkers=2",
+        "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.stop.test.ts mobile/src/session/MobileNativeChatView.failure-banner.test.ts mobile/src/session/MobileNativeChatView.rows.test.ts mobile/src/session/MobileNativeChatView.composer-lock.test.ts mobile/src/session/MobileNativeChatView.tail-follow.test.ts mobile/src/session/MobileNativeChatView.history-paging.test.ts mobile/src/session/mobile-prompt-controller.test.ts mobile/src/session/mobile-native-chat-permission-send.test.ts mobile/src/session/use-mobile-native-chat-cancel-ask.test.ts mobile/src/session/use-mobile-native-chat-answer-send.test.ts mobile/src/session/use-mobile-native-chat-message-send.test.ts mobile/src/session/mobile-native-chat-send.test.ts mobile/src/session/MobileNativeChatCardHeaderAction.test.tsx mobile/src/session/MobileNativeChatPromptCard.test.tsx --maxWorkers=2",
         "ORCA_BACKGROUND_LAUNCH=1 pnpm test tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts --maxWorkers=1",
         "ORCA_BACKGROUND_LAUNCH=1 pnpm test src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx src/renderer/src/components/native-chat/native-chat-observed-send.test.ts src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts src/renderer/src/components/native-chat/NativeChatResolvedView.prompt-card-input.test.tsx src/renderer/src/components/native-chat/NativeChatResolvedView.turn-status.test.tsx src/renderer/src/components/native-chat/NativeChatApprovalCard.test.tsx src/renderer/src/components/native-chat/native-chat-interactive-prompt.test.ts src/renderer/src/runtime/runtime-terminal-inspection.test.ts src/renderer/src/lib/agent-paste-draft.test.ts src/renderer/src/lib/agent-paste-draft-submit-retry.test.ts src/renderer/src/lib/agent-followup-delivery.test.ts src/main/ipc/pty/ipc/write-input-acceptance.test.ts src/main/ipc/pty/ipc/write-input-user-input.test.ts src/main/ipc/pty/ipc/write-input-chunk-yield.test.ts src/main/ipc/pty-write-ipc-validation.test.ts src/main/daemon/daemon-pty-write-settlement-recovery.test.ts --maxWorkers=2",
-        "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.test.ts --maxWorkers=2"
+        "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.stop.test.ts mobile/src/session/MobileNativeChatView.failure-banner.test.ts mobile/src/session/MobileNativeChatView.rows.test.ts mobile/src/session/MobileNativeChatView.composer-lock.test.ts mobile/src/session/MobileNativeChatView.tail-follow.test.ts mobile/src/session/MobileNativeChatView.history-paging.test.ts --maxWorkers=2"
       ],
       "testFiles": [
         "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx",
@@ -327,7 +327,12 @@
         "mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts",
         "mobile/src/session/use-mobile-native-chat-controller.test.ts",
         "mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts",
-        "mobile/src/session/MobileNativeChatView.test.ts",
+        "mobile/src/session/MobileNativeChatView.stop.test.ts",
+        "mobile/src/session/MobileNativeChatView.failure-banner.test.ts",
+        "mobile/src/session/MobileNativeChatView.rows.test.ts",
+        "mobile/src/session/MobileNativeChatView.composer-lock.test.ts",
+        "mobile/src/session/MobileNativeChatView.tail-follow.test.ts",
+        "mobile/src/session/MobileNativeChatView.history-paging.test.ts",
         "mobile/src/session/mobile-prompt-controller.test.ts",
         "mobile/src/session/mobile-native-chat-permission-send.test.ts",
         "mobile/src/session/use-mobile-native-chat-cancel-ask.test.ts",
@@ -429,7 +434,7 @@
           "date": "2026-10-05",
           "runner": "local",
           "platform": "macos",
-          "command": "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.test.ts --maxWorkers=2",
+          "command": "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.stop.test.ts mobile/src/session/MobileNativeChatView.failure-banner.test.ts mobile/src/session/MobileNativeChatView.rows.test.ts mobile/src/session/MobileNativeChatView.composer-lock.test.ts mobile/src/session/MobileNativeChatView.tail-follow.test.ts mobile/src/session/MobileNativeChatView.history-paging.test.ts --maxWorkers=2",
           "result": "passed",
           "durationSeconds": 10.32,
           "summary": "73 tests passed across four explicit files after the controller extraction, covering the production view/card/composer, occurrence dismissal, controller session scoping, unknown/refused replies and stopping active dictation."
@@ -447,7 +452,7 @@
           "date": "2026-10-06",
           "runner": "local",
           "platform": "macos",
-          "command": "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.test.ts mobile/src/session/mobile-prompt-controller.test.ts mobile/src/session/mobile-native-chat-permission-send.test.ts mobile/src/session/use-mobile-native-chat-cancel-ask.test.ts mobile/src/session/use-mobile-native-chat-answer-send.test.ts mobile/src/session/use-mobile-native-chat-message-send.test.ts mobile/src/session/mobile-native-chat-send.test.ts mobile/src/session/MobileNativeChatCardHeaderAction.test.tsx mobile/src/session/MobileNativeChatPromptCard.test.tsx --maxWorkers=2",
+          "command": "ORCA_BACKGROUND_LAUNCH=1 mobile/node_modules/.bin/vitest run --config mobile/vitest.config.ts mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts mobile/src/session/use-mobile-native-chat-controller.test.ts mobile/src/session/use-mobile-native-chat-ask-dismiss.test.ts mobile/src/session/MobileNativeChatView.stop.test.ts mobile/src/session/MobileNativeChatView.failure-banner.test.ts mobile/src/session/MobileNativeChatView.rows.test.ts mobile/src/session/MobileNativeChatView.composer-lock.test.ts mobile/src/session/MobileNativeChatView.tail-follow.test.ts mobile/src/session/MobileNativeChatView.history-paging.test.ts mobile/src/session/mobile-prompt-controller.test.ts mobile/src/session/mobile-native-chat-permission-send.test.ts mobile/src/session/use-mobile-native-chat-cancel-ask.test.ts mobile/src/session/use-mobile-native-chat-answer-send.test.ts mobile/src/session/use-mobile-native-chat-message-send.test.ts mobile/src/session/mobile-native-chat-send.test.ts mobile/src/session/MobileNativeChatCardHeaderAction.test.tsx mobile/src/session/MobileNativeChatPromptCard.test.tsx --maxWorkers=2",
           "result": "passed",
           "durationSeconds": 1.19,
           "summary": "186 tests passed across 12 explicit files after the round-3 review fixes, including older-host answers dismissing like acknowledged ones, collapse that keeps the card mounted, one card per occurrence, wait-start question identity and only Send blocked."
@@ -20952,6 +20957,124 @@
         "Reproduce and fix the native trigger; collect cross-platform and soak evidence."
       ],
       "demotionRule": "Keep experimental until the initial trigger and cross-platform behavior are understood."
+    },
+    {
+      "id": "agent-status.nested-provider-roster",
+      "title": "Nested review CLIs cannot replace the active pane status",
+      "maturity": "experimental",
+      "protection": "partial",
+      "owner": "agent-session",
+      "layer": "cross-boundary",
+      "surfaces": [
+        "agent hook normalization",
+        "sidebar child rows",
+        "mobile status snapshots"
+      ],
+      "platforms": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "providers": [
+        "local",
+        "daemon",
+        "ssh",
+        "wsl",
+        "remote-runtime"
+      ],
+      "coveredPlatforms": [
+        "macos"
+      ],
+      "coveredProviders": [],
+      "coverageNotes": "Contract tests exercise local HTTP hooks, loopback SSH/WSL relay forwarding and legacy relay snapshots. No live SSH, WSL, Linux or Windows execution is claimed. Daemon PTYs use the same hook ingress; folder workspace routing is covered. Hidden macOS Electron validation used the real WorktreeCardAgents component and store in a temporary harness, receiving real hook IPC: 60 nested Codex updates produced zero row mutations, retained 32 children and kept height at 1170px. Screenshots inspected; synthetic hooks, no new model-backed turn.",
+      "motivatingLinks": [
+        "User report (2026-10-15): Claude status in nwparker/SSH alternates between a 32-child roster and an empty roster when nested Codex reviews report on the inherited terminal pane.",
+        "https://github.com/stablyai/orca/pull/8211",
+        "https://github.com/stablyai/orca/pull/3990"
+      ],
+      "invariant": "A different provider inheriting an active pane key cannot replace its child roster, main turn, prompt, resume identity, model or freshness, nor mutate the owning provider caches. Same-provider children still update; finished or stale owners and distinct execution hosts/workspaces permit provider replacement. WSL local and relay transports retain the same owner.",
+      "oracle": "Send a full Claude child roster, interleave Codex review lifecycle/tool/approval/completion hooks, and require identical snapshots plus zero publications. A later Claude child event must retain the original prompt and roster, and a real child completion must shrink it.",
+      "commands": [
+        "ORCA_BACKGROUND_LAUNCH=1 pnpm exec vitest run --config config/vitest.config.ts src/main/agent-hooks/server-nested-agent-roster.test.ts src/main/agent-hooks/server-nested-agent-boundaries.test.ts src/main/agent-hooks/server-nested-agent-consumers.test.ts src/main/agent-hooks/server-nested-agent-model.test.ts src/main/agent-hooks/server-ingest-remote.test.ts src/main/agent-hooks/server-hook-http-ingest.test.ts src/main/agent-hooks/server-turn-started-at.test.ts src/main/agent-hooks/server-status-listener-fanout.test.ts src/main/agent-hooks/terminal-handle-row-identity.test.ts src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts src/renderer/src/store/slices/agent-status-provider-session.test.ts src/renderer/src/store/slices/agent-status-nested-resume.test.ts src/wsl-guest/agent-hook-provider-normalization.test.ts --maxWorkers=2",
+        "ORCA_BACKGROUND_LAUNCH=1 pnpm exec vitest run --config config/vitest.config.ts src/main/agent-hooks/server-nested-agent-roster.test.ts src/main/agent-hooks/server-nested-agent-model.test.ts src/main/agent-hooks/server-ingest-remote.test.ts src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts --maxWorkers=2",
+        "ORCA_BACKGROUND_LAUNCH=1 pnpm exec vitest run --config config/vitest.config.ts src/main/agent-hooks/server-nested-agent-roster.test.ts src/main/agent-hooks/server-nested-agent-model.test.ts src/main/agent-hooks/server-ingest-remote.test.ts src/main/agent-hooks/server-agent-presence.test.ts src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts src/main/agent-hooks/server-hook-http-ingest.test.ts src/wsl-guest/agent-hook-server.test.ts --maxWorkers=2",
+        "ORCA_BACKGROUND_LAUNCH=1 pnpm exec vitest run --config config/vitest.config.ts src/main/agent-hooks/server-nested-agent-roster.test.ts src/main/agent-hooks/server-ingest-remote.test.ts src/main/agent-hooks/server-nested-agent-model.test.ts src/main/agent-hooks/server-hook-http-ingest.test.ts src/main/agent-hooks/server-turn-started-at.test.ts src/main/agent-hooks/server-status-listener-fanout.test.ts src/main/agent-hooks/terminal-handle-row-identity.test.ts src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts --maxWorkers=2"
+      ],
+      "testFiles": [
+        "src/main/agent-hooks/server-status-listener-fanout.test.ts",
+        "src/main/agent-hooks/terminal-handle-row-identity.test.ts",
+        "src/wsl-guest/agent-hook-provider-normalization.test.ts",
+        "src/main/agent-hooks/server-nested-agent-boundaries.test.ts",
+        "src/main/agent-hooks/server-nested-agent-consumers.test.ts",
+        "src/renderer/src/store/slices/agent-status-nested-resume.test.ts",
+        "src/main/agent-hooks/server-nested-agent-roster.test.ts",
+        "src/main/agent-hooks/server-nested-agent-model.test.ts",
+        "src/main/agent-hooks/server-ingest-remote.test.ts",
+        "src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts"
+      ],
+      "assertionRefs": [
+        {
+          "file": "src/main/agent-hooks/server-nested-agent-roster.test.ts",
+          "assertions": [
+            "keeps Claude children, prompt and turn stable through Codex review hooks",
+            "rejects a nested working snapshot from an older relay without renewing the parent"
+          ]
+        }
+      ],
+      "evidenceRuns": [
+        {
+          "date": "2026-10-15",
+          "runner": "local",
+          "platform": "macos",
+          "command": "ORCA_BACKGROUND_LAUNCH=1 pnpm exec vitest run --config config/vitest.config.ts src/main/agent-hooks/server-nested-agent-roster.test.ts src/main/agent-hooks/server-nested-agent-boundaries.test.ts src/main/agent-hooks/server-nested-agent-consumers.test.ts src/main/agent-hooks/server-nested-agent-model.test.ts src/main/agent-hooks/server-ingest-remote.test.ts src/main/agent-hooks/server-hook-http-ingest.test.ts src/main/agent-hooks/server-turn-started-at.test.ts src/main/agent-hooks/server-status-listener-fanout.test.ts src/main/agent-hooks/terminal-handle-row-identity.test.ts src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts src/renderer/src/store/slices/agent-status-provider-session.test.ts src/renderer/src/store/slices/agent-status-nested-resume.test.ts src/wsl-guest/agent-hook-provider-normalization.test.ts --maxWorkers=2",
+          "result": "passed",
+          "durationSeconds": 8.75,
+          "summary": "132 tests across 13 files passed after review and CI boundary fixes, including actual mobile transcript selection, renderer Claude resume argv, host/workspace collision replacement, WSL transport equivalence, legacy unstamped local renderer entries, Pi identity-only boundaries, clock rollback and provider-isolated relay HTTP/spool/reconnect/teardown."
+        },
+        {
+          "date": "2026-10-15",
+          "runner": "local",
+          "platform": "macos",
+          "command": "ORCA_BACKGROUND_LAUNCH=1 pnpm exec vitest run --config config/vitest.config.ts src/main/agent-hooks/server-nested-agent-roster.test.ts src/main/agent-hooks/server-nested-agent-model.test.ts src/main/agent-hooks/server-ingest-remote.test.ts src/main/agent-hooks/server-agent-presence.test.ts src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts src/main/agent-hooks/server-hook-http-ingest.test.ts src/wsl-guest/agent-hook-server.test.ts --maxWorkers=2",
+          "result": "passed",
+          "durationSeconds": 91.45,
+          "summary": "97 tests across seven files passed, including full 32-child local and relay HTTP flows, legacy remote snapshots, model isolation, owner process contracts and renderer ownership. Finished/stale replacement controls added afterward are validated separately."
+        },
+        {
+          "date": "2026-10-15",
+          "runner": "local",
+          "platform": "macos",
+          "command": "ORCA_BACKGROUND_LAUNCH=1 pnpm exec vitest run --config config/vitest.config.ts src/main/agent-hooks/server-nested-agent-roster.test.ts src/main/agent-hooks/server-ingest-remote.test.ts src/main/agent-hooks/server-nested-agent-model.test.ts src/main/agent-hooks/server-hook-http-ingest.test.ts src/main/agent-hooks/server-turn-started-at.test.ts src/main/agent-hooks/server-status-listener-fanout.test.ts src/main/agent-hooks/terminal-handle-row-identity.test.ts src/renderer/src/store/slices/agent-status-tool-assistant-fields.test.ts --maxWorkers=2",
+          "result": "passed",
+          "durationSeconds": 180.43,
+          "summary": "Final implementation passes 64 tests in six files, including local/relay finished-provider replacement, stale-provider replacement, 32-child ownership, legacy remote snapshots, turn clocks and renderer identity."
+        }
+      ],
+      "runtimeBudget": {
+        "p95Seconds": 30,
+        "scope": "Focused local HTTP, relay, legacy snapshot and renderer contracts; excludes package build and machine contention."
+      },
+      "flakeHistory": {
+        "status": "not-started",
+        "evidence": "New gate; no CI soak history."
+      },
+      "redGreenEvidence": {
+        "status": "partial",
+        "evidence": "Live incident records alternate between a Claude 32-child roster and a Codex empty roster. Executing the original HEAD identity function accepts a nested working status; the patched function rejects it. Local and relay HTTP roster tests pass and hidden Electron real-component proof preserves all 32 rendered children through 60 nested hooks. No archived CI red/green run yet."
+      },
+      "performanceBudget": {
+        "required": true,
+        "evidence": "Main reuses the constant-time provider identity decision and publishes no rejected updates. Legacy relays retain provider-specific prompt/tool/previous-status caches, bounded by MAX_CACHED_PANES for each finite provider and cleared on pane teardown or stop; no polling, timers or subprocesses added."
+      },
+      "promotionCriteria": [
+        "Save red/green evidence and CI soak before promotion."
+      ],
+      "knownGaps": [
+        "A nested CLI started before any owner is observed may still establish the initial pane identity.",
+        "Same-provider nested sessions remain governed by the existing process/session ownership rules.",
+        "Live SSH/WSL, Linux, Windows and physical mobile validation are not included."
+      ],
+      "demotionRule": "Keep experimental until CI soak; investigate any roster loss or blocked genuine provider replacement without weakening the snapshot and publication assertions."
     }
   ]
 }

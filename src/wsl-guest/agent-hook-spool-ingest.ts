@@ -9,12 +9,14 @@ import {
   type SpoolRecord
 } from '../shared/agent-hook-spool'
 import { hookBodyEnv, hookBodyVersion } from './agent-hook-envelope-build'
+import type { RelayProviderHookNormalization } from './agent-hook-provider-normalization'
 
 export function ingestRelayHookSpoolRecord(
   record: SpoolRecord,
   state: HookListenerState,
   env: string,
   host: {
+    providerNormalization?: RelayProviderHookNormalization
     apply: (
       event: AgentHookEventPayload,
       source: AgentHookSource,
@@ -29,10 +31,13 @@ export function ingestRelayHookSpoolRecord(
     return
   }
   const body = buildSpoolHookBody(record)
-  const event = normalizeHookPayload(state, record.source, body, env, {
+  const options: Parameters<typeof normalizeHookPayload>[4] = {
     admitOpenCodeTui: (identity) => admitRelayOpenCodeTui(host, identity),
     deferCompactOwnershipToClient: true
-  })
+  }
+  const event = host.providerNormalization
+    ? host.providerNormalization.normalize(state, record.source, body, env, options)
+    : normalizeHookPayload(state, record.source, body, env, options)
   if (event) {
     host.apply(event, record.source, hookBodyEnv(body), hookBodyVersion(body))
   }

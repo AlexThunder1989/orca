@@ -40,6 +40,8 @@ export type VisibleWorktreeOptions = {
   injectLineageAncestors?: boolean
   preserveLineageParentOrder?: boolean
   forcedVisibleWorktreeIds?: readonly string[]
+  /** Exempt from the sleeping sweep only; unlike forcedVisibleWorktreeIds, every other filter still applies. */
+  sleepingSweepExemptWorktreeIds?: ReadonlySet<string>
 }
 
 export function computeVisibleWorktrees(

@@ -74,6 +74,22 @@ function commandsFor(model: WorkspaceLayoutModel): LayoutCommand[] {
           userPaneClose: true
         })
         commands.push({ type: 'equalizePanes', workspace, tabId: tab.id })
+        commands.push({
+          type: 'movePane',
+          workspace,
+          tabId: tab.id,
+          leafId: second,
+          targetLeafId: first!,
+          side: 'left'
+        })
+        if (tab.panes.root?.type === 'split') {
+          commands.push({
+            type: 'setPaneRatios',
+            workspace,
+            tabId: tab.id,
+            root: { ...tab.panes.root, ratio: 0.7 }
+          })
+        }
       }
     }
   }

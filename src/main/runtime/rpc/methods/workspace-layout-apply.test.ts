@@ -106,6 +106,21 @@ describe('layout.apply', () => {
     ).toEqual({ command: { type: 'renamePane', ...pane, title: 'Build' } })
   })
 
+  it('accepts only a drop side and a valid pane tree for gestures', async () => {
+    const apply = (await registeredMethods(true)).find((method) => method.name === 'layout.apply')
+    const pane = { workspace: WORKTREE, tabId: 'tab-1', leafId: 'leaf-1' }
+    const move = { type: 'movePane', ...pane, targetLeafId: 'leaf-2' }
+    const ratios = { type: 'setPaneRatios', workspace: WORKTREE, tabId: 'tab-1' }
+
+    expect(apply?.params?.safeParse({ command: { ...move, side: 'left' } }).success).toBe(true)
+    expect(apply?.params?.safeParse({ command: { ...move, side: 'center' } }).success).toBe(false)
+    expect(
+      apply?.params?.safeParse({
+        command: { ...ratios, root: { type: 'split', direction: 'vertical', ratio: 2 } }
+      }).success
+    ).toBe(false)
+  })
+
   it('applies to the partition that holds the tab, such as an SSH host’s', async () => {
     const { runtime, applyLayoutCommand } = runtimeHolding('ssh:target-1')
 

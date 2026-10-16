@@ -3,13 +3,9 @@ import {
   type RelayInterruptHost
 } from './agent-hook-interrupt-reconciliation'
 import { applyRelayHookEvent } from './agent-hook-event-admission'
+import { RelayProviderHookNormalization } from './agent-hook-provider-normalization'
 import { RelayAgentHookCanonicalStatus } from './agent-hook-canonical-status'
 import type {
-  RelayHookForward,
-  RelayHookServerOptions,
-  RelayHookServerStartOptions
-} from './agent-hook-server-contract'
-export type {
   RelayHookForward,
   RelayHookServerOptions,
   RelayHookServerStartOptions
@@ -27,8 +23,7 @@ import {
 import {
   clearAllListenerCaches,
   clearPaneCacheState,
-  createHookListenerState,
-  type HookListenerState
+  createHookListenerState
 } from '../shared/agent-hook-listener/listener-state'
 import {
   getEndpointFileName,
@@ -59,7 +54,8 @@ export class RelayAgentHookServer extends RelayAgentHookCanonicalStatus {
   private endpointDir: string
   private endpointFilePath: string
   private endpointFileWritten = false
-  private state: HookListenerState = createHookListenerState()
+  private state = createHookListenerState()
+  private readonly providerNormalization = new RelayProviderHookNormalization()
   private transportInterference = createHookTransportInterferenceTracker((report) => {
     process.stderr.write(`${describeHookTransportInterference(report)}\n`)
   })
@@ -188,6 +184,7 @@ export class RelayAgentHookServer extends RelayAgentHookCanonicalStatus {
     this.stopCanonicalHooks()
     this.retryScheduler.clearAll()
     clearAllListenerCaches(this.state)
+    this.providerNormalization.clear()
     this.claudeTerminalInterrupts.clear()
     this.lastEnvelopeMetaByPaneKey.clear()
   }
@@ -258,6 +255,7 @@ export class RelayAgentHookServer extends RelayAgentHookCanonicalStatus {
     this.retryScheduler.clearAssistantMessageRetry(paneKey)
     this.retryScheduler.clearTranscriptPoll(paneKey)
     clearPaneCacheState(this.state, paneKey)
+    this.providerNormalization.clearPane(paneKey)
     this.lastEnvelopeMetaByPaneKey.delete(paneKey)
   }
 
@@ -284,6 +282,7 @@ export class RelayAgentHookServer extends RelayAgentHookCanonicalStatus {
       token: this.token,
       env: this.env,
       state: this.state,
+      providerNormalization: this.providerNormalization,
       isPaneSurfaceRetired: this.isPaneSurfaceRetired,
       getAgentLaunchToken: this.getAgentLaunchToken,
       applyEvent: (event, source, env, version) => this.applyEvent(event, source, env, version),
@@ -322,6 +321,7 @@ export class RelayAgentHookServer extends RelayAgentHookCanonicalStatus {
 
   private ingestSpoolRecord(record: SpoolRecord): void {
     ingestRelayHookSpoolRecord(record, this.state, this.env, {
+      providerNormalization: this.providerNormalization,
       apply: (...args) => this.applyEvent(...args, { isReplay: true }),
       isPaneSurfaceRetired: this.isPaneSurfaceRetired,
       getAgentLaunchToken: this.getAgentLaunchToken

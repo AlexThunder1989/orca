@@ -50,7 +50,8 @@ jobs:
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: node
-          cache-pnpm-store-lookup-only: 'true'
+          # Windows PR consumers download packages directly; retain only the build caches.
+          cache-pnpm-store: 'false'
       - name: Verify native cache is usable
         run: node config/scripts/ensure-native-runtime.mjs --check-only
 

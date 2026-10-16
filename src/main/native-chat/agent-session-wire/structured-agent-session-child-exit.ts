@@ -9,7 +9,6 @@ import {
 } from '../../../shared/agent-session-failure'
 import { PROVIDER_EXIT_ROW_PREFIX } from '../../../shared/agent-session-stop-row-identity'
 import { structuredAgentSessionFailureWordsContext } from './structured-agent-session-send-preparation'
-import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import type { StructuredAgentSessionEndedEvent } from './structured-agent-session-adapter'
 import type {
   StructuredAgentSessionHostSession,
@@ -21,7 +20,12 @@ import {
   type StructuredAgentSessionLeaseStore
 } from './structured-agent-session-lease-release'
 import type { StructuredAgentSessionSinkBarrier } from './structured-agent-session-event-sink'
-import { settleStructuredAgentSessionDeadGeneration } from './structured-agent-session-dead-generation-settlement'
+import {
+  settleStructuredAgentSessionLeftovers,
+  type StructuredAgentSessionExitSettlement,
+  type StructuredAgentSessionLeftoverStore
+} from './structured-agent-session-leftover-settlement'
+import type { StaleStructuredAgentSessionStateJournal } from './structured-agent-session-stale-state-settlement'
 import {
   captureUnfinishedStructuredAgentSessionWork,
   type DeadGenerationJournal,
@@ -47,7 +51,7 @@ export type StructuredAgentSessionChildExit = {
 export type StructuredAgentSessionChildExitSession = Pick<
   StructuredAgentSessionHostSession,
   'child' | 'lastEndedChild'
-> & { journal: DeadGenerationJournal & Pick<AgentSessionJournal, 'cursor' | 'itemBody'> }
+> & { journal: DeadGenerationJournal & StaleStructuredAgentSessionStateJournal }
 
 /** The one edge every way a generation ends goes through
  *  (`StructuredAgentSessionClientDelivery.publishGenerationEnded`). */
@@ -59,7 +63,7 @@ export type StructuredAgentSessionGenerationEnded = (
 export type StructuredAgentSessionChildExitContext<
   TSession extends StructuredAgentSessionChildExitSession = StructuredAgentSessionHostSession
 > = {
-  store: StructuredAgentSessionLeaseStore
+  store: StructuredAgentSessionLeaseStore & StructuredAgentSessionLeftoverStore
   sessions: Map<string, TSession>
   flushLifecycle: (sessionId: string) => Promise<StructuredAgentSessionSinkBarrier>
   publishStatus?: (sessionId: string) => void
@@ -184,6 +188,7 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
     context.wakeDelivery?.(sessionId)
     return
   }
+  let settlement: StructuredAgentSessionExitSettlement | null = null
   try {
     // The exited child's own writes land first: its dead generation is settled from all of them.
     try {
@@ -207,13 +212,11 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
     // Folded before the fallback's end is built, so the end reads it (`turnEndAfterStop`).
     await close?.recorded
     const generation = child.generation ?? 'unknown'
-    // The exit proves this child gone, as the record's death evidence later says: what it left
-    // `unverifiable` is revised now, not at the next open.
+    // The exit proves this child gone, as the record's death evidence says once released: what it
+    // left `unverifiable` is revised now.
     const watched = { ownerFence: child.fence, observedAt }
-    const settled = await settleStructuredAgentSessionDeadGeneration({
-      journal: session.journal,
-      sessionId,
-      fence: child.fence,
+    settlement = {
+      ownerFence: child.fence,
       settlementId: `${expected ? 'expected-close:' : PROVIDER_EXIT_ROW_PREFIX}${sessionId}:${child.fence}:${generation}`,
       pendingSubmissionReason: expected
         ? 'provider_closed_before_acknowledgement'
@@ -238,15 +241,25 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
         : {}),
       exit: watched,
       ...(unrunRejection ? { unrunRejection } : {})
-    })
-    if (!settled.ok) {
-      logExitFailure(context, sessionId, 'exit-settlement', settled.error)
     }
   } finally {
-    // The root's exit was observed, so the owner is released even when terminal settlement could
-    // not be durably accepted. Bare cause: whatever this settlement could not write is settled from
-    // it later (the settle recording it queues, or the next open or acquire).
+    // What the exited child left is settled first, at its own fence, as its own closing tail lands.
+    // The root's exit was observed, so the owner is released even when that settlement could not
+    // be durably accepted: whatever it could not write is settled at the next open or acquire.
     let released = false
+    if (settlement) {
+      const settled = await settleStructuredAgentSessionLeftovers({
+        store: context.store,
+        sessionId,
+        journal: session.journal,
+        exit: settlement,
+        // Ended whether or not the release lands: the host saw the root go.
+        ended: { fence: child.fence, rootGone: true }
+      })
+      if (!settled.ok) {
+        logExitFailure(context, sessionId, 'exit-settlement', settled.error)
+      }
+    }
     try {
       await releaseStoredStructuredAgentSessionOwnerAfterExit({
         store: context.store,

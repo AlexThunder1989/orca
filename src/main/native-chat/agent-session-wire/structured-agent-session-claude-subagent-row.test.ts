@@ -63,8 +63,9 @@ beforeEach(async () => {
       claudeConfigDir: join(root, 'claude-home'),
       providerSessionId: PROVIDER_SESSION_ID,
       resumeLeafUuid: null,
-      resumesTranscript: false,
-      continuesChain: false
+      // A later child resumes the transcript the first one started.
+      resumesTranscript: (store.getRecord(SESSION)?.providerHandleChain.length ?? 0) > 0,
+      continuesChain: (store.getRecord(SESSION)?.providerHandleChain.length ?? 0) > 0
     }),
     onEvent: (event) => {
       const mapped = structuredClaudeLifecycleEvent(event)
@@ -75,8 +76,8 @@ beforeEach(async () => {
     onDispatchSettledLate: (settlement) => void host.settleLateDispatch(settlement),
     persistHandle: async () => undefined,
     logger: log.logger,
-    onChildWorkEvidence: (sessionId, evidence) =>
-      host.publishChildWorkEvidence(sessionId, evidence),
+    onChildWorkEvidence: (sessionId, evidence, producer) =>
+      host.publishChildWorkEvidence(sessionId, evidence, producer),
     openConnection: claude.openConnection,
     readProcessStartTime: async () => 1_700_000_000_000,
     now: () => clock
@@ -297,4 +298,40 @@ it('settles a helper still running when its session closes as unverifiable, clai
     expect(await savedRows()).toEqual([expect.objectContaining({ state: 'unverifiable' })])
   )
   expect((await savedRows())[0]).not.toHaveProperty('outcomeBasis')
+})
+
+it('keeps a helper the next child resumes while it is still starting working, past that start’s settlement', async () => {
+  const first = claude.connections[0]!
+  await sendAndEcho(first, 'Run it in the background.')
+  for (const [index, captured] of RESUMED_BY_MESSAGE.filter(({ at }) => at <= 4_765).entries()) {
+    frame(first, { uuid: `launch-${index}`, ...captured.frame })
+  }
+  await eventually(async () =>
+    expect(await savedRows()).toEqual([expect.objectContaining({ state: 'working' })])
+  )
+  await adapter.closeSession(SESSION)
+  await eventually(async () =>
+    expect(await savedRows()).toEqual([expect.objectContaining({ state: 'unverifiable' })])
+  )
+  // The next child reports the helper running again before its start returns, so before the host
+  // installs it and settles what the first child left.
+  const opened = claude.connections.push.bind(claude.connections)
+  vi.spyOn(claude.connections, 'push').mockImplementation((connection) => {
+    const initialize = connection.initializationResult
+    connection.initializationResult = async () => {
+      const initialized = await initialize()
+      for (const [index, captured] of RESUMED_BY_MESSAGE.filter(
+        ({ at }) => at >= 16_142 && at <= 16_143
+      ).entries()) {
+        frame(connection, { uuid: `resume-${index}`, ...captured.frame })
+      }
+      return initialized
+    }
+    return opened(connection)
+  })
+  const body = hostTestMessage('Carry on.')
+  await host.send(CALLER, { envelope: envelope('agentSession.send', { body }), body })
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(claude.connections).toHaveLength(2)
+  expect(await savedRows()).toEqual([expect.objectContaining({ id: 'agent-1', state: 'working' })])
 })

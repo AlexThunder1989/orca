@@ -21,6 +21,7 @@ import {
   sendRemoteRuntimeSharedControlRequest,
   subscribeRemoteRuntimeSharedControlRequest
 } from './runtime-environment-request-connections'
+import { getRemoteRuntimeSharedControlAnsweredAt } from './runtime-environment-shared-control-answers'
 
 const ENVIRONMENT_ID = 'standing-intent-test'
 
@@ -63,6 +64,25 @@ describe('runtime environment shared-control connection cache', () => {
     ensureRemoteRuntimeSharedControlConnection(ENVIRONMENT_ID, server.pairing)
     reconnectRemoteRuntimeSharedControlConnection(ENVIRONMENT_ID)
     await waitFor(() => server.connectionCount() === 2)
+  })
+
+  it('reports when the ready control socket last heard from its server, never once it drops', async () => {
+    const server = await createSharedControlTestServer()
+    expect(getRemoteRuntimeSharedControlAnsweredAt(ENVIRONMENT_ID)).toBeNull()
+
+    const before = Date.now()
+    await sendRemoteRuntimeSharedControlRequest(
+      ENVIRONMENT_ID,
+      server.pairing,
+      'status.get',
+      undefined,
+      1000
+    )
+    expect(getRemoteRuntimeSharedControlAnsweredAt(ENVIRONMENT_ID)).toBeGreaterThanOrEqual(before)
+
+    server.closeClients()
+    await waitFor(() => getRemoteRuntimeSharedControlDiagnostics(ENVIRONMENT_ID)?.state !== 'ready')
+    expect(getRemoteRuntimeSharedControlAnsweredAt(ENVIRONMENT_ID)).toBeNull()
   })
 
   it('blocks standing creation while manual intent is disconnected', async () => {

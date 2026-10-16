@@ -81,16 +81,17 @@ describe('agent status tool + assistant fields', () => {
     expect(store.getState().agentStatusByPaneKey['tab-1:1'].agentType).toBe('claude')
   })
 
-  it('preserves active pane agentType when a nested hook sends a different known value', () => {
+  it('preserves the active pane row when a nested hook sends a different known value', () => {
     vi.useFakeTimers()
     const store = createTestStore()
     store
       .getState()
       .setAgentStatus('tab-1:1', { state: 'working', prompt: 'p1', agentType: 'codex' })
+    const before = store.getState().agentStatusByPaneKey['tab-1:1']
     store
       .getState()
       .setAgentStatus('tab-1:1', { state: 'working', prompt: 'p2', agentType: 'claude' })
-    expect(store.getState().agentStatusByPaneKey['tab-1:1'].agentType).toBe('codex')
+    expect(store.getState().agentStatusByPaneKey['tab-1:1']).toBe(before)
   })
 
   it('ignores nested done while the parent pane agent is still active', () => {
